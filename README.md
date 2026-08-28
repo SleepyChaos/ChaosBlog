@@ -6,21 +6,23 @@
 
 ## 写新文章
 
-在 `src/content/blog/` 下新建 `.md` 文件,写好 frontmatter 即可:
+文档目录 `documents/` 是唯一的内容源,规范见 [documents/README.md](documents/README.md)。最方便的方式:
 
-```md
----
-title: 文章标题
-description: 一句话摘要(会显示在列表和 RSS 里)
-pubDate: 2026-08-28
-tags: [技术, 随笔]
-draft: false
----
-
-正文从这里开始……
+```bash
+npm run new -- "文章标题"              # 生成草稿,自动带好 frontmatter
+npm run new -- "标题" --tags 技术,随笔  # 顺便指定标签
+npm run content:check                  # 发布前校验规范
 ```
 
-`draft: true` 的文章不会出现在任何页面和 RSS 里。
+把生成文件里的 `draft` 改为 `false`,git push 即自动上线。也可以直接把符合规范的 `.md` 文件放进 `documents/posts/`,前端自动读取,无需手动挂载。
+
+## 内容架构(为模板迁移设计)
+
+- `documents/` — 唯一内容源,固定规范,与博客框架无关(兼容 Hexo/Jekyll 字段习惯)
+- `src/lib/content.ts` — 内容读取器,前端唯一的对接接口
+- `npm run content:export` — 导出框架无关的 `content-manifest.json`,任何模板可直接消费
+
+将来换博客模板时文章零改动,只需在新模板里按同样签名实现读取接口(或直接读 manifest JSON)。
 
 ## 常用命令
 
@@ -30,6 +32,9 @@ draft: false
 | `npm run dev` | 本地开发,http://localhost:4321/ChaosBlog/ |
 | `npm run build` | 构建到 `./dist/` |
 | `npm run preview` | 本地预览构建结果 |
+| `npm run new` | 新建文章/页面(内容写入器) |
+| `npm run content:check` | 校验 documents/ 规范 |
+| `npm run content:export` | 导出 content-manifest.json |
 
 ## 部署
 

@@ -9,7 +9,10 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "new": "node scripts/new-post.mjs",
+    "content:check": "node scripts/check-content.mjs",
+    "content:export": "node scripts/export-content.mjs"
   },
   "dependencies": {
     "@astrojs/rss": "^4.0.19",
@@ -18,5 +21,8 @@
   },
   "allowScripts": {
     "esbuild": true
+  },
+  "devDependencies": {
+    "gray-matter": "^4.0.3"
   }
 }

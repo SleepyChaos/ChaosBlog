@@ -1,7 +1,7 @@
 ---
 title: 这个博客是如何搭建的
 description: 用 Astro + GitHub Pages 从零搭建博客的完整记录:技术选型、目录结构和自动部署。
-pubDate: 2026-08-28
+date: 2026-08-28
 tags: [技术]
 ---
 
@@ -22,12 +22,16 @@ tags: [技术]
 
 ```text
 /
-├── public/              # 静态资源(图标等)
+├── documents/           # 文档目录(唯一的内容源,规范见 documents/README.md)
+│   ├── posts/           # 博客文章,一篇一个 .md 文件
+│   └── pages/           # 独立页面(如 about.md → /about/)
+├── public/              # 静态资源(图标、图片)
+├── scripts/             # 内容写入器/校验器/导出器
 ├── src/
-│   ├── content/blog/    # 文章,一篇一个 .md 文件
+│   ├── lib/content.ts   # 内容读取器:前端唯一的对接接口
 │   ├── components/      # 页头、页脚组件
 │   ├── layouts/         # 基础布局(含暗色模式脚本)
-│   ├── pages/           # 路由:首页、文章页、标签页、关于页
+│   ├── pages/           # 路由:首页、文章页、标签页、通用页面路由
 │   └── styles/          # 全局样式
 └── astro.config.mjs     # 站点配置
 ```
@@ -62,4 +66,4 @@ on:
     branches: [main]
 ```
 
-整个流程是:**写 Markdown → git push → 自动上线**,大概一分钟生效。写作体验和纯粹记笔记几乎一样,这正是我想要的效果。
+整个流程是:**`npm run new` 建稿 → 写 Markdown → git push → 自动上线**,大概一分钟生效。写作体验和纯粹记笔记几乎一样,这正是我想要的效果。内容都放在独立的 `documents/` 目录并遵循固定规范(见 `documents/README.md`),将来换模板时文章不用动,只需要在新模板里实现同样的读取接口。

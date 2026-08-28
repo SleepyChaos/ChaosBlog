@@ -1,0 +1,26 @@
+---
+import { getAllPages, getPageBySlug, renderPage, type PageFull } from '../lib/content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+// documents/pages/ 下的每个 .md 文件自动挂载为根路径页面,如 about.md → /about/
+export async function getStaticPaths() {
+  const pages = await getAllPages();
+  return pages.map((page) => ({ params: { slug: page.slug }, props: { page } }));
+}
+
+const page = Astro.props.page as PageFull;
+const { Content } = await renderPage(page);
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title={page.title} description={page.description}>
+  <article>
+    <a class="back-link" href={`${base}/`}>← 返回首页</a>
+    <header class="post-header">
+      <h1>{page.title}</h1>
+    </header>
+    <div class="prose">
+      <Content />
+    </div>
+  </article>
+</BaseLayout>
