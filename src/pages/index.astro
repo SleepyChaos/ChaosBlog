@@ -1,0 +1,40 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { groupByYear, formatDateShort } from '../utils';
+
+const posts = await getCollection('blog', ({ data }) => !data.draft);
+const byYear = groupByYear(posts);
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout>
+  <section class="hero">
+    <h1>你好,我是 Chaos 👋</h1>
+    <p>欢迎来到我的个人博客。这里记录我在技术世界的探索、踩过的坑,以及日常的所思所想。</p>
+  </section>
+
+  <h2 class="section-title">全部文章<span class="count">{posts.length} 篇</span></h2>
+  {
+    byYear.map(([year, yearPosts]) => (
+      <section>
+        <h3 class="year">{year}</h3>
+        <ul class="post-list">
+          {yearPosts.map((post) => (
+            <li class="post-item">
+              <div class="title-line">
+                <a class="title" href={`${base}/posts/${post.id}/`}>
+                  {post.data.title}
+                </a>
+                <time datetime={post.data.pubDate.toISOString()}>
+                  {formatDateShort(post.data.pubDate)}
+                </time>
+              </div>
+              {post.data.description && <p class="desc">{post.data.description}</p>}
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))
+  }
+</BaseLayout>

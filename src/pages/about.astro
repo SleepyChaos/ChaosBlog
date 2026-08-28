@@ -1,0 +1,25 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { GITHUB_URL } from '../consts';
+---
+
+<BaseLayout title="关于" description="关于 Chaos 和这个博客">
+  <h1 class="section-title">关于</h1>
+  <div class="prose">
+    <p>你好,我是 <strong>Chaos</strong>,欢迎来到我的博客。</p>
+    <p>
+      这里是我的自留地,主要写写:
+    </p>
+    <ul>
+      <li>技术探索——开发中遇到的坑、值得分享的工具与实践</li>
+      <li>学习笔记——读过的书、学到的知识</li>
+      <li>生活随笔——偶尔记录一些日常的思考</li>
+    </ul>
+    <p>
+      这个博客基于 <a href="https://astro.build" target="_blank" rel="noopener">Astro</a>
+      构建,托管在 GitHub Pages 上,文章源文件都在
+      <a href={GITHUB_URL} target="_blank" rel="noopener">GitHub</a> 仓库里。
+    </p>
+    <p>如果想交流,欢迎通过 GitHub 联系我。</p>
+  </div>
+</BaseLayout>

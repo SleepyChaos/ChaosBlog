@@ -1,0 +1,46 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { sortPosts, formatDateShort } from '../../utils';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog', ({ data }) => !data.draft);
+  const byTag = new Map<string, typeof posts>();
+  for (const post of posts) {
+    for (const tag of post.data.tags) {
+      if (!byTag.has(tag)) byTag.set(tag, []);
+      byTag.get(tag)!.push(post);
+    }
+  }
+  return [...byTag.entries()].map(([tag, tagPosts]) => ({
+    params: { tag },
+    props: { tagPosts: sortPosts(tagPosts) },
+  }));
+}
+
+const { tag } = Astro.params;
+const { tagPosts } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title={`标签:${tag}`} description={`标签「${tag}」下的所有文章`}>
+  <h1 class="section-title"># {tag}<span class="count">{tagPosts.length} 篇</span></h1>
+  <ul class="post-list">
+    {
+      tagPosts.map((post) => (
+        <li class="post-item">
+          <div class="title-line">
+            <a class="title" href={`${base}/posts/${post.id}/`}>
+              {post.data.title}
+            </a>
+            <time datetime={post.data.pubDate.toISOString()}>
+              {formatDateShort(post.data.pubDate)}
+            </time>
+          </div>
+          {post.data.description && <p class="desc">{post.data.description}</p>}
+        </li>
+      ))
+    }
+  </ul>
+  <p style="margin-top: 2.5rem"><a href={`${base}/tags/`}>← 查看全部标签</a></p>
+</BaseLayout>

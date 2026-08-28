@@ -1,0 +1,19 @@
+---
+import { SITE_AUTHOR, GITHUB_URL } from '../consts';
+
+const base = import.meta.env.BASE_URL;
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="container inner">
+    <span>© {year} {SITE_AUTHOR}</span>
+    <span>
+      <a href={`${base}/rss.xml`}>RSS</a>
+      ·
+      <a href={GITHUB_URL} target="_blank" rel="noopener">GitHub</a>
+      ·
+      Powered by <a href="https://astro.build" target="_blank" rel="noopener">Astro</a>
+    </span>
+  </div>
+</footer>

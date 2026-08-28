@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sleepychaos.github.io/ChaosBlog/sitemap-index.xml
