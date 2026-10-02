@@ -35,6 +35,15 @@ documents/
 
 > 用 `npm run new` 生成的文件自带完整 frontmatter,不需要手写。
 
+## inbox/:来自其他仓库的自动同步
+
+`inbox/<仓库名>/` 是各私有学习仓库(如 CTF-learning、rust-learning)通过流水线推送来的原始来料,**不是手动编辑区**:
+
+- 源仓库 `public/` 目录的 push 会自动镜像到这里,随后 sync workflow 把它转换为 `posts/` 里的草稿(`draft: true`);
+- frontmatter 约定:`publishable: false` 跳过不同步;`publish: true` 直接发布;默认落草稿,把 `draft` 改为 `false` 才上线;
+- 幂等与删除规则由 `documents/.sync-manifest.json` 追踪,不要手动编辑它;
+- 本目录下的文件不参与博客构建,仅作为来料审计副本保留。
+
 ## 图片
 
 放在 `public/images/` 下,文中用绝对路径引用(带站点 base 前缀):
