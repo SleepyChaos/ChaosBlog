@@ -1,4 +1,8 @@
 {
+  "CTF-learning/pipeline-delete-test.md": {
+    "target": "2026-10-02-pipeline-delete-test.md",
+    "hash": "0f3bd459540d2b2d"
+  },
   "rust-learning/rust-ownership-notes.md": {
     "target": "2026-10-02-rust-ownership-notes.md",
     "hash": "eedde166f16adc37"
