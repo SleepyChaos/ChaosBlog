@@ -6,7 +6,7 @@
  *   - 源仓库 public/ 下的 .md 会被其 workflow 原样推送到本仓库 inbox/<仓库名>/
  *   - frontmatter `publishable: false` → 跳过,不同步;已同步过的草稿一并删除
  *   - frontmatter `publish: true` → 直接发布(draft: false);否则一律落为草稿
- *   - 源文件删除 → 对应草稿删除;已发布(draft: false)的保留并警告,防止误删上线内容
+ *   - 源文件删除 → 对应文章删除(草稿和已发布一视同仁:public/ 是显式上传区,从源删除即撤回发布)
  *
  * 幂等:documents/.sync-manifest.json 记录 源路径 → 目标文件 与内容指纹。
  * 不改动正文内容(%% 注释等 Obsidian 方言只在输出里提醒),格式转换只碰 frontmatter 和文件名。
@@ -102,7 +102,7 @@ function parseTargetDraft(targetFile) {
 export function main() {
   const manifest = loadManifest();
   const nextManifest = {};
-  const stats = { synced: 0, updated: 0, unchanged: 0, published: 0, skipped: 0, deleted: 0, kept: 0 };
+  const stats = { synced: 0, updated: 0, unchanged: 0, published: 0, skipped: 0, deleted: 0 };
   const seenSources = new Set();
 
   for (const { repo, relPath, abs } of scanInbox()) {
@@ -131,16 +131,11 @@ export function main() {
     let slug = sanitizeSlug(parts.concat(stem).join('-'));
     let target = `${date}-${slug}.md`;
 
-    // 目标文件名变化(日期或路径变了):草稿跟着改名,已发布的提醒人工处理
+    // 目标文件名变化(日期或路径变了):删除旧文件,内容随新文件重新落库
     const prev = manifest[sourceKey];
-    if (prev && prev.target && prev.target !== target) {
-      const prevDraft = parseTargetDraft(prev.target);
-      if (prevDraft === true) {
-        fs.unlinkSync(path.join(POSTS_DIR, prev.target));
-        console.log(`  - 目标文件名变化:${prev.target} → ${target}(旧草稿已删除)`);
-      } else {
-        console.log(`  ! 目标文件名变化且旧文件已发布,保留 ${prev.target},请人工处理`);
-      }
+    if (prev && prev.target && prev.target !== target && fs.existsSync(path.join(POSTS_DIR, prev.target))) {
+      fs.unlinkSync(path.join(POSTS_DIR, prev.target));
+      console.log(`  - 目标文件名变化:${prev.target} → ${target}(旧文件已删除)`);
     }
     // slug 撞上其他来源:加仓库前缀
     if (prev?.target !== target && fs.existsSync(path.join(POSTS_DIR, target))) {
@@ -172,7 +167,7 @@ export function main() {
   }
 
   // 删除检查:清单里有、本次扫描没见到的源,即视为源端已撤回。
-  // handleRemoval 只删草稿,已发布的保留并警告,所以这里不需要额外的目录存在性护栏。
+  // handleRemoval 按清单删除对应文章,无需额外的目录存在性护栏。
   for (const [sourceKey, entry] of Object.entries(manifest)) {
     if (seenSources.has(sourceKey)) continue;
     handleRemoval(manifest, nextManifest, sourceKey, stats, '源文件已删除');
@@ -181,24 +176,20 @@ export function main() {
   fs.writeFileSync(MANIFEST_FILE, JSON.stringify(nextManifest, null, 2) + '\n');
 
   console.log(
-    `\n同步完成:新增草稿 ${stats.synced},更新 ${stats.updated},无变化 ${stats.unchanged},直接发布 ${stats.published},跳过 ${stats.skipped},删除草稿 ${stats.deleted},保留已发布 ${stats.kept}`,
+    `\n同步完成:新增草稿 ${stats.synced},更新 ${stats.updated},无变化 ${stats.unchanged},直接发布 ${stats.published},跳过 ${stats.skipped},删除文章 ${stats.deleted}`,
   );
 }
 
-/** 源端不再提供该文件时:删草稿、留已发布并警告 */
+/** 源端不再提供该文件时:删除对应文章(草稿和已发布一视同仁,public/ 的删除即撤回发布) */
 function handleRemoval(manifest, nextManifest, sourceKey, stats, reason) {
   const entry = manifest[sourceKey];
   if (!entry?.target) return;
   const abs = path.join(POSTS_DIR, entry.target);
   if (!fs.existsSync(abs)) return;
-  if (parseTargetDraft(entry.target) === true) {
-    fs.unlinkSync(abs);
-    stats.deleted++;
-    console.log(`  - ${reason},已删除草稿:${entry.target}`);
-  } else {
-    stats.kept++;
-    console.log(`  ! ${reason},但 ${entry.target} 已发布,保留不动`);
-  }
+  const wasPublished = parseTargetDraft(entry.target) === false;
+  fs.unlinkSync(abs);
+  stats.deleted++;
+  console.log(`  - ${reason},已删除${wasPublished ? "已发布文章" : "草稿"}:${entry.target}`);
 }
 
 main();

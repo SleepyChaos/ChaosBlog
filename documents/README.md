@@ -41,7 +41,7 @@ documents/
 
 - 源仓库 `public/` 目录的 push 会自动镜像到这里,随后 sync workflow 把它转换为 `posts/` 里的草稿(`draft: true`);
 - frontmatter 约定:`publishable: false` 跳过不同步;`publish: true` 直接发布;默认落草稿,把 `draft` 改为 `false` 才上线;
-- 幂等与删除规则由 `documents/.sync-manifest.json` 追踪,不要手动编辑它;
+- 幂等与删除由 `documents/.sync-manifest.json` 追踪:源仓库 `public/` 中删除文件会同步删除博客对应文章(**含已发布**),清单文件不要手动编辑;
 - 本目录下的文件不参与博客构建,仅作为来料审计副本保留。
 
 ## 图片
