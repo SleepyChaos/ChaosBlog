@@ -171,11 +171,10 @@ export function main() {
     nextManifest[sourceKey] = { target, hash: crypto.createHash('sha256').update(text).digest('hex').slice(0, 16) };
   }
 
-  // 源仓库目录整体消失(如 inbox 被手动清空)时不做删除,只在其目录仍存在而单文件消失时删除
+  // 删除检查:单仓库目录消失视为该仓库撤回了内容;整个 inbox/ 缺失(全新环境)则不动作
   for (const [sourceKey, entry] of Object.entries(manifest)) {
     if (seenSources.has(sourceKey)) continue;
-    const repo = sourceKey.split('/')[0];
-    if (!fs.existsSync(path.join(INBOX_DIR, repo))) {
+    if (!fs.existsSync(INBOX_DIR)) {
       nextManifest[sourceKey] = entry;
       continue;
     }
