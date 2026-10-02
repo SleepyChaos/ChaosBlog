@@ -376,11 +376,12 @@ main {
 /* Shiki 双主题:暗色模式切换代码高亮 */
 :root[data-theme='dark'] .astro-code,
 :root[data-theme='dark'] .astro-code span {
-  color: var(--shiki-dark, inherit);
-  background-color: var(--shiki-dark-bg);
-  font-style: var(--shiki-dark-font-style);
-  font-weight: var(--shiki-dark-font-weight);
-  text-decoration: var(--shiki-dark-text-decoration);
+  /* 内联的浅色主题样式优先级最高,必须 !important 才能切到暗色 */
+  color: var(--shiki-dark, inherit) !important;
+  background-color: var(--shiki-dark-bg) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+  text-decoration: var(--shiki-dark-text-decoration) !important;
 }
 
 /* ================= 上一篇/下一篇 ================= */
@@ -477,4 +478,18 @@ main {
   .post-nav .next {
     text-align: left;
   }
+}
+
+/* ================= Callout 适配(remark-callouts) ================= */
+/* 双重 :root 提高优先级,覆盖插件样式自带的默认背景,让 callout 跟随本站主题 */
+:root:root {
+  --callout-bg-color: var(--bg-code);
+}
+
+/* .prose blockquote 的普通引用样式(左侧竖条/紫色调/圆角)不应作用于 callout */
+.prose blockquote.callout {
+  color: var(--text);
+  background: var(--callout-bg-color);
+  border-left: none;
+  border-radius: 2px;
 }

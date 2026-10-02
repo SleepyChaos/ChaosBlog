@@ -1,0 +1,59 @@
+name: Sync inbox to posts
+
+on:
+  push:
+    branches: [main]
+    paths: ['inbox/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: sync-inbox
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run inbox sync
+        run: node scripts/sync-inbox.mjs
+
+      - name: Content check
+        run: npm run content:check
+
+      - name: Commit synced drafts
+        id: commit
+        run: |
+          git config user.name "inbox-sync"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A documents
+          if git diff --cached --quiet; then
+            echo "没有需要提交的变更"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "sync: inbox 笔记落库为草稿"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # GITHUB_TOKEN 的 push 不会触发其他 workflow,部署需要显式 dispatch
+      - name: Trigger deploy
+        if: steps.commit.outputs.changed == 'true'
+        run: gh workflow run deploy.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}

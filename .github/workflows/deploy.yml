@@ -3,6 +3,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+    # inbox/ 来料由 sync-inbox 落库后显式触发部署,避免来料推送触发一次空构建
+    paths-ignore:
+      - 'inbox/**'
   workflow_dispatch:
 
 permissions:

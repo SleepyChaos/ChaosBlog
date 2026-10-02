@@ -12,12 +12,18 @@
     "astro": "astro",
     "new": "node scripts/new-post.mjs",
     "content:check": "node scripts/check-content.mjs",
-    "content:export": "node scripts/export-content.mjs"
+    "content:export": "node scripts/export-content.mjs",
+    "sync:inbox": "node scripts/sync-inbox.mjs"
   },
   "dependencies": {
+    "@astrojs/markdown-remark": "^7.2.4",
     "@astrojs/rss": "^4.0.19",
     "@astrojs/sitemap": "^3.7.3",
-    "astro": "^7.2.9"
+    "astro": "^7.2.9",
+    "katex": "^0.18.11",
+    "rehype-katex": "^7.0.1",
+    "remark-callouts": "^2.0.0",
+    "remark-math": "^6.0.0"
   },
   "allowScripts": {
     "esbuild": true
