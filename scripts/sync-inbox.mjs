@@ -171,13 +171,10 @@ export function main() {
     nextManifest[sourceKey] = { target, hash: crypto.createHash('sha256').update(text).digest('hex').slice(0, 16) };
   }
 
-  // 删除检查:单仓库目录消失视为该仓库撤回了内容;整个 inbox/ 缺失(全新环境)则不动作
+  // 删除检查:清单里有、本次扫描没见到的源,即视为源端已撤回。
+  // handleRemoval 只删草稿,已发布的保留并警告,所以这里不需要额外的目录存在性护栏。
   for (const [sourceKey, entry] of Object.entries(manifest)) {
     if (seenSources.has(sourceKey)) continue;
-    if (!fs.existsSync(INBOX_DIR)) {
-      nextManifest[sourceKey] = entry;
-      continue;
-    }
     handleRemoval(manifest, nextManifest, sourceKey, stats, '源文件已删除');
   }
 
