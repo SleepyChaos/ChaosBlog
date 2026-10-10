@@ -37,7 +37,7 @@ documents/
 
 ## inbox/:来自其他仓库的自动同步
 
-`inbox/<仓库名>/` 是各私有学习仓库(如 CTF-learning、rust-learning)通过流水线推送来的原始来料,**不是手动编辑区**:
+`inbox/<仓库名>/` 是笔记仓库(当前:`RecodingMyself`)通过流水线推送来的原始来料,**不是手动编辑区**:
 
 - 源仓库 `public/` 目录的 push 会自动镜像到这里,随后 sync workflow 把它转换为 `posts/` 里的草稿(`draft: true`);
 - frontmatter 约定:`publishable: false` 跳过不同步;`publish: true` 直接发布;默认落草稿,把 `draft` 改为 `false` 才上线;
