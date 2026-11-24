@@ -1,1 +1,18 @@
-{}
+{
+  "RecodingMyself/2026-10-14-Day0-初探Rust.md": {
+    "target": "2026-10-14-Day0-初探Rust.md",
+    "hash": "71815eab2b5e2bd0"
+  },
+  "RecodingMyself/2026-10-14-Day1-所有权与基础语法.md": {
+    "target": "2026-10-14-Day1-所有权与基础语法.md",
+    "hash": "f33b1013cc0cd65b"
+  },
+  "RecodingMyself/2026-11-11-阶段2-结构体与枚举.md": {
+    "target": "2026-11-11-阶段2-结构体与枚举.md",
+    "hash": "36ce532c2e8ac047"
+  },
+  "RecodingMyself/2026-11-11-阶段3-包模块、错误处理与序列化.md": {
+    "target": "2026-11-11-阶段3-包模块错误处理与序列化.md",
+    "hash": "228bf12f9965b27c"
+  }
+}
