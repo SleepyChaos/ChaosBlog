@@ -1,39 +1,205 @@
 ---
-import { getAllPosts, groupPostsByYear, formatDateShort } from '../lib/content';
+import {
+  getAllPosts,
+  getAllTags,
+  groupPostsByYear,
+  formatDateShort,
+  readingTime,
+} from '../lib/content';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import AsciiSisyphus from '../components/AsciiSisyphus.astro';
+import { GITHUB_HANDLE, GITHUB_URL, REPO_URL, SITE_SUB_AUTHOR } from '../consts';
 
 const posts = await getAllPosts();
+const tags = getAllTags(posts);
 const byYear = groupPostsByYear(posts);
-const base = import.meta.env.BASE_URL;
+const latestPost = posts[0] ?? null;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <BaseLayout>
-  <section class="hero">
-    <h1>你好,我是 Chaos 👋</h1>
-    <p>欢迎来到我的个人博客。这里记录我在技术世界的探索、踩过的坑,以及日常的所思所想。</p>
-  </section>
+  <div class="bento-grid">
+    <!-- [01] 西西弗斯实时 ASCII 推石画布 -->
+    <AsciiSisyphus initialSummits={Math.max(1, posts.length)} />
 
-  <h2 class="section-title">全部文章<span class="count">{posts.length} 篇</span></h2>
-  {
-    byYear.map(([year, yearPosts]) => (
-      <section>
-        <h3 class="year">{year}</h3>
-        <ul class="post-list">
-          {yearPosts.map((post) => (
-            <li class="post-item">
-              <div class="title-line">
-                <a class="title" href={`${base}/posts/${post.slug}/`}>
-                  {post.title}
-                </a>
-                <time datetime={post.pubDate.toISOString()}>
-                  {formatDateShort(post.pubDate)}
-                </time>
-              </div>
-              {post.description && <p class="desc">{post.description}</p>}
-            </li>
-          ))}
-        </ul>
-      </section>
-    ))
-  }
+    <!-- [02] 身份与浮动 HUD 物理控制台 -->
+    <section class="bento-card col-5">
+      <div>
+        <div class="bento-head">
+          <span class="bento-head-title">
+            <span class="term-ascii-icon">$@</span>
+            <span>02 // WHOAMI</span>
+          </span>
+          <span class="bento-head-meta">ID::{GITHUB_HANDLE.toUpperCase()}</span>
+        </div>
+
+        <h1 class="identity-title">
+          你好，我是 <span class="handle">{GITHUB_HANDLE}</span> ({SITE_SUB_AUTHOR})
+        </h1>
+        <p class="identity-desc">
+          在代码与字符之间日复一日推石上山。这里记录我的技术探索、踩坑复盘与学习思考。
+        </p>
+
+        <div class="kv-list">
+          <div>
+            <span class="prompt">$</span>github:
+            <a href={GITHUB_URL} target="_blank" rel="noopener">
+              <strong>@{GITHUB_HANDLE}</strong> (SleepyChaos)
+            </a>
+          </div>
+          <div>
+            <span class="prompt">$</span>hud_nav:
+            <strong>拖拽 / 用力甩出弹射 / 贴边磁吸</strong>
+          </div>
+          <div style="display: flex; gap: 0.45rem; padding-top: 0.25rem; flex-wrap: wrap;">
+            <button type="button" class="term-btn is-primary" id="bento-kick-btn">
+              [LAUNCH 弹射导航块]
+            </button>
+            <button type="button" class="term-btn" id="bento-dock-btn">
+              [DOCK 贴顶/释放]
+            </button>
+            <a class="term-btn" href={`${base}/about/`}>[?ABOUT]</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="bento-foot">
+        <span>POSTS: {posts.length}</span>
+        <span>TAGS: {tags.length} · COMMITS: ∞</span>
+      </div>
+    </section>
+
+    <!-- [03] 最新登顶记录（最新文章精选） -->
+    {
+      latestPost && (
+        <section class="bento-card col-7">
+          <div>
+            <div class="bento-head">
+              <span class="bento-head-title">
+                <span class="term-ascii-icon">&gt;!</span>
+                <span>03 // LATEST_SUMMIT · 最新文章</span>
+              </span>
+              <span class="bento-head-meta">{formatDateShort(latestPost.pubDate)}</span>
+            </div>
+
+            <a class="featured-post-box" href={`${base}/posts/${latestPost.slug}/`}>
+              <span class="featured-badge">
+                [NEW_ENTRY · {readingTime(latestPost.body)}]
+              </span>
+              <h3>{latestPost.title}</h3>
+              {latestPost.description && <p>{latestPost.description}</p>}
+            </a>
+          </div>
+
+          <div class="bento-foot">
+            <span>
+              {latestPost.tags.map((t) => `#${t}`).join('  ') || '#untagged'}
+            </span>
+            <a href={`${base}/posts/${latestPost.slug}/`}>[READ_FULL →]</a>
+          </div>
+        </section>
+      )
+    }
+
+    <!-- [04] 标签字符矩阵 -->
+    <section class:list={['bento-card', latestPost ? 'col-5' : 'col-12']}>
+      <div>
+        <div class="bento-head">
+          <span class="bento-head-title">
+            <span class="term-ascii-icon">#*</span>
+            <span>04 // TAG_MATRIX · 标签索引</span>
+          </span>
+          <span class="bento-head-meta">TOTAL {tags.length}</span>
+        </div>
+
+        <div class="tag-matrix">
+          {
+            tags.slice(0, 12).map(([tag, count]) => (
+              <a class="tag-chip" href={`${base}/tags/${encodeURIComponent(tag)}/`}>
+                <span>#{tag}</span>
+                <span class="tag-count">[{count}]</span>
+              </a>
+            ))
+          }
+        </div>
+      </div>
+
+      <div class="bento-foot">
+        <a href={REPO_URL} target="_blank" rel="noopener">[REPO: ChaosBlog]</a>
+        <a href={`${base}/tags/`}>[ALL_TAGS →]</a>
+      </div>
+    </section>
+
+    <!-- [05] 全部文章时间轴日志 -->
+    <section class="bento-card col-12" id="summit-logs">
+      <div>
+        <div class="bento-head">
+          <span class="bento-head-title">
+            <span class="term-ascii-icon">ls</span>
+            <span>05 // SUMMIT_LOGS · 全部文章归档</span>
+          </span>
+          <span class="bento-head-meta">./documents/posts/ ({posts.length})</span>
+        </div>
+
+        {
+          byYear.map(([year, yearPosts]) => (
+            <div>
+              <h2 class="year-divider">[{year}]</h2>
+              <ul class="post-list">
+                {yearPosts.map((post, idx) => {
+                  const branch = idx === yearPosts.length - 1 ? '└─' : '├─';
+                  return (
+                    <li class="post-row">
+                      <div class="post-row-head">
+                        <div class="post-row-title-wrap">
+                          <span class="post-tree-branch">{branch}</span>
+                          <a class="post-row-title" href={`${base}/posts/${post.slug}/`}>
+                            {post.title}
+                          </a>
+                        </div>
+                        <div class="post-row-meta">
+                          <span>{readingTime(post.body)}</span>
+                          <span>·</span>
+                          <time datetime={post.pubDate.toISOString()}>
+                            {formatDateShort(post.pubDate)}
+                          </time>
+                        </div>
+                      </div>
+                      {post.description && <p class="post-row-desc">{post.description}</p>}
+                      {post.tags.length > 0 && (
+                        <div class="post-row-tags">
+                          {post.tags.map((tag) => (
+                            <a
+                              class="mini-tag"
+                              href={`${base}/tags/${encodeURIComponent(tag)}/`}
+                            >
+                              [#{tag}]
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))
+        }
+      </div>
+
+      <div class="bento-foot">
+        <span>SOURCE: documents/posts/*.md</span>
+        <a href={`${base}/rss.xml`}>[SUBSCRIBE_RSS]</a>
+      </div>
+    </section>
+  </div>
 </BaseLayout>
+
+<script>
+  document.getElementById('bento-kick-btn')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('sisyphus:hud-kick'));
+  });
+  document.getElementById('bento-dock-btn')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('sisyphus:hud-toggle-dock'));
+  });
+</script>

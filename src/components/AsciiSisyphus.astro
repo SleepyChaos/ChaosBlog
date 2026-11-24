@@ -1,0 +1,121 @@
+---
+import { CAMUS_QUOTE } from '../consts';
+
+interface Props {
+  initialSummits?: number;
+}
+
+const { initialSummits = 1 } = Astro.props;
+---
+
+<div class="bento-card col-7">
+  <div class="bento-head">
+    <span class="bento-head-title">
+      <span class="term-ascii-icon">/▲</span>
+      <span>01 // SISYPHUS_SLOPE.SH</span>
+    </span>
+    <div style="display: flex; align-items: center; gap: 0.4rem;">
+      <button type="button" class="term-btn is-primary" id="sisyphus-push-btn">
+        [+PUSH 助推]
+      </button>
+    </div>
+  </div>
+
+  <pre
+    class="ascii-slope-pre"
+    id="sisyphus-ascii-stage"
+    aria-label="西西弗斯推石上山实时 ASCII 动画"></pre>
+
+  <div class="bento-foot">
+    <span id="sisyphus-telemetry" data-summits={initialSummits}>
+      ALT: 210m [▪▪▪▫▫▫▫▫] #{initialSummits}
+    </span>
+    <span>"{CAMUS_QUOTE}"</span>
+  </div>
+</div>
+
+<script>
+  const stageEl = document.getElementById('sisyphus-ascii-stage');
+  const telemetryEl = document.getElementById('sisyphus-telemetry');
+  const pushBtn = document.getElementById('sisyphus-push-btn');
+
+  if (stageEl && telemetryEl) {
+    let progress = 0.24;
+    let rollingDown = false;
+    let rollVel = 0;
+    let summits = Number(telemetryEl.dataset.summits || '1');
+
+    pushBtn?.addEventListener('click', () => {
+      if (!rollingDown) {
+        progress = Math.min(0.97, progress + 0.22);
+      }
+    });
+
+    const cols = 42;
+    const rows = 7;
+    const slopeRow = (c: number) => Math.round(6 - (c / (cols - 1)) * 5);
+
+    const draw = (t: number) => {
+      const grid = Array.from({ length: rows }, () => Array(cols).fill(' '));
+
+      for (let c = 0; c < cols; c++) {
+        const sr = slopeRow(c);
+        if (sr >= 0 && sr < rows) grid[sr][c] = '╱';
+        for (let r = sr + 1; r < rows; r++) {
+          grid[r][c] = (r + c) % 3 === 0 ? '▒' : '░';
+        }
+      }
+
+      if (!rollingDown) {
+        progress += 0.0015;
+        if (progress >= 0.96) {
+          rollingDown = true;
+          rollVel = 0.011;
+        }
+      } else {
+        rollVel += 0.0032;
+        progress -= rollVel;
+        if (progress <= 0.1) {
+          progress = 0.1;
+          rollingDown = false;
+          summits += 1;
+        }
+      }
+
+      const bCol = Math.max(3, Math.min(cols - 3, Math.round(progress * (cols - 5)) + 2));
+      const bRow = Math.max(0, slopeRow(bCol) - 1);
+      const boulderFrames = ['■', '▣', '▪', '□'];
+      grid[bRow][bCol] =
+        boulderFrames[Math.floor(t * (rollingDown ? 0.024 : 0.006)) % boulderFrames.length];
+
+      if (rollingDown && bCol + 2 < cols && bRow > 0) {
+        grid[bRow - 1][bCol + 1] = '▪';
+        grid[bRow][bCol + 2] = '·';
+      }
+
+      const sCol = Math.max(1, bCol - 2);
+      const sRow = Math.max(0, slopeRow(sCol) - 1);
+      grid[sRow][sCol] = rollingDown ? 'o' : 'λ';
+      if (!rollingDown && sCol + 1 < bCol) {
+        grid[sRow][sCol + 1] = '/';
+      }
+
+      // 静态像素星尘点缀
+      grid[0][5] = '▪';
+      grid[1][14] = '·';
+      grid[0][25] = '▪';
+      grid[2][8] = '·';
+
+      stageEl.textContent = grid.map((r) => r.join('')).join('\n');
+
+      const alt = Math.round(progress * 884);
+      const filled = Math.round(progress * 10);
+      const bar = '▪'.repeat(filled) + '▫'.repeat(10 - filled);
+      telemetryEl.textContent = `ALT:${String(alt).padStart(3, '0')}m [${bar}] SUMMIT#${summits}`;
+
+      requestAnimationFrame(draw);
+    };
+
+    requestAnimationFrame(draw);
+  }
+</script>

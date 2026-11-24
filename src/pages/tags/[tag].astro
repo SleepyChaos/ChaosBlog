@@ -1,5 +1,12 @@
 ---
-import { getAllPosts, getAllTags, getPostsByTag, formatDateShort, type PostFull } from '../../lib/content';
+import {
+  getAllPosts,
+  getAllTags,
+  getPostsByTag,
+  formatDateShort,
+  readingTime,
+  type PostFull,
+} from '../../lib/content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 export async function getStaticPaths() {
@@ -11,27 +18,52 @@ export async function getStaticPaths() {
 }
 
 const { tag, tagPosts } = Astro.props as { tag: string; tagPosts: PostFull[] };
-const base = import.meta.env.BASE_URL;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<BaseLayout title={`标签:${tag}`} description={`标签「${tag}」下的所有文章`}>
-  <h1 class="section-title"># {tag}<span class="count">{tagPosts.length} 篇</span></h1>
-  <ul class="post-list">
-    {
-      tagPosts.map((post) => (
-        <li class="post-item">
-          <div class="title-line">
-            <a class="title" href={`${base}/posts/${post.slug}/`}>
-              {post.title}
-            </a>
-            <time datetime={post.pubDate.toISOString()}>
-              {formatDateShort(post.pubDate)}
-            </time>
-          </div>
-          {post.description && <p class="desc">{post.description}</p>}
-        </li>
-      ))
-    }
-  </ul>
-  <p style="margin-top: 2.5rem"><a href={`${base}/tags/`}>← 查看全部标签</a></p>
+<BaseLayout title={`标签: ${tag}`} description={`标签「${tag}」下的所有文章`}>
+  <section class="bento-card">
+    <div>
+      <div class="bento-head">
+        <span class="bento-head-title">
+          <span class="term-ascii-icon">#</span>
+          <span>FILTER // #{tag}</span>
+        </span>
+        <span class="bento-head-meta">{tagPosts.length} POSTS</span>
+      </div>
+
+      <ul class="post-list">
+        {
+          tagPosts.map((post, idx) => {
+            const branch = idx === tagPosts.length - 1 ? '└─' : '├─';
+            return (
+              <li class="post-row">
+                <div class="post-row-head">
+                  <div class="post-row-title-wrap">
+                    <span class="post-tree-branch">{branch}</span>
+                    <a class="post-row-title" href={`${base}/posts/${post.slug}/`}>
+                      {post.title}
+                    </a>
+                  </div>
+                  <div class="post-row-meta">
+                    <span>{readingTime(post.body)}</span>
+                    <span>·</span>
+                    <time datetime={post.pubDate.toISOString()}>
+                      {formatDateShort(post.pubDate)}
+                    </time>
+                  </div>
+                </div>
+                {post.description && <p class="post-row-desc">{post.description}</p>}
+              </li>
+            );
+          })
+        }
+      </ul>
+    </div>
+
+    <div class="bento-foot">
+      <a href={`${base}/tags/`}>[← ALL_TAGS]</a>
+      <a href={`${base}/`}>[cd ~/home]</a>
+    </div>
+  </section>
 </BaseLayout>

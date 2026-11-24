@@ -1,13 +1,37 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 
-const base = import.meta.env.BASE_URL;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<BaseLayout title="页面不存在">
-  <div class="not-found">
-    <h1>404</h1>
-    <p style="color: var(--text-muted)">你访问的页面不存在,可能已经被移动或删除了。</p>
-    <p><a href={`${base}/`}>← 回到首页</a></p>
+<BaseLayout title="404 页面不存在">
+  <div class="reader-layout is-single">
+    <section class="bento-card" style="text-align: center; padding: 2.5rem 1.5rem;">
+      <div class="bento-head">
+        <span class="bento-head-title">
+          <span class="term-ascii-icon">!</span>
+          <span>ERR_404 // BOULDER_NOT_FOUND</span>
+        </span>
+        <span class="bento-head-meta">EXIT_CODE: 404</span>
+      </div>
+
+      <pre
+        class="ascii-slope-pre"
+        style="display: inline-block; text-align: left; margin: 1rem auto; padding: 0.75rem 1.2rem;"
+      >{`      ·    ╱▒▒▒
+    λ     ╱▒▒▒▒▒
+   ╱▒▒▒  ╱▒▒▒▒▒▒▒   [■] · · (巨石滚出了已知路径)
+  ╱▒▒▒▒▒╱▒▒▒▒▒▒▒▒▒`}</pre>
+
+      <h1 style="font-family: var(--font-mono); font-size: 2rem; margin: 0.4rem 0;">
+        404 :: PATH_NOT_FOUND
+      </h1>
+      <p style="color: var(--text-muted); margin: 0.4rem 0 1.4rem;">
+        你访问的页面不存在，可能已经被移动或删除了。
+      </p>
+      <div>
+        <a class="term-btn is-primary" href={`${base}/`}>[← cd ~/home 返回山脚首页]</a>
+      </div>
+    </section>
   </div>
 </BaseLayout>

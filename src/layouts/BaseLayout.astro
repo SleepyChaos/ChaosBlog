@@ -4,6 +4,7 @@ import 'remark-callouts/styles.css';
 import 'katex/dist/katex.min.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import FloatingAsciiNav from '../components/FloatingAsciiNav.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
 
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
 
 const { title, description = SITE_DESCRIPTION } = Astro.props;
 const pageTitle = title ? `${title} · ${SITE_TITLE}` : SITE_TITLE;
-const base = import.meta.env.BASE_URL;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const canonical = new URL(Astro.url.pathname, Astro.site);
 ---
 
@@ -32,17 +33,150 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <script is:inline>
-      const theme =
+      const savedTheme =
         localStorage.getItem('theme') ??
         (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      document.documentElement.dataset.theme = theme;
+      document.documentElement.dataset.theme = savedTheme;
     </script>
   </head>
   <body>
+    <!-- 柔和底色 + 重度雾面毛玻璃遮罩 + 像素微尘画布 -->
+    <div class="ambient-bg" aria-hidden="true">
+      <div class="ambient-blob blob-a"></div>
+      <div class="ambient-blob blob-b"></div>
+    </div>
+    <div class="heavy-frost-veil" aria-hidden="true"></div>
+    <canvas id="bg-pixel-canvas" aria-hidden="true"></canvas>
+
+    <!-- 全站纯 ASCII 外框包裹毛玻璃芯的弹射磁吸导航块 -->
+    <FloatingAsciiNav />
+
     <Header />
-    <main class="container">
+    <main class="container-wide page-main">
       <slot />
     </main>
     <Footer />
+
+    <!-- 文章配图灯箱 -->
+    <div class="lightbox-modal" id="lightbox-modal" role="dialog" aria-label="图片放大预览">
+      <span class="lightbox-close-hint">[ESC // CLICK TO CLOSE]</span>
+      <img id="lightbox-img" src="" alt="" />
+    </div>
+
+    <script>
+      // 1. 背景微像素尘埃渲染（对齐 2px 像素网格，零模糊光晕）
+      const bgCanvas = document.getElementById('bg-pixel-canvas') as HTMLCanvasElement | null;
+      if (bgCanvas && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const ctx = bgCanvas.getContext('2d');
+        let mutedColor = '#888fa3';
+
+        const syncPalette = () => {
+          mutedColor =
+            getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() ||
+            '#888fa3';
+        };
+        syncPalette();
+        window.addEventListener('sisyphus:themechange', syncPalette);
+
+        const resize = () => {
+          const dpr = window.devicePixelRatio || 1;
+          bgCanvas.width = window.innerWidth * dpr;
+          bgCanvas.height = window.innerHeight * dpr;
+          if (ctx) {
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.imageSmoothingEnabled = false;
+          }
+        };
+        resize();
+        window.addEventListener('resize', resize);
+
+        const dust = Array.from({ length: 28 }, () => ({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          vx: (Math.random() - 0.5) * 0.22,
+          vy: -0.1 - Math.random() * 0.2,
+          size: Math.random() < 0.78 ? 2 : 3,
+          alpha: 0.12 + Math.random() * 0.18,
+        }));
+
+        const tickDust = () => {
+          if (ctx) {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = mutedColor;
+            for (const p of dust) {
+              p.x += p.vx;
+              p.y += p.vy;
+              if (p.x < 0) p.x = w;
+              if (p.x > w) p.x = 0;
+              if (p.y < 0) p.y = h;
+              ctx.globalAlpha = p.alpha;
+              ctx.fillRect(Math.round(p.x / 2) * 2, Math.round(p.y / 2) * 2, p.size, p.size);
+            }
+            ctx.globalAlpha = 1;
+          }
+          requestAnimationFrame(tickDust);
+        };
+        requestAnimationFrame(tickDust);
+      }
+
+      // 2. 终端代码块顶栏与一键复制增强
+      document.querySelectorAll('.prose pre').forEach((pre) => {
+        if (pre.parentElement?.classList.contains('code-term-frame')) return;
+        const lang =
+          (pre as HTMLElement).dataset.language ||
+          pre.querySelector('code')?.className.match(/language-(\w+)/)?.[1] ||
+          'txt';
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'code-term-frame';
+
+        const head = document.createElement('div');
+        head.className = 'code-term-head';
+
+        const label = document.createElement('span');
+        label.textContent = `┌─ [${lang.toUpperCase()}]`;
+
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'code-copy-btn';
+        copyBtn.textContent = '[COPY]';
+        copyBtn.addEventListener('click', async () => {
+          const raw = pre.querySelector('code')?.textContent ?? pre.textContent ?? '';
+          try {
+            await navigator.clipboard.writeText(raw);
+            copyBtn.textContent = '[COPIED ✓]';
+            setTimeout(() => {
+              copyBtn.textContent = '[COPY]';
+            }, 1600);
+          } catch {
+            copyBtn.textContent = '[ERR]';
+          }
+        });
+
+        head.append(label, copyBtn);
+        pre.parentNode?.insertBefore(wrapper, pre);
+        wrapper.append(head, pre);
+      });
+
+      // 3. 图片点击放大预览（Lightbox）
+      const modal = document.getElementById('lightbox-modal');
+      const modalImg = document.getElementById('lightbox-img') as HTMLImageElement | null;
+      if (modal && modalImg) {
+        document.querySelectorAll('.prose img').forEach((img) => {
+          img.addEventListener('click', () => {
+            modalImg.src = (img as HTMLImageElement).src;
+            modalImg.alt = (img as HTMLImageElement).alt;
+            modal.classList.add('is-open');
+          });
+        });
+        const closeModal = () => modal.classList.remove('is-open');
+        modal.addEventListener('click', closeModal);
+        window.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') closeModal();
+        });
+      }
+    </script>
   </body>
 </html>

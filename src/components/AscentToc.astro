@@ -1,0 +1,115 @@
+---
+interface HeadingItem {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  headings: HeadingItem[];
+}
+
+const { headings } = Astro.props;
+const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+<aside class="ascent-sidebar" aria-label="阅读海拔与文章目录">
+  <div class="ascent-box">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <span style="display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 700;">
+        <span class="term-ascii-icon">/▲</span>
+        <span>ASCENT_METER</span>
+      </span>
+      <span id="ascent-pct" style="color: var(--text-muted);">000%</span>
+    </div>
+
+    <div class="ascent-bar-row">
+      <span id="ascent-bar">[▫▫▫▫▫▫▫▫▫▫]</span>
+      <button type="button" class="term-btn" id="scroll-top-btn" title="回到页面顶部">
+        [↑TOP]
+      </button>
+    </div>
+
+    <div id="ascent-status" style="color: var(--text-muted); font-size: 0.72rem;">
+      STATUS: CLIMBING...
+    </div>
+  </div>
+
+  {
+    tocItems.length > 0 && (
+      <div class="ascent-box">
+        <div style="display: flex; align-items: center; gap: 0.4rem; font-weight: 700; padding-bottom: 0.45rem; border-bottom: 1px solid var(--border);">
+          <span class="term-ascii-icon">≡</span>
+          <span>OUTLINE ({tocItems.length})</span>
+        </div>
+        <ul class="toc-list" id="toc-list">
+          {tocItems.map((h, i) => {
+            const branch = i === tocItems.length - 1 ? '└─ ' : '├─ ';
+            return (
+              <li>
+                <a
+                  href={`#${h.slug}`}
+                  data-slug={h.slug}
+                  class:list={['toc-link', `depth-${h.depth}`]}
+                >
+                  {h.depth === 2 ? branch : '   · '}
+                  {h.text}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    )
+  }
+</aside>
+
+<script>
+  const pctEl = document.getElementById('ascent-pct');
+  const barEl = document.getElementById('ascent-bar');
+  const statusEl = document.getElementById('ascent-status');
+  const topBtn = document.getElementById('scroll-top-btn');
+  const tocLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('#toc-list .toc-link'));
+
+  topBtn?.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  const headingEls = tocLinks
+    .map((link) => {
+      const id = link.dataset.slug;
+      return id ? document.getElementById(id) : null;
+    })
+    .filter((el): el is HTMLElement => Boolean(el));
+
+  const updateAscent = () => {
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const raw = docHeight > 20 ? window.scrollY / docHeight : 1;
+    const clamped = Math.max(0, Math.min(1, raw));
+    const pct = Math.round(clamped * 100);
+    const filled = Math.round(clamped * 10);
+
+    if (pctEl) pctEl.textContent = `${String(pct).padStart(3, '0')}%`;
+    if (barEl) barEl.textContent = `[${'▪'.repeat(filled)}${'▫'.repeat(10 - filled)}]`;
+    if (statusEl) {
+      statusEl.textContent =
+        pct >= 96 ? 'STATUS: ✓ SUMMIT REACHED' : `ALTITUDE: ${Math.round(clamped * 884)}m`;
+    }
+
+    if (headingEls.length > 0) {
+      let currentSlug = headingEls[0].id;
+      for (const h of headingEls) {
+        if (h.getBoundingClientRect().top <= 130) {
+          currentSlug = h.id;
+        }
+      }
+      tocLinks.forEach((link) => {
+        link.classList.toggle('is-current', link.dataset.slug === currentSlug);
+      });
+    }
+  };
+
+  updateAscent();
+  window.addEventListener('scroll', updateAscent, { passive: true });
+  window.addEventListener('resize', updateAscent);
+</script>
