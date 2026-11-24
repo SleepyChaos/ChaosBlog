@@ -648,75 +648,24 @@ main.page-main {
   cursor: grabbing;
 }
 
-/* 缩小一圈的内部雾面毛玻璃芯：严格缩进在外圈 ASCII 框线之内！ */
+/* 缩小一圈的内部雾面毛玻璃芯：严格缩进在外圈动态浮动 ASCII 框线之内！ */
 .ascii-inner-frost {
   position: absolute;
   background: var(--surface-inner);
   -webkit-backdrop-filter: blur(18px) saturate(125%);
   backdrop-filter: blur(18px) saturate(125%);
-  border: 1px solid color-mix(in srgb, var(--border-strong) 75%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 65%, transparent);
   border-radius: 1px;
   box-shadow: var(--shadow-float);
   pointer-events: none;
+  transform-origin: center center;
+  will-change: transform, left, right, top, bottom;
 }
 
-.ascii-frame-top,
-.ascii-frame-bot {
+/* 外圈逐字符动态浮动 ASCII 边界画布（含气动冲刺尾迹、撞墙冲击波与贴边磁吸触角） */
+.ascii-border-canvas {
   position: absolute;
-  left: 0;
-  right: 0;
-  text-align: center;
-  white-space: nowrap;
   pointer-events: none;
-  line-height: 1;
-}
-
-.ascii-frame-top {
-  top: 0;
-  color: var(--accent);
-}
-
-.ascii-frame-bot {
-  bottom: 0;
-  color: var(--text-muted);
-}
-
-.ascii-frame-pipes {
-  position: absolute;
-  top: 12px;
-  bottom: 12px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  color: var(--accent);
-  pointer-events: none;
-  line-height: 1;
-}
-
-.ascii-frame-pipes.is-left {
-  left: 3px;
-}
-
-.ascii-frame-pipes.is-right {
-  right: 3px;
-}
-
-.ascii-bar-cap {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--accent);
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-}
-
-.ascii-bar-cap.is-left {
-  left: 2px;
-}
-
-.ascii-bar-cap.is-right {
-  right: 2px;
 }
 
 .ascii-nav-item {

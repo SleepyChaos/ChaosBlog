@@ -23,30 +23,18 @@ const navItems = [
   id="ascii-float-nav"
   class="ascii-float-nav"
   aria-label="浮动 ASCII 终端导航"
-  style="width: 140px; height: 64px;"
+  style="width: 144px; height: 68px; visibility: hidden;"
 >
-  <!-- 缩小一圈的雾面毛玻璃芯（严格缩进在最外圈 ASCII 框线之内） -->
+  <!-- 内部缩小一圈的雾面毛玻璃芯（随速度拉伸与撞击回弹同步微呼吸） -->
   <div
     id="ascii-inner-frost"
     class="ascii-inner-frost"
-    style="left: 9px; right: 9px; top: 9px; bottom: 9px;"
+    style="left: 11px; right: 11px; top: 11px; bottom: 11px;"
   >
   </div>
 
-  <!-- 外圈纯 ASCII 框线边界 -->
-  <div id="ascii-frame-top" class="ascii-frame-top">┌─[::0G──v0.8]─┐</div>
-  <div id="ascii-frame-bot" class="ascii-frame-bot">└───[000,000]──┘</div>
-
-  <div id="ascii-pipes-left" class="ascii-frame-pipes is-left">
-    <span>│</span><span>│</span><span>│</span>
-  </div>
-  <div id="ascii-pipes-right" class="ascii-frame-pipes is-right">
-    <span>│</span><span>│</span><span>│</span>
-  </div>
-
-  <!-- 横向贴边态外包端头 -->
-  <span id="ascii-cap-left" class="ascii-bar-cap is-left">╠═[::]</span>
-  <span id="ascii-cap-right" class="ascii-bar-cap is-right">═╣</span>
+  <!-- 逐字符动态演算的浮动 ASCII 边界画布（0G 波浪呼吸 + 冲刺气动尾迹 + 撞墙冲击波 + 贴边磁吸触角） -->
+  <canvas id="ascii-border-canvas" class="ascii-border-canvas" aria-hidden="true"></canvas>
 
   {
     navItems.map((item, idx) => (
@@ -63,46 +51,53 @@ const navItems = [
 </nav>
 
 <script>
-  const STORAGE_KEY = 'sisyphus_ascii_hud_v1';
+  const STORAGE_KEY = 'sisyphus_ascii_hud_v3';
+  const BORDER_PAD = 46;
 
   const nav = document.getElementById('ascii-float-nav') as HTMLElement | null;
   const innerFrost = document.getElementById('ascii-inner-frost') as HTMLElement | null;
-  const frameTop = document.getElementById('ascii-frame-top') as HTMLElement | null;
-  const frameBot = document.getElementById('ascii-frame-bot') as HTMLElement | null;
-  const pipesLeft = document.getElementById('ascii-pipes-left') as HTMLElement | null;
-  const pipesRight = document.getElementById('ascii-pipes-right') as HTMLElement | null;
-  const capLeft = document.getElementById('ascii-cap-left') as HTMLElement | null;
-  const capRight = document.getElementById('ascii-cap-right') as HTMLElement | null;
+  const borderCanvas = document.getElementById('ascii-border-canvas') as HTMLCanvasElement | null;
   const ruler = document.getElementById('pixel-dock-ruler') as HTMLElement | null;
   const fxCanvas = document.getElementById('fx-pixel-canvas') as HTMLCanvasElement | null;
-  const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('#ascii-float-nav .ascii-nav-item'));
+  const links = Array.from(
+    document.querySelectorAll<HTMLAnchorElement>('#ascii-float-nav .ascii-nav-item'),
+  );
 
-  if (nav && innerFrost && frameTop && frameBot && pipesLeft && pipesRight && capLeft && capRight && ruler && fxCanvas) {
-    const ctx = fxCanvas.getContext('2d');
+  if (nav && innerFrost && borderCanvas && ruler && fxCanvas) {
+    const fxCtx = fxCanvas.getContext('2d');
+    const bCtx = borderCanvas.getContext('2d');
+
     let accentColor = '#818cf8';
     let mutedColor = '#888fa3';
+    let textColor = '#e5e7f0';
+    let monoFont = '600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
-    const syncColors = () => {
+    const syncThemePalette = () => {
       const cs = getComputedStyle(document.documentElement);
       accentColor = cs.getPropertyValue('--accent').trim() || '#818cf8';
       mutedColor = cs.getPropertyValue('--text-muted').trim() || '#888fa3';
+      textColor = cs.getPropertyValue('--text').trim() || '#e5e7f0';
+      const family = cs.getPropertyValue('--font-mono').trim() || 'monospace';
+      monoFont = `600 11px ${family}`;
     };
-    syncColors();
-    window.addEventListener('sisyphus:themechange', syncColors);
+    syncThemePalette();
+    window.addEventListener('sisyphus:themechange', syncThemePalette);
 
-    const resizeFx = () => {
+    let lastFxW = 0;
+    let lastFxH = 0;
+    const ensureFxCanvas = (vw: number, vh: number) => {
+      if (vw === lastFxW && vh === lastFxH) return;
+      lastFxW = vw;
+      lastFxH = vh;
       const dpr = window.devicePixelRatio || 1;
-      fxCanvas.width = window.innerWidth * dpr;
-      fxCanvas.height = window.innerHeight * dpr;
-      if (ctx) {
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.imageSmoothingEnabled = false;
+      fxCanvas.width = vw * dpr;
+      fxCanvas.height = vh * dpr;
+      if (fxCtx) {
+        fxCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        fxCtx.imageSmoothingEnabled = false;
       }
     };
-    resizeFx();
-    window.addEventListener('resize', resizeFx);
 
-    // 像素迸发粒子池（2px 网格对齐，阶梯消隐，无发光模糊）
     interface BurstPixel {
       x: number;
       y: number;
@@ -115,9 +110,16 @@ const navItems = [
     }
     const bursts: BurstPixel[] = [];
 
-    const spawnBurst = (bx: number, by: number, nx: number, ny: number, count: number, scale: number) => {
+    const spawnBurst = (
+      bx: number,
+      by: number,
+      nx: number,
+      ny: number,
+      count: number,
+      scale: number,
+    ) => {
       for (let i = 0; i < count; i++) {
-        const ang = Math.atan2(ny, nx) + (Math.random() - 0.5) * 1.7;
+        const ang = Math.atan2(ny, nx) + (Math.random() - 0.5) * 1.65;
         const sp = (1.3 + Math.random() * 3.2) * scale;
         bursts.push({
           x: bx,
@@ -126,46 +128,51 @@ const navItems = [
           vy: Math.sin(ang) * sp,
           size: Math.random() < 0.55 ? 3 : 2,
           life: 1,
-          decay: 0.035 + Math.random() * 0.025,
-          accent: Math.random() < 0.75,
+          decay: 0.034 + Math.random() * 0.024,
+          accent: Math.random() < 0.78,
         });
       }
     };
 
-    const spawnDockPixels = (edge: string, cx: number, cy: number, vw: number, vh: number) => {
+    const spawnDockPixels = (
+      edge: 'top' | 'bottom' | 'left' | 'right',
+      cx: number,
+      cy: number,
+      vw: number,
+      vh: number,
+    ) => {
       for (let i = -5; i <= 5; i++) {
         if (edge === 'top' || edge === 'bottom') {
           bursts.push({
             x: cx + i * 20,
             y: edge === 'top' ? 3 : vh - 5,
-            vx: i * 0.3,
-            vy: edge === 'top' ? 0.7 : -0.7,
+            vx: i * 0.32,
+            vy: edge === 'top' ? 0.75 : -0.75,
             size: 3,
             life: 0.95,
-            decay: 0.045,
+            decay: 0.042,
             accent: true,
           });
         } else {
           bursts.push({
             x: edge === 'left' ? 3 : vw - 5,
             y: cy + i * 12,
-            vx: edge === 'left' ? 0.7 : -0.7,
+            vx: edge === 'left' ? 0.75 : -0.75,
             vy: i * 0.28,
             size: 3,
             life: 0.95,
-            decay: 0.045,
+            decay: 0.042,
             accent: true,
           });
         }
       }
     };
 
-    // 三套形态几何与内部毛玻璃缩进（确保外圈 ASCII 边界始终包裹内部毛玻璃芯）
     const SHAPES = {
       block: {
-        w: 140,
-        h: 64,
-        inset: { l: 9, r: 9, t: 9, b: 9 },
+        w: 144,
+        h: 68,
+        inset: { l: 11, r: 11, t: 11, b: 11 },
         coords: [
           [-28, -8],
           [28, -8],
@@ -174,69 +181,77 @@ const navItems = [
         ],
       },
       bar: {
-        w: 266,
-        h: 30,
-        inset: { l: 44, r: 20, t: 4, b: 4 },
+        w: 268,
+        h: 34,
+        inset: { l: 22, r: 22, t: 6, b: 6 },
         coords: [
-          [-64, 0],
-          [-15, 0],
-          [34, 0],
-          [83, 0],
+          [-74, 0],
+          [-25, 0],
+          [25, 0],
+          [74, 0],
         ],
       },
       rail: {
-        w: 78,
-        h: 116,
-        inset: { l: 9, r: 9, t: 9, b: 9 },
+        w: 82,
+        h: 120,
+        inset: { l: 11, r: 11, t: 11, b: 11 },
         coords: [
-          [0, -32],
+          [0, -33],
           [0, -11],
-          [0, 10],
-          [0, 31],
+          [0, 11],
+          [0, 33],
         ],
       },
     } as const;
 
     const CAPTURE_SPEED = 3.8;
-    const MAGNET_ZONE = 58;
+    const MAGNET_ZONE = 54;
     const CRUISE_SPEED = 0.82;
     const RESTITUTION = 0.85;
     const AIR_DRAG = 0.986;
 
-    type HudState = 'free' | 'dragging' | 'top' | 'bottom' | 'left' | 'right';
-    let state: HudState = window.innerWidth < 640 ? 'top' : 'free';
-    let x = window.innerWidth < 640 ? window.innerWidth * 0.5 : window.innerWidth * 0.78;
-    let y = window.innerWidth < 640 ? 18 : 132;
+    type EdgeSide = 'top' | 'bottom' | 'left' | 'right';
+    type HudState = 'free' | 'dragging' | EdgeSide;
+
+    let initialized = false;
+    let ambientOrbit = true;
+    let state: HudState = 'free';
+    let x = 400;
+    let y = 160;
     let vx = -0.82;
     let vy = 0.56;
-    let impactUntil = 0;
     let magnetImmunityUntil = 0;
 
-    // 恢复跨页面持久化坐标与状态
-    try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw);
-        if (saved && typeof saved.xNorm === 'number' && typeof saved.yNorm === 'number') {
-          state = saved.state || state;
-          x = Math.max(40, Math.min(window.innerWidth - 40, saved.xNorm * window.innerWidth));
-          y = Math.max(18, Math.min(window.innerHeight - 18, saved.yNorm * window.innerHeight));
-          vx = typeof saved.vx === 'number' ? saved.vx : vx;
-          vy = typeof saved.vy === 'number' ? saved.vy : vy;
-        }
-      }
-    } catch {
-      // ignore storage errors
-    }
+    let sprintW = 0;
+    let dirUX = -0.8;
+    let dirUY = 0.6;
+    let impactW = 0;
+    let impactNX = 0;
+    let impactNY = 1;
+    let impactStart = 0;
+    let dockRippleW = 0;
+    let dockRippleStart = 0;
+    let smoothPullW = 0;
+    let lastPullEdge: EdgeSide | null = null;
+    let smoothDockW = 0;
+
+    let curW: number = SHAPES.block.w;
+    let curH: number = SHAPES.block.h;
+    let velW = 0;
+    let velH = 0;
+    let curInset = { ...SHAPES.block.inset };
+    const itemSpring = SHAPES.block.coords.map(([ix, iy]) => ({ x: ix, y: iy, vx: 0, vy: 0 }));
 
     const saveState = () => {
+      if (!initialized || window.innerWidth < 160 || window.innerHeight < 140) return;
       try {
         sessionStorage.setItem(
           STORAGE_KEY,
           JSON.stringify({
             state: state === 'dragging' ? 'free' : state,
-            xNorm: x / Math.max(1, window.innerWidth),
-            yNorm: y / Math.max(1, window.innerHeight),
+            ambientOrbit,
+            xNorm: Math.max(0.05, Math.min(0.95, x / window.innerWidth)),
+            yNorm: Math.max(0.03, Math.min(0.97, y / window.innerHeight)),
             vx,
             vy,
           }),
@@ -247,22 +262,43 @@ const navItems = [
     };
     window.addEventListener('pagehide', saveState);
 
-    const initKey =
-      state === 'top' || state === 'bottom'
-        ? 'bar'
-        : state === 'left' || state === 'right'
-          ? 'rail'
-          : 'block';
-    let curW: number = SHAPES[initKey].w;
-    let curH: number = SHAPES[initKey].h;
-    let velW = 0;
-    let velH = 0;
-    let curInset = { ...SHAPES[initKey].inset };
-    let barAlpha = initKey === 'bar' ? 1 : 0;
-    const itemSpring = SHAPES[initKey].coords.map(([ix, iy]) => ({ x: ix, y: iy, vx: 0, vy: 0 }));
+    let lastCanvasW = 0;
+    let lastCanvasH = 0;
+    const syncBorderCanvasSize = (w: number, h: number) => {
+      const cw = Math.ceil(w + BORDER_PAD * 2);
+      const ch = Math.ceil(h + BORDER_PAD * 2);
+      if (cw === lastCanvasW && ch === lastCanvasH) return;
+      lastCanvasW = cw;
+      lastCanvasH = ch;
+      const dpr = window.devicePixelRatio || 1;
+      borderCanvas.width = cw * dpr;
+      borderCanvas.height = ch * dpr;
+      borderCanvas.style.width = `${cw}px`;
+      borderCanvas.style.height = `${ch}px`;
+      borderCanvas.style.left = `${-BORDER_PAD}px`;
+      borderCanvas.style.top = `${-BORDER_PAD}px`;
+      if (bCtx) {
+        bCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+    };
 
-    const nearestWall = (cx: number, cy: number, hw: number, hh: number, vw: number, vh: number) => {
-      const list: { edge: 'top' | 'bottom' | 'left' | 'right'; dist: number }[] = [
+    const wallVector = (edge: EdgeSide | null): [number, number] => {
+      if (edge === 'top') return [0, -1];
+      if (edge === 'bottom') return [0, 1];
+      if (edge === 'left') return [-1, 0];
+      if (edge === 'right') return [1, 0];
+      return [0, 0];
+    };
+
+    const nearestWall = (
+      cx: number,
+      cy: number,
+      hw: number,
+      hh: number,
+      vw: number,
+      vh: number,
+    ) => {
+      const list: { edge: EdgeSide; dist: number }[] = [
         { edge: 'top', dist: cy - hh },
         { edge: 'bottom', dist: vh - (cy + hh) },
         { edge: 'left', dist: cx - hw },
@@ -273,7 +309,7 @@ const navItems = [
     };
 
     const updateRuler = (
-      edge: 'top' | 'bottom' | 'left' | 'right' | null,
+      edge: EdgeSide | null,
       strength: number,
       cx: number,
       cy: number,
@@ -304,28 +340,42 @@ const navItems = [
       }
     };
 
-    const lockDock = (edge: 'top' | 'bottom' | 'left' | 'right', vw: number, vh: number) => {
+    const triggerImpact = (nx: number, ny: number, speed: number, now: number) => {
+      impactNX = nx;
+      impactNY = ny;
+      impactW = Math.min(1, Math.max(0.5, speed / 13));
+      impactStart = now;
+    };
+
+    const lockDock = (edge: EdgeSide, vw: number, vh: number, now: number) => {
       if (state === edge) return;
       state = edge;
+      ambientOrbit = false;
       vx = 0;
       vy = 0;
       if (edge === 'top' || edge === 'bottom') {
-        velW += 7;
-        velH -= 3;
+        velW += 7.5;
+        velH -= 3.5;
+        x = Math.max(SHAPES.bar.w * 0.5 + 8, Math.min(vw - SHAPES.bar.w * 0.5 - 8, x));
       } else {
-        velW -= 3;
-        velH += 7;
+        velW -= 3.5;
+        velH += 7.5;
+        y = Math.max(SHAPES.rail.h * 0.5 + 8, Math.min(vh - SHAPES.rail.h * 0.5 - 8, y));
       }
+      dockRippleW = 1;
+      dockRippleStart = now;
+      lastPullEdge = edge;
       spawnDockPixels(edge, x, y, vw, vh);
       saveState();
       window.dispatchEvent(new CustomEvent('sisyphus:hud-state', { detail: { state: edge } }));
     };
 
-    // 外部事件联动（顶栏与首页控制台可触发高速弹射或吸顶/释放）
     window.addEventListener('sisyphus:hud-kick', () => {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
+      if (vw < 160) return;
       state = 'free';
+      ambientOrbit = false;
       if (x < 80 || x > vw - 80) x = vw * 0.5;
       if (y < 60 || y > vh - 60) y = vh * 0.45;
       const ang = (Math.random() * 0.5 + 0.22) * Math.PI * (Math.random() < 0.5 ? 1 : -1);
@@ -338,22 +388,24 @@ const navItems = [
     window.addEventListener('sisyphus:hud-toggle-dock', () => {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
+      if (vw < 160) return;
+      const now = performance.now();
       if (state === 'free') {
         x = vw * 0.5;
-        lockDock('top', vw, vh);
+        lockDock('top', vw, vh, now);
       } else {
         state = 'free';
-        const dx = vw * 0.65 - x;
-        const dy = Math.min(220, vh * 0.35) - y;
+        ambientOrbit = true;
+        const dx = vw * 0.72 - x;
+        const dy = Math.min(240, vh * 0.36) - y;
         const d = Math.max(1, Math.hypot(dx, dy));
         vx = (dx / d) * 4.4;
         vy = (dy / d) * 4.4;
-        magnetImmunityUntil = performance.now() + 700;
+        magnetImmunityUntil = now + 750;
         saveState();
       }
     });
 
-    // 拖拽与甩手动量采样
     let pointerId: number | null = null;
     let startPX = 0;
     let startPY = 0;
@@ -374,6 +426,7 @@ const navItems = [
       if (!moved && Math.hypot(e.clientX - startPX, e.clientY - startPY) > 4) {
         moved = true;
         state = 'dragging';
+        ambientOrbit = false;
         nav.setPointerCapture(e.pointerId);
       }
       if (!moved) return;
@@ -391,11 +444,11 @@ const navItems = [
       const vh = window.innerHeight;
       const hw = curW * 0.5;
       const hh = curH * 0.5;
-      x = Math.max(hw + 2, Math.min(vw - hw - 2, e.clientX - grabOffsetX));
-      y = Math.max(hh + 2, Math.min(vh - hh - 2, e.clientY - grabOffsetY));
+      x = Math.max(hw + 4, Math.min(vw - hw - 4, e.clientX - grabOffsetX));
+      y = Math.max(hh + 4, Math.min(vh - hh - 4, e.clientY - grabOffsetY));
 
       const nw = nearestWall(x, y, hw, hh, vw, vh);
-      const preSnap = nw.dist < MAGNET_ZONE * 0.72 && dragSpeed <= CAPTURE_SPEED;
+      const preSnap = nw.dist < MAGNET_ZONE * 0.75 && dragSpeed <= CAPTURE_SPEED;
       updateRuler(preSnap ? nw.edge : null, preSnap ? 1 - nw.dist / MAGNET_ZONE : 0, x, y, vw, vh);
     });
 
@@ -437,13 +490,16 @@ const navItems = [
       const nw = nearestWall(x, y, hw, hh, vw, vh);
 
       if (nw.dist < MAGNET_ZONE * 0.75 && speed <= CAPTURE_SPEED) {
-        lockDock(nw.edge, vw, vh);
+        lockDock(nw.edge, vw, vh, now);
       } else {
         state = 'free';
-        if (speed < 0.35) {
+        if (speed < 0.5) {
+          ambientOrbit = nw.dist >= MAGNET_ZONE;
           const ang = Math.random() * Math.PI * 2;
           vx = Math.cos(ang) * CRUISE_SPEED;
           vy = Math.sin(ang) * CRUISE_SPEED;
+        } else {
+          ambientOrbit = false;
         }
         saveState();
       }
@@ -473,32 +529,388 @@ const navItems = [
       }
     };
 
-    const makeBorderLine = (
-      prefix: string,
-      label: string,
-      suffix: string,
-      totalChars: number,
-      fill: string,
-    ) => {
-      const inner = Math.max(0, totalChars - prefix.length - suffix.length);
-      if (label.length >= inner) return prefix + label.slice(0, inner) + suffix;
-      const rem = inner - label.length;
-      const l = Math.floor(rem / 2);
-      const r = rem - l;
-      return prefix + fill.repeat(l) + label + fill.repeat(r) + suffix;
-    };
+    interface PerimNode {
+      bx: number;
+      by: number;
+      nx: number;
+      ny: number;
+      tx: number;
+      ty: number;
+      glyph: string;
+      phase: number;
+      isCorner: boolean;
+      isLabel: boolean;
+    }
 
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const drawDynamicAsciiBorder = (
+      t: number,
+      w: number,
+      h: number,
+      speed: number,
+      dockEdge: EdgeSide | null,
+      pullEdge: EdgeSide | null,
+    ) => {
+      if (!bCtx) return;
+      syncBorderCanvasSize(w, h);
+      const cw = lastCanvasW;
+      const ch = lastCanvasH;
+      const ox = cw * 0.5;
+      const oy = ch * 0.5;
+
+      bCtx.clearRect(0, 0, cw, ch);
+      bCtx.font = monoFont;
+      bCtx.textAlign = 'center';
+      bCtx.textBaseline = 'middle';
+
+      const rx = w * 0.5 - 5;
+      const ry = h * 0.5 - 5;
+      const cols = Math.max(6, Math.round((rx * 2) / 7.0));
+      const rows = Math.max(2, Math.round((ry * 2) / 11.5));
+
+      const topLabel =
+        impactW > 0.38
+          ? '!RICOCHET!'
+          : sprintW > 0.35
+            ? `>>v${speed.toFixed(1)}<<`
+            : smoothPullW > 0.3
+              ? `::SNAP`
+              : dockEdge
+                ? `::`
+                : `::0G`;
+      const botLabel = dockEdge ? '' : `${Math.round(x)},${Math.round(y)}`;
+
+      const topStartIdx = Math.floor((cols - 1 - topLabel.length) * 0.5) + 1;
+      const botStartIdx = Math.floor((cols - 1 - botLabel.length) * 0.5) + 1;
+
+      const nodes: PerimNode[] = [];
+      let pIdx = 0;
+
+      const corners: [number, number, number, number, string, string][] = [
+        [-rx, -ry, -0.707, -0.707, '┌', '╔'],
+        [rx, -ry, 0.707, -0.707, '┐', '╗'],
+        [rx, ry, 0.707, 0.707, '┘', '╝'],
+        [-rx, ry, -0.707, 0.707, '└', '╚'],
+      ];
+      for (const [cx, cy, nx, ny, singleG, doubleG] of corners) {
+        const useDouble = impactW > 0.28 || sprintW > 0.45 || smoothDockW > 0.5;
+        nodes.push({
+          bx: cx,
+          by: cy,
+          nx,
+          ny,
+          tx: -ny,
+          ty: nx,
+          glyph: useDouble ? doubleG : singleG,
+          phase: pIdx++ * 0.9,
+          isCorner: true,
+          isLabel: false,
+        });
+      }
+
+      for (let i = 1; i < cols; i++) {
+        const u = i / cols;
+        const px = -rx + u * (rx * 2);
+
+        const tCharIdx = i - topStartIdx;
+        const hasTopChar = tCharIdx >= 0 && tCharIdx < topLabel.length;
+        const waveTopGlyph =
+          Math.sin(t * 0.004 + i * 0.7) > 0.72 && smoothDockW < 0.4 ? '═' : '─';
+        nodes.push({
+          bx: px,
+          by: -ry,
+          nx: 0,
+          ny: -1,
+          tx: 1,
+          ty: 0,
+          glyph: hasTopChar ? topLabel[tCharIdx] : waveTopGlyph,
+          phase: i * 0.55,
+          isCorner: false,
+          isLabel: hasTopChar,
+        });
+
+        const bCharIdx = i - botStartIdx;
+        const hasBotChar = botLabel.length > 0 && bCharIdx >= 0 && bCharIdx < botLabel.length;
+        const waveBotGlyph =
+          Math.sin(t * 0.004 - i * 0.7) > 0.72 && smoothDockW < 0.4 ? '═' : '─';
+        nodes.push({
+          bx: px,
+          by: ry,
+          nx: 0,
+          ny: 1,
+          tx: 1,
+          ty: 0,
+          glyph: hasBotChar ? botLabel[bCharIdx] : waveBotGlyph,
+          phase: (cols - i) * 0.55 + 2.1,
+          isCorner: false,
+          isLabel: hasBotChar,
+        });
+      }
+
+      for (let j = 1; j < rows; j++) {
+        const v = j / rows;
+        const py = -ry + v * (ry * 2);
+        const isMid = Math.abs(v - 0.5) < 0.25;
+        const barMode = smoothDockW > 0.5 && (dockEdge === 'top' || dockEdge === 'bottom');
+        const leftG = barMode && isMid ? '╠' : sprintW > 0.5 || impactW > 0.3 ? '║' : '│';
+        const rightG = barMode && isMid ? '╣' : sprintW > 0.5 || impactW > 0.3 ? '║' : '│';
+
+        nodes.push({
+          bx: -rx,
+          by: py,
+          nx: -1,
+          ny: 0,
+          tx: 0,
+          ty: 1,
+          glyph: leftG,
+          phase: j * 0.75 + 4.0,
+          isCorner: false,
+          isLabel: false,
+        });
+        nodes.push({
+          bx: rx,
+          by: py,
+          nx: 1,
+          ny: 0,
+          tx: 0,
+          ty: 1,
+          glyph: rightG,
+          phase: j * 0.75 + 5.6,
+          isCorner: false,
+          isLabel: false,
+        });
+      }
+
+      const [dockWX, dockWY] = wallVector(dockEdge);
+      const [pullWX, pullWY] = wallVector(pullEdge);
+      const impactAge = t - impactStart;
+      const shockFront = 1 - (impactAge / 240) * 2.2;
+      const dockRippleAge = t - dockRippleStart;
+
+      const satAlpha = (1 - smoothDockW) * (1 - sprintW * 0.7) * 0.45;
+      if (satAlpha > 0.04) {
+        bCtx.fillStyle = mutedColor;
+        bCtx.globalAlpha = satAlpha;
+        for (let s = 0; s < 4; s++) {
+          const ang = t * 0.0011 * (s % 2 === 0 ? 1 : -1) + s * 1.57;
+          const sx = ox + Math.cos(ang) * (rx + 7 + Math.sin(t * 0.003 + s) * 2.5);
+          const sy = oy + Math.sin(ang) * (ry + 6 + Math.cos(t * 0.0026 + s) * 2.5);
+          bCtx.fillText(s % 2 === 0 ? '·' : ':', Math.round(sx), Math.round(sy));
+        }
+      }
+
+      for (let k = 0; k < nodes.length; k++) {
+        const nd = nodes[k];
+        let dx = 0;
+        let dy = 0;
+        let glyph = nd.glyph;
+        let useAccent = nd.isCorner || nd.isLabel || nd.ny < -0.5 || Math.abs(nd.nx) > 0.5;
+
+        const kissAlign = dockEdge ? nd.nx * dockWX + nd.ny * dockWY : -1;
+        const freeFactor = kissAlign > 0.4 ? 1 - smoothDockW * 0.88 : 1 - smoothDockW * 0.25;
+        const floatAmp = (nd.isLabel ? 1.1 : 2.5) * freeFactor;
+        const waveN =
+          Math.sin(t * 0.0034 + nd.phase) * floatAmp +
+          Math.cos(t * 0.0021 - nd.phase * 0.7) * (floatAmp * 0.45);
+        const waveT = Math.cos(t * 0.0026 + nd.phase * 0.9) * (1.1 * freeFactor);
+        dx += nd.nx * waveN + nd.tx * waveT;
+        dy += nd.ny * waveN + nd.ty * waveT;
+
+        if (smoothDockW > 0.6 && !nd.isLabel && !nd.isCorner) {
+          if (kissAlign > 0.5) {
+            if (k % 3 === 0) {
+              glyph =
+                dockEdge === 'top'
+                  ? '╤'
+                  : dockEdge === 'bottom'
+                    ? '╧'
+                    : dockEdge === 'left'
+                      ? '╟'
+                      : '╢';
+              useAccent = true;
+            }
+          } else if (kissAlign < -0.5 && Math.sin(t * 0.0045 + nd.phase) > 0.62) {
+            glyph = Math.abs(nd.ny) > 0.5 ? '~' : '¦';
+          }
+        }
+
+        if (dockRippleW > 0.04) {
+          const alongDist =
+            dockEdge === 'top' || dockEdge === 'bottom'
+              ? Math.abs(nd.bx) / Math.max(1, rx)
+              : Math.abs(nd.by) / Math.max(1, ry);
+          const rippleCrest = (dockRippleAge / 280) * 1.25;
+          if (Math.abs(alongDist - rippleCrest) < 0.28) {
+            dx += nd.nx * dockRippleW * 3.5;
+            dy += nd.ny * dockRippleW * 3.5;
+            useAccent = true;
+            if (!nd.isLabel) glyph = '▪';
+          }
+        }
+
+        if (smoothPullW > 0.04 && pullEdge) {
+          const pullAlign = nd.nx * pullWX + nd.ny * pullWY;
+          if (pullAlign > 0.35) {
+            const reach =
+              pullAlign *
+              smoothPullW *
+              (6.5 + Math.sin(t * 0.018 + nd.phase * 1.4) * 2.5);
+            dx += pullWX * reach;
+            dy += pullWY * reach;
+            useAccent = true;
+            if (!nd.isLabel && !nd.isCorner && k % 2 === 0) {
+              glyph =
+                pullEdge === 'top'
+                  ? '┬'
+                  : pullEdge === 'bottom'
+                    ? '┴'
+                    : pullEdge === 'left'
+                      ? '├'
+                      : '┤';
+            }
+          }
+        }
+
+        if (sprintW > 0.04) {
+          const motionAlign = nd.nx * dirUX + nd.ny * dirUY;
+          if (motionAlign > 0.2) {
+            const bowCompress = motionAlign * sprintW * 3.4;
+            dx -= nd.nx * bowCompress;
+            dy -= nd.ny * bowCompress;
+            useAccent = true;
+            if (!nd.isLabel && !nd.isCorner && motionAlign > 0.65 && k % 2 === 0) {
+              glyph =
+                Math.abs(dirUX) > Math.abs(dirUY)
+                  ? dirUX > 0
+                    ? '»'
+                    : '«'
+                  : dirUY > 0
+                    ? '▼'
+                    : '▲';
+            }
+          } else if (motionAlign < -0.2) {
+            const tailStretch =
+              -motionAlign *
+              sprintW *
+              (8.5 + Math.sin(t * 0.026 + nd.phase * 1.5) * 4.2);
+            dx -= dirUX * tailStretch;
+            dy -= dirUY * tailStretch;
+            if (!nd.isLabel && !nd.isCorner) {
+              glyph = Math.sin(t * 0.03 + nd.phase) > 0 ? '~' : '=';
+            }
+
+            if (sprintW > 0.22 && k % 2 === 0) {
+              const wakeGlyphs = ['-', ':', '·'];
+              for (let wIdx = 0; wIdx < wakeGlyphs.length; wIdx++) {
+                const dist = tailStretch * (1.55 + wIdx * 0.78);
+                const wx = ox + nd.bx + dx - dirUX * dist;
+                const wy = oy + nd.by + dy - dirUY * dist;
+                bCtx.fillStyle = wIdx === 0 ? accentColor : mutedColor;
+                bCtx.globalAlpha = Math.max(0.12, sprintW * (0.55 - wIdx * 0.16));
+                bCtx.fillText(wakeGlyphs[wIdx], Math.round(wx), Math.round(wy));
+              }
+            }
+          } else {
+            const flutter = Math.sin(t * 0.038 - nd.phase * 1.3) * sprintW * 2.4;
+            dx += nd.nx * flutter - dirUX * sprintW * 3.5;
+            dy += nd.ny * flutter - dirUY * sprintW * 3.5;
+          }
+        }
+
+        if (impactW > 0.03) {
+          const hitAlign = -(nd.nx * impactNX + nd.ny * impactNY);
+          if (hitAlign > 0.35) {
+            const crush = hitAlign * impactW * 5.8;
+            dx -= nd.nx * crush;
+            dy -= nd.ny * crush;
+            useAccent = true;
+            if (!nd.isLabel) {
+              glyph = impactW > 0.55 ? '█' : '▓';
+            }
+          } else {
+            const osc = Math.cos(impactAge * 0.044 - (1 - hitAlign) * 1.5);
+            const bulge = (1 - Math.max(0, hitAlign)) * impactW * osc * 6.8;
+            dx += nd.nx * bulge;
+            dy += nd.ny * bulge;
+          }
+
+          if (Math.abs(hitAlign - shockFront) < 0.34) {
+            useAccent = true;
+            if (!nd.isLabel && hitAlign <= 0.35) {
+              glyph = '+';
+            }
+          }
+        }
+
+        bCtx.fillStyle = nd.isLabel && nd.ny > 0 ? textColor : useAccent ? accentColor : mutedColor;
+        bCtx.globalAlpha = nd.isLabel ? 0.96 : useAccent ? 0.92 : 0.76;
+        bCtx.fillText(glyph, Math.round(ox + nd.bx + dx), Math.round(oy + nd.by + dy));
+      }
+
+      bCtx.globalAlpha = 1;
+    };
 
     const tick = (t: number) => {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
+      // 关键保护：等待视口真实尺寸就绪后再初始化位置，防止 0x0 阶段锁死在左上角 (0,0)！
+      if (vw < 180 || vh < 140) {
+        requestAnimationFrame(tick);
+        return;
+      }
+
+      if (!initialized) {
+        initialized = true;
+        state = vw < 640 ? 'top' : 'free';
+        ambientOrbit = state === 'free';
+        x = vw < 640 ? vw * 0.5 : vw * 0.72;
+        y = vw < 640 ? 19 : Math.max(150, Math.min(260, vh * 0.3));
+
+        try {
+          const raw = sessionStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const saved = JSON.parse(raw);
+            if (
+              saved &&
+              Number.isFinite(saved.xNorm) &&
+              Number.isFinite(saved.yNorm) &&
+              saved.xNorm > 0.04 &&
+              saved.yNorm > 0.02
+            ) {
+              state = saved.state || state;
+              ambientOrbit = Boolean(saved.ambientOrbit);
+              x = Math.max(80, Math.min(vw - 80, saved.xNorm * vw));
+              y = Math.max(20, Math.min(vh - 20, saved.yNorm * vh));
+              vx = Number.isFinite(saved.vx) ? saved.vx : vx;
+              vy = Number.isFinite(saved.vy) ? saved.vy : vy;
+            }
+          }
+        } catch {
+          // ignore
+        }
+
+        const k =
+          state === 'top' || state === 'bottom'
+            ? 'bar'
+            : state === 'left' || state === 'right'
+              ? 'rail'
+              : 'block';
+        curW = SHAPES[k].w;
+        curH = SHAPES[k].h;
+        curInset = { ...SHAPES[k].inset };
+        SHAPES[k].coords.forEach(([ix, iy], idx) => {
+          itemSpring[idx].x = ix;
+          itemSpring[idx].y = iy;
+        });
+        smoothDockW = state === 'free' ? 0 : 1;
+        nav.style.visibility = 'visible';
+      }
+
+      ensureFxCanvas(vw, vh);
       const hw = curW * 0.5;
       const hh = curH * 0.5;
 
-      // 渲染碰撞与吸附像素粒子
-      if (ctx) {
-        ctx.clearRect(0, 0, vw, vh);
+      if (fxCtx) {
+        fxCtx.clearRect(0, 0, vw, vh);
         for (let i = bursts.length - 1; i >= 0; i--) {
           const b = bursts[i];
           b.x += b.vx;
@@ -510,20 +922,20 @@ const navItems = [
             bursts.splice(i, 1);
             continue;
           }
-          ctx.fillStyle = b.accent ? accentColor : mutedColor;
-          ctx.globalAlpha = Math.ceil(b.life * 4) / 4;
-          ctx.fillRect(Math.round(b.x / 2) * 2, Math.round(b.y / 2) * 2, b.size, b.size);
+          fxCtx.fillStyle = b.accent ? accentColor : mutedColor;
+          fxCtx.globalAlpha = Math.ceil(b.life * 4) / 4;
+          fxCtx.fillRect(Math.round(b.x / 2) * 2, Math.round(b.y / 2) * 2, b.size, b.size);
         }
-        ctx.globalAlpha = 1;
+        fxCtx.globalAlpha = 1;
       }
 
-      let pullingEdge: 'top' | 'bottom' | 'left' | 'right' | null = null;
+      let pullingEdge: EdgeSide | null = null;
       let pullStrength = 0;
 
-      if (state === 'free' && !reducedMotion) {
+      if (state === 'free') {
         const speed = Math.hypot(vx, vy);
         const nw = nearestWall(x, y, hw, hh, vw, vh);
-        const canMagnet = t > magnetImmunityUntil;
+        const canMagnet = !ambientOrbit && t > magnetImmunityUntil;
 
         if (speed > CAPTURE_SPEED) {
           vx *= AIR_DRAG;
@@ -535,22 +947,38 @@ const navItems = [
           if (nw.edge === 'top') {
             vy -= accel;
             vx *= 0.9;
+            const safeHalf = SHAPES.bar.w * 0.5 + 8;
+            if (x < safeHalf) x += (safeHalf - x) * 0.2;
+            if (x > vw - safeHalf) x += (vw - safeHalf - x) * 0.2;
           } else if (nw.edge === 'bottom') {
             vy += accel;
             vx *= 0.9;
+            const safeHalf = SHAPES.bar.w * 0.5 + 8;
+            if (x < safeHalf) x += (safeHalf - x) * 0.2;
+            if (x > vw - safeHalf) x += (vw - safeHalf - x) * 0.2;
           } else if (nw.edge === 'left') {
             vx -= accel;
             vy *= 0.9;
+            const safeHalf = SHAPES.rail.h * 0.5 + 8;
+            if (y < safeHalf) y += (safeHalf - y) * 0.2;
+            if (y > vh - safeHalf) y += (vh - safeHalf - y) * 0.2;
           } else if (nw.edge === 'right') {
             vx += accel;
             vy *= 0.9;
+            const safeHalf = SHAPES.rail.h * 0.5 + 8;
+            if (y < safeHalf) y += (safeHalf - y) * 0.2;
+            if (y > vh - safeHalf) y += (vh - safeHalf - y) * 0.2;
           }
-          if (nw.dist <= 5) lockDock(nw.edge, vw, vh);
+          if (nw.dist <= 5) lockDock(nw.edge, vw, vh, t);
         } else {
-          vx += Math.sin(t * 0.00055) * 0.011;
-          vy += Math.cos(t * 0.00072) * 0.011;
+          if (ambientOrbit) {
+            vx += (vw * 0.72 - x) * 0.00014 + Math.sin(t * 0.00065) * 0.011;
+            vy += (Math.min(240, vh * 0.32) - y) * 0.00018 + Math.cos(t * 0.00082) * 0.011;
+          } else {
+            vx += Math.sin(t * 0.00055) * 0.011;
+            vy += Math.cos(t * 0.00072) * 0.011;
+          }
 
-          // 光标靠近时静默缓停，轻松点击不追逐
           if (Math.hypot(cursorX - x, cursorY - y) < 82) {
             vx *= 0.82;
             vy *= 0.82;
@@ -568,59 +996,74 @@ const navItems = [
           y += vy;
           const postSpeed = Math.hypot(vx, vy);
 
-          if (x - hw <= 3) {
+          if (x - hw <= 4) {
             if (postSpeed > CAPTURE_SPEED || !canMagnet) {
-              x = hw + 3;
+              x = hw + 4;
               vx = Math.abs(vx);
               deflect(false);
               vx = Math.abs(vx);
-              spawnBurst(4, y, 1, 0, 12, Math.min(2.2, postSpeed / 6));
-              impactUntil = t + 150;
+              if (postSpeed > 2) {
+                spawnBurst(4, y, 1, 0, 12, Math.min(2.2, postSpeed / 6));
+                triggerImpact(1, 0, postSpeed, t);
+              }
             } else {
-              lockDock('left', vw, vh);
+              lockDock('left', vw, vh, t);
             }
-          } else if (x + hw >= vw - 3) {
+          } else if (x + hw >= vw - 4) {
             if (postSpeed > CAPTURE_SPEED || !canMagnet) {
-              x = vw - hw - 3;
+              x = vw - hw - 4;
               vx = -Math.abs(vx);
               deflect(false);
               vx = -Math.abs(vx);
-              spawnBurst(vw - 4, y, -1, 0, 12, Math.min(2.2, postSpeed / 6));
-              impactUntil = t + 150;
+              if (postSpeed > 2) {
+                spawnBurst(vw - 4, y, -1, 0, 12, Math.min(2.2, postSpeed / 6));
+                triggerImpact(-1, 0, postSpeed, t);
+              }
             } else {
-              lockDock('right', vw, vh);
+              lockDock('right', vw, vh, t);
             }
           }
 
           if (state === 'free') {
-            if (y - hh <= 3) {
+            if (y - hh <= 4) {
               if (postSpeed > CAPTURE_SPEED || !canMagnet) {
-                y = hh + 3;
+                y = hh + 4;
                 vy = Math.abs(vy);
                 deflect(true);
                 vy = Math.abs(vy);
-                spawnBurst(x, 4, 0, 1, 12, Math.min(2.2, postSpeed / 6));
-                impactUntil = t + 150;
+                if (postSpeed > 2) {
+                  spawnBurst(x, 4, 0, 1, 12, Math.min(2.2, postSpeed / 6));
+                  triggerImpact(0, 1, postSpeed, t);
+                }
               } else {
-                lockDock('top', vw, vh);
+                lockDock('top', vw, vh, t);
               }
-            } else if (y + hh >= vh - 3) {
+            } else if (y + hh >= vh - 4) {
               if (postSpeed > CAPTURE_SPEED || !canMagnet) {
-                y = vh - hh - 3;
+                y = vh - hh - 4;
                 vy = -Math.abs(vy);
                 deflect(true);
                 vy = -Math.abs(vy);
-                spawnBurst(x, vh - 4, 0, -1, 12, Math.min(2.2, postSpeed / 6));
-                impactUntil = t + 150;
+                if (postSpeed > 2) {
+                  spawnBurst(x, vh - 4, 0, -1, 12, Math.min(2.2, postSpeed / 6));
+                  triggerImpact(0, -1, postSpeed, t);
+                }
               } else {
-                lockDock('bottom', vw, vh);
+                lockDock('bottom', vw, vh, t);
               }
             }
           }
         }
 
         updateRuler(pullingEdge, pullStrength, x, y, vw, vh);
-      } else if (state !== 'dragging') {
+      } else if (state === 'dragging') {
+        const nw = nearestWall(x, y, hw, hh, vw, vh);
+        const dragSp = Math.hypot(vx, vy);
+        if (nw.dist < MAGNET_ZONE * 0.75 && dragSp <= CAPTURE_SPEED) {
+          pullingEdge = nw.edge;
+          pullStrength = 1 - Math.max(0, nw.dist) / MAGNET_ZONE;
+        }
+      } else {
         updateRuler(null, 0, x, y, vw, vh);
         if (state === 'top') {
           x += (Math.max(hw + 8, Math.min(vw - hw - 8, x)) - x) * 0.22;
@@ -637,21 +1080,37 @@ const navItems = [
         }
       }
 
-      // 弹簧阻尼插值形态（宽高 + 缩小版毛玻璃缩进 + 按钮坐标 + ASCII 框线字符）
-      let targetKey: 'block' | 'bar' | 'rail' = 'block';
-      const activeEdge =
-        state === 'top' || state === 'bottom' || state === 'left' || state === 'right'
-          ? state
-          : pullStrength > 0.35
-            ? pullingEdge
-            : null;
+      const isDockedState =
+        state === 'top' || state === 'bottom' || state === 'left' || state === 'right';
+      const curSpeed = isDockedState ? 0 : Math.hypot(vx, vy);
 
-      if (state === 'dragging') {
-        const nw = nearestWall(x, y, hw, hh, vw, vh);
-        if (nw.dist < MAGNET_ZONE * 0.65 && Math.hypot(vx, vy) <= CAPTURE_SPEED) {
-          targetKey = nw.edge === 'top' || nw.edge === 'bottom' ? 'bar' : 'rail';
-        }
-      } else if (activeEdge === 'top' || activeEdge === 'bottom') {
+      if (curSpeed > 0.25) {
+        dirUX += (vx / curSpeed - dirUX) * 0.28;
+        dirUY += (vy / curSpeed - dirUY) * 0.28;
+        const dNorm = Math.max(0.001, Math.hypot(dirUX, dirUY));
+        dirUX /= dNorm;
+        dirUY /= dNorm;
+      }
+
+      const targetSprint = Math.max(0, Math.min(1, (curSpeed - 1.6) / 8.5));
+      sprintW += (targetSprint - sprintW) * 0.2;
+      impactW *= 0.9;
+      if (impactW < 0.01) impactW = 0;
+      dockRippleW *= 0.91;
+      if (dockRippleW < 0.01) dockRippleW = 0;
+
+      if (pullingEdge) lastPullEdge = pullingEdge;
+      smoothPullW += (pullStrength - smoothPullW) * 0.22;
+      smoothDockW += ((isDockedState ? 1 : 0) - smoothDockW) * 0.2;
+
+      let targetKey: 'block' | 'bar' | 'rail' = 'block';
+      const activeEdge: EdgeSide | null = isDockedState
+        ? state
+        : pullStrength > 0.35
+          ? pullingEdge
+          : null;
+
+      if (activeEdge === 'top' || activeEdge === 'bottom') {
         targetKey = 'bar';
       } else if (activeEdge === 'left' || activeEdge === 'right') {
         targetKey = 'rail';
@@ -674,6 +1133,15 @@ const navItems = [
       innerFrost.style.top = `${curInset.t.toFixed(1)}px`;
       innerFrost.style.bottom = `${curInset.b.toFixed(1)}px`;
 
+      const impactOsc = Math.cos((t - impactStart) * 0.04) * impactW * 0.08;
+      const impactSquashX = Math.abs(impactNX) > 0.5 ? -impactOsc : impactOsc;
+      const impactSquashY = Math.abs(impactNY) > 0.5 ? -impactOsc : impactOsc;
+      const sprintStretchX = (Math.abs(dirUX) - Math.abs(dirUY)) * sprintW * 0.045;
+      const breath = Math.sin(t * 0.0025) * 0.012 * (1 - smoothDockW);
+      const sx = 1 + sprintStretchX + impactSquashX + breath;
+      const sy = 1 - sprintStretchX + impactSquashY - breath;
+      innerFrost.style.transform = `scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
+
       target.coords.forEach(([tx, ty], i) => {
         const sp = itemSpring[i];
         sp.vx = (sp.vx + (tx - sp.x) * 0.2) * 0.74;
@@ -685,45 +1153,14 @@ const navItems = [
         }
       });
 
-      const wantBar = targetKey === 'bar' ? 1 : 0;
-      barAlpha += (wantBar - barAlpha) * 0.22;
-      const boxAlpha = 1 - barAlpha;
-
-      frameTop.style.opacity = boxAlpha.toFixed(2);
-      frameBot.style.opacity = boxAlpha.toFixed(2);
-      pipesLeft.style.opacity = boxAlpha.toFixed(2);
-      pipesRight.style.opacity = boxAlpha.toFixed(2);
-      capLeft.style.opacity = barAlpha.toFixed(2);
-      capRight.style.opacity = barAlpha.toFixed(2);
-
-      const isImpact = t < impactUntil;
-      const dispSpeed = Math.hypot(vx, vy);
-      const charCount = Math.max(8, Math.round((curW - 6) / 6.65));
-
-      if (boxAlpha > 0.04) {
-        if (isImpact) {
-          frameTop.textContent = makeBorderLine('╔', '[!BOUNCE!]', '╗', charCount, '═');
-          frameBot.textContent = makeBorderLine('╚', '', '╝', charCount, '═');
-        } else if (targetKey === 'rail') {
-          frameTop.textContent = makeBorderLine('╔', '[::]', '╗', charCount, '═');
-          frameBot.textContent = makeBorderLine('╚', '', '╝', charCount, '═');
-        } else {
-          const vLabel = dispSpeed > CAPTURE_SPEED ? `[v${dispSpeed.toFixed(1)}]` : `[::0G v${dispSpeed.toFixed(1)}]`;
-          const cLabel = `[${Math.round(x)},${Math.round(y)}]`;
-          frameTop.textContent = makeBorderLine('┌', vLabel, '┐', charCount, '─');
-          frameBot.textContent = makeBorderLine('└', cLabel, '┘', charCount, '─');
-        }
-
-        const glyph = isImpact || targetKey === 'rail' ? '║' : '│';
-        const rows = Math.max(3, Math.round((curH - 22) / 14));
-        const key = `${glyph}${rows}`;
-        if (pipesLeft.dataset.key !== key) {
-          const html = Array(rows).fill(`<span>${glyph}</span>`).join('');
-          pipesLeft.innerHTML = html;
-          pipesRight.innerHTML = html;
-          pipesLeft.dataset.key = key;
-        }
-      }
+      drawDynamicAsciiBorder(
+        t,
+        curW,
+        curH,
+        curSpeed,
+        isDockedState ? state : null,
+        smoothPullW > 0.04 ? lastPullEdge : null,
+      );
 
       nav.style.transform = `translate3d(${Math.round(x - curW * 0.5)}px, ${Math.round(y - curH * 0.5)}px, 0)`;
       requestAnimationFrame(tick);
