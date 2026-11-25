@@ -274,7 +274,7 @@ const { initialSummits = 1 } = Astro.props;
     pushBtn?.addEventListener('click', () => {
       window.dispatchEvent(
         new CustomEvent('sisyphus:boulder-boost', {
-          detail: { amount: 0.028, source: '主动助推' },
+          detail: { minM: 14, maxM: 38, source: '主动助推' },
         }),
       );
     });
@@ -291,17 +291,34 @@ const { initialSummits = 1 } = Astro.props;
       const clickedCol = Math.round(ratioX * (COLS - 1));
       window.dispatchEvent(
         new CustomEvent('sisyphus:boulder-boost', {
-          detail: { amount: 0.025, source: '天象共鸣', strikeCol: clickedCol },
+          detail: { minM: 12, maxM: 34, source: '天象共鸣', strikeCol: clickedCol },
         }),
       );
     });
 
     window.addEventListener('sisyphus:boulder-boost', (ev: Event) => {
       const detail = (
-        ev as CustomEvent<{ amount?: number; source?: string; strikeCol?: number }>
+        ev as CustomEvent<{
+          amount?: number;
+          minM?: number;
+          maxM?: number;
+          rolledAmount?: number;
+          source?: string;
+          strikeCol?: number;
+        }>
       ).detail;
+      let rawAmt = detail?.rolledAmount;
+      if (typeof rawAmt !== 'number') {
+        if (typeof detail?.minM === 'number' && typeof detail?.maxM === 'number') {
+          rawAmt = (detail.minM + Math.random() * (detail.maxM - detail.minM)) / PEAK_ALT;
+        } else {
+          const baseAmt = Math.max(0.001, Math.min(0.12, detail?.amount ?? 0.018));
+          rawAmt = baseAmt * (0.58 + Math.random() * 0.87);
+        }
+        if (detail) detail.rolledAmount = rawAmt;
+      }
       applyBoost(
-        detail?.amount ?? 0.018,
+        rawAmt,
         detail?.strikeCol,
         detail?.source || '动能共鸣',
         true,

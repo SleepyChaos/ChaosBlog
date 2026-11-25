@@ -167,13 +167,15 @@ const peakAlt = Math.min(884, Math.max(160, Math.round(140 + post.body.length * 
         localStorage.setItem(CAIRN_KEY, JSON.stringify(map));
       } catch {}
       renderCairn();
-      window.dispatchEvent(
-        new CustomEvent('sisyphus:boulder-boost', {
-          detail: { amount: 0.0204, source: '垒石立碑' },
-        }),
-      );
+      const dObj: { minM: number; maxM: number; source: string; rolledAmount?: number } = {
+        minM: 12,
+        maxM: 28,
+        source: '垒石立碑',
+      };
+      window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: dObj }));
+      const rolledM = ((dObj.rolledAmount ?? 0.02) * 884.8).toFixed(1);
       if (stackBtn) {
-        stackBtn.textContent = `[+1 界石已立 (#${map[slug]}) · +18m]`;
+        stackBtn.textContent = `[+1 界石已立 (#${map[slug]}) · +${rolledM}m]`;
       }
     });
   }

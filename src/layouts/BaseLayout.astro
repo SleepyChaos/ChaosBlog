@@ -187,12 +187,33 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         );
       };
 
-      // 全局监听任何助推事件（无论在首页、文章页、标签页还是关于页触发，均统一持久化并回显！）
+      // 全局监听任何助推事件（支持 [minM, maxM] 随机区间投掷，且保证多监听器共享同一投掷结果！）
       window.addEventListener('sisyphus:boulder-boost', (ev: Event) => {
-        const detail = (ev as CustomEvent<{ amount?: number; source?: string; persisted?: boolean }>)
-          .detail;
-        const rawAmt = Math.max(0.001, Math.min(0.12, detail?.amount ?? 0.012));
-        const source = detail?.source || '主动助推';
+        const detail =
+          (
+            ev as CustomEvent<{
+              amount?: number;
+              minM?: number;
+              maxM?: number;
+              rolledAmount?: number;
+              source?: string;
+              persisted?: boolean;
+            }>
+          ).detail || {};
+
+        let rawAmt = detail.rolledAmount;
+        if (typeof rawAmt !== 'number') {
+          if (typeof detail.minM === 'number' && typeof detail.maxM === 'number') {
+            const randM = detail.minM + Math.random() * (detail.maxM - detail.minM);
+            rawAmt = randM / PEAK_ALT;
+          } else {
+            const baseAmt = Math.max(0.001, Math.min(0.12, detail.amount ?? 0.015));
+            rawAmt = baseAmt * (0.58 + Math.random() * 0.87);
+          }
+          detail.rolledAmount = rawAmt;
+        }
+
+        const source = detail.source || '主动助推';
         flowMult = Math.min(2.5, +(flowMult + 0.06).toFixed(2));
         try {
           sessionStorage.setItem(FLOW_KEY, String(flowMult));
@@ -203,8 +224,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         lastImpulseMeters = gainedM;
         strideFrame++;
 
-        // 若触发方尚未写入 localStorage，则在此处统一持久化
-        if (!detail?.persisted) {
+        if (!detail.persisted) {
           const save = loadBoulderSave();
           save.boostAccum += rawAmt;
           save.boostMeters += gainedM;
@@ -216,7 +236,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         updateHorizonBar(`+${gainedM.toFixed(1)}m [${source}]`);
       });
 
-      // 被动推石手段 A：沉浸式匀速阅读步频（过滤掉暴躁乱滚，只采集 35..520 px/s 的阅读滚动）
+      // 被动推石手段 A：沉浸式匀速阅读步频（每次在 +1.8m ~ +6.2m 乘以心流倍率区间内随机推进）
       let lastScrollPos = window.scrollY;
       let lastScrollAt = performance.now();
       let readingScrollAccum = 0;
@@ -235,9 +255,10 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
             readingScrollAccum += dy;
             if (readingScrollAccum >= 360) {
               readingScrollAccum = 0;
+              const f = Math.min(1.6, flowMult);
               window.dispatchEvent(
                 new CustomEvent('sisyphus:boulder-boost', {
-                  detail: { amount: 0.0028 * Math.min(1.8, flowMult), source: '阅读步频' },
+                  detail: { minM: 1.8 * f, maxM: 6.2 * f, source: '阅读步频' },
                 }),
               );
             }
@@ -246,12 +267,13 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         { passive: true },
       );
 
-      // 被动推石手段 B：划选正文词句思考（哲思共鸣 + 浮现一键终端检索签）
+      // 被动推石手段 B：划选正文词句思考（哲思共鸣 +5.5m ~ +15.5m 随机浮动）
       const selHud = document.getElementById('selection-echo-hud');
       const selTag = document.getElementById('selection-echo-tag');
       const selGrepBtn = document.getElementById('selection-grep-btn');
       let currentSelectedSnippet = '';
       let lastSelectionBoostAt = 0;
+      let lastRolledSelM = 8.5;
 
       document.addEventListener('mouseup', () => {
         setTimeout(() => {
@@ -264,15 +286,19 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
               const now = performance.now();
               if (now - lastSelectionBoostAt > 3500) {
                 lastSelectionBoostAt = now;
-                window.dispatchEvent(
-                  new CustomEvent('sisyphus:boulder-boost', {
-                    detail: { amount: 0.0096, source: '哲思共鸣' },
-                  }),
-                );
+                const dObj: { minM: number; maxM: number; source: string; rolledAmount?: number } = {
+                  minM: 5.5,
+                  maxM: 15.5,
+                  source: '哲思共鸣',
+                };
+                window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: dObj }));
+                if (typeof dObj.rolledAmount === 'number') {
+                  lastRolledSelM = dObj.rolledAmount * PEAK_ALT;
+                }
               }
               if (selHud && selTag) {
                 const shortQ = text.length > 12 ? `${text.slice(0, 12)}…` : text;
-                selTag.textContent = `[+8.5m 哲思共鸣]`;
+                selTag.textContent = `[+${lastRolledSelM.toFixed(1)}m 哲思共鸣]`;
                 if (selGrepBtn) selGrepBtn.textContent = `[>> 检索 "${shortQ}"]`;
                 const left = Math.max(12, Math.min(window.innerWidth - 250, rect.left));
                 const top = Math.max(12, rect.top - 34);

@@ -359,14 +359,71 @@ const tagIndex = tags.map(([name, count]) => ({
     syncThemePalette();
     window.addEventListener('sisyphus:realmchange', syncThemePalette);
 
-    // ========= 零依赖 Web Audio 科幻合成器与五声音阶 ASCII 边框竖琴 =========
+    // ========= 零依赖 Web Audio 四大科幻主题专属低通滤波音效集 + 严格发声频次上限 =========
     let sfxEnabled = false;
     try {
       sfxEnabled = localStorage.getItem('sisyphus_sfx') === '1';
     } catch {}
     let audioCtx: AudioContext | null = null;
     let lastPluckSoundAt = 0;
-    const PENTATONIC_HZ = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25, 783.99];
+    let lastPluckedRingIdx = -1;
+    let lastBoostSoundAt = 0;
+    let activeVoices = 0;
+
+    // 四大科幻世界各自的专属音阶、波形、低通截止频率与包络参数
+    const WORLD_SCALES: Record<
+      RealmId,
+      {
+        notes: number[];
+        wave: OscillatorType;
+        cutoff: number;
+        dur: number;
+        attack: number;
+        gain: number;
+        subOctave: boolean;
+      }
+    > = {
+      void: {
+        // 2001 太空漫游：C 利底亚星际音阶 (G3~G4)，温暖正弦波 + 低八度泛音 + 悠长深空余韵
+        notes: [196.0, 220.0, 246.94, 261.63, 293.66, 329.63, 369.99, 392.0],
+        wave: 'sine',
+        cutoff: 1100,
+        dur: 0.28,
+        attack: 0.028,
+        gain: 0.024,
+        subOctave: true,
+      },
+      paper: {
+        // 银河帝国：古典古琴/钢片琴五声音阶 (宫商角徵羽 D4~D5)
+        notes: [261.63, 293.66, 329.63, 392.0, 440.0, 523.25],
+        wave: 'triangle',
+        cutoff: 1220,
+        dur: 0.22,
+        attack: 0.02,
+        gain: 0.022,
+        subOctave: false,
+      },
+      crt: {
+        // 黑客帝国：E 多利亚暗色模拟合成器 (E3~E4)，经 780Hz 陡峭低通滤波，浑厚不刺耳
+        notes: [164.81, 185.0, 196.0, 220.0, 246.94, 277.18, 293.66, 329.63],
+        wave: 'sawtooth',
+        cutoff: 780,
+        dur: 0.19,
+        attack: 0.022,
+        gain: 0.015,
+        subOctave: false,
+      },
+      amber: {
+        // 沙丘：厄拉科斯 Hijaz 沙漠弗里吉亚调式 (D3~D4)，柔缓风吟包络
+        notes: [146.83, 155.56, 185.0, 196.0, 220.0, 233.08, 277.18, 293.66],
+        wave: 'triangle',
+        cutoff: 900,
+        dur: 0.26,
+        attack: 0.036,
+        gain: 0.024,
+        subOctave: true,
+      },
+    };
 
     const ensureAudio = (): AudioContext | null => {
       if (!sfxEnabled) return null;
@@ -381,60 +438,132 @@ const tagIndex = tags.map(([name, count]) => ({
       return audioCtx;
     };
 
+    const playFilteredTone = (
+      freq: number,
+      dur = 0.2,
+      type: OscillatorType = 'sine',
+      gainPeak = 0.022,
+      delay = 0,
+      cutoff = 1050,
+      attack = 0.024,
+      pitchSlideTo?: number,
+    ) => {
+      const ctx = ensureAudio();
+      if (!ctx || activeVoices >= 3) return;
+      activeVoices++;
+      const t0 = ctx.currentTime + delay;
+      const osc = ctx.createOscillator();
+      const filter = ctx.createBiquadFilter();
+      const g = ctx.createGain();
+
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0);
+      if (pitchSlideTo) {
+        osc.frequency.exponentialRampToValueAtTime(pitchSlideTo, t0 + dur * 0.85);
+      }
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(cutoff, t0);
+      filter.Q.setValueAtTime(0.7, t0);
+
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(gainPeak, t0 + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+      osc.connect(filter);
+      filter.connect(g);
+      g.connect(ctx.destination);
+      osc.onended = () => {
+        activeVoices = Math.max(0, activeVoices - 1);
+      };
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.025);
+    };
+
+    // 兼容机械落锁短音
     const playTone = (
       freq: number,
       dur = 0.14,
       type: OscillatorType = 'sine',
-      gainPeak = 0.04,
+      gainPeak = 0.024,
       delay = 0,
     ) => {
-      const ctx = ensureAudio();
-      if (!ctx) return;
-      const t0 = ctx.currentTime + delay;
-      const osc = ctx.createOscillator();
-      const g = ctx.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, t0);
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(gainPeak, t0 + 0.012);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      osc.connect(g);
-      g.connect(ctx.destination);
-      osc.start(t0);
-      osc.stop(t0 + dur + 0.02);
+      playFilteredTone(freq, dur, type, Math.min(0.026, gainPeak), delay, 980, 0.018);
     };
 
     const playPluckNote = (ringIdx: number) => {
       const now = performance.now();
-      if (!sfxEnabled || now - lastPluckSoundAt < 58) return;
+      // 严格频次上限：拖拽途中不发拨弦音，同一节点不重复触发，最小间隔 180ms（每秒最多 ~5 音）
+      if (
+        !sfxEnabled ||
+        pointerId !== null ||
+        ringIdx === lastPluckedRingIdx ||
+        now - lastPluckSoundAt < 180
+      ) {
+        return;
+      }
       lastPluckSoundAt = now;
-      const baseFreq = PENTATONIC_HZ[ringIdx % PENTATONIC_HZ.length];
-      const wave: OscillatorType =
-        curRealm === 'crt' ? 'square' : curRealm === 'amber' ? 'triangle' : 'sine';
-      playTone(baseFreq, 0.16, wave, curRealm === 'crt' ? 0.022 : 0.036);
+      lastPluckedRingIdx = ringIdx;
+
+      const cfg = WORLD_SCALES[curRealm] || WORLD_SCALES.void;
+      const baseFreq = cfg.notes[ringIdx % cfg.notes.length];
+      playFilteredTone(
+        baseFreq,
+        cfg.dur,
+        cfg.wave,
+        cfg.gain,
+        0,
+        cfg.cutoff,
+        cfg.attack,
+        curRealm === 'paper' ? baseFreq * 1.008 : undefined,
+      );
+      if (cfg.subOctave && activeVoices < 3) {
+        playFilteredTone(baseFreq * 0.5, cfg.dur * 1.1, 'sine', cfg.gain * 0.45, 0.01, 600, 0.035);
+      }
     };
 
     const playWorldChord = (realm: RealmId) => {
       if (!sfxEnabled) return;
       if (realm === 'void') {
-        // 2001 太空漫游：查拉图斯特拉如是说 C-G-C 五度石碑共鸣
-        playTone(130.81, 0.35, 'triangle', 0.045, 0);
-        playTone(196.0, 0.35, 'sine', 0.04, 0.09);
-        playTone(261.63, 0.45, 'sine', 0.045, 0.18);
+        // 2001 太空漫游：深空石碑五度共鸣 (C3 - G3 - D4)
+        playFilteredTone(130.81, 0.38, 'sine', 0.028, 0, 900, 0.035);
+        playFilteredTone(196.0, 0.38, 'sine', 0.024, 0.09, 950, 0.035);
+        playFilteredTone(293.66, 0.45, 'sine', 0.024, 0.18, 1050, 0.04);
       } else if (realm === 'paper') {
-        // 银河帝国：第一辐光清脆竖琴琶音
-        [329.63, 392.0, 493.88, 659.25].forEach((f, i) =>
-          playTone(f, 0.22, 'sine', 0.035, i * 0.055),
+        // 银河帝国：第一辐光古琴泛音琶音
+        [261.63, 329.63, 392.0, 523.25].forEach((f, i) =>
+          playFilteredTone(f, 0.25, 'triangle', 0.02, i * 0.065, 1150, 0.024),
         );
       } else if (realm === 'crt') {
-        // 黑客帝国：数字调制矩阵高频脉冲
-        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
-          playTone(f, 0.11, 'square', 0.02, i * 0.04),
+        // 黑客帝国：锡安低通模拟合成器深沉三和弦 (E3 - G3 - B3)
+        [164.81, 196.0, 246.94].forEach((f, i) =>
+          playFilteredTone(f, 0.22, 'sawtooth', 0.016, i * 0.055, 760, 0.025),
         );
       } else {
-        // 沙丘：弗雷曼沙槌低频双震 + 沙漠风吟
-        playTone(98.0, 0.24, 'triangle', 0.055, 0);
-        playTone(146.83, 0.32, 'sine', 0.04, 0.12);
+        // 沙丘：弗雷曼沙槌低频地震双脉冲 (D2 -> A2)
+        playFilteredTone(73.42, 0.28, 'triangle', 0.036, 0, 420, 0.02, 55.0);
+        playFilteredTone(110.0, 0.34, 'triangle', 0.028, 0.14, 580, 0.03);
+      }
+    };
+
+    const playBoostSound = (isDraggingBoost = false) => {
+      const now = performance.now();
+      // 严格限制助推音效触发频率：高速拖拽时静音或仅每 680ms 发出极轻低频脉搏，正常助推冷却 440ms
+      const minGap = isDraggingBoost || pointerId !== null ? 680 : 440;
+      if (!sfxEnabled || now - lastBoostSoundAt < minGap) return;
+      lastBoostSoundAt = now;
+      const scaleGain = isDraggingBoost || pointerId !== null ? 0.45 : 1.0;
+
+      if (curRealm === 'void') {
+        playFilteredTone(196.0, 0.22, 'sine', 0.022 * scaleGain, 0, 950, 0.025, 293.66);
+      } else if (curRealm === 'paper') {
+        playFilteredTone(293.66, 0.18, 'triangle', 0.02 * scaleGain, 0, 1100, 0.02);
+        playFilteredTone(392.0, 0.22, 'sine', 0.02 * scaleGain, 0.06, 1100, 0.025);
+      } else if (curRealm === 'crt') {
+        playFilteredTone(164.81, 0.2, 'sawtooth', 0.015 * scaleGain, 0, 740, 0.022, 246.94);
+      } else {
+        // 沙丘：低沉沙槌重击
+        playFilteredTone(82.41, 0.24, 'triangle', 0.032 * scaleGain, 0, 460, 0.02, 65.41);
       }
     };
 
@@ -448,11 +577,9 @@ const tagIndex = tags.map(([name, count]) => ({
       return sfxEnabled;
     };
     window.addEventListener('sisyphus:toggle-sfx', () => toggleSfx());
-    window.addEventListener('sisyphus:boulder-boost', () => {
-      if (sfxEnabled) {
-        playTone(392.0, 0.12, 'triangle', 0.03, 0);
-        playTone(523.25, 0.18, 'sine', 0.035, 0.05);
-      }
+    window.addEventListener('sisyphus:boulder-boost', (ev: Event) => {
+      const src = (ev as CustomEvent<{ source?: string }>).detail?.source || '';
+      playBoostSound(src === '拖拽蓄能');
     });
 
     const applyRealm = (next: RealmId) => {
@@ -903,8 +1030,17 @@ const tagIndex = tags.map(([name, count]) => ({
       }
 
       if (cmd === 'push' || cmd === 'boost') {
-        window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.06 } }));
-        showTerminalText('BOULDER BOOST', `<pre class="hud-term-pre">▲ 已向山坡上的西西弗斯注入 +53m 推石冲量！</pre>`);
+        const dObj: { minM: number; maxM: number; source: string; rolledAmount?: number } = {
+          minM: 28,
+          maxM: 68,
+          source: '终端指令',
+        };
+        window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: dObj }));
+        const m = ((dObj.rolledAmount ?? 0.05) * 884.8).toFixed(1);
+        showTerminalText(
+          'BOULDER BOOST :: RANDOM_ROLL',
+          `<pre class="hud-term-pre">▲ 已向山坡上的西西弗斯随机注入 <strong>+${m}m</strong> (区间 28~68m) 推石冲量！</pre>`,
+        );
         return true;
       }
 
@@ -1300,7 +1436,11 @@ const tagIndex = tags.map(([name, count]) => ({
       vy = Math.sin(ang) * power;
       impulseRing(-vx * 0.65, -vy * 0.65, 3.0);
       magnetImmunityUntil = performance.now() + 260;
-      window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.045 } }));
+      window.dispatchEvent(
+        new CustomEvent('sisyphus:boulder-boost', {
+          detail: { minM: 22, maxM: 52, source: '弹射推进' },
+        }),
+      );
       saveState();
     };
 
@@ -1418,7 +1558,11 @@ const tagIndex = tags.map(([name, count]) => ({
       impactW = Math.min(1, Math.max(0.5, speed / 13));
       impactStart = now;
       impulseRing(nx * Math.min(9, speed * 0.55), ny * Math.min(9, speed * 0.55), 3.2);
-      window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.015 } }));
+      window.dispatchEvent(
+        new CustomEvent('sisyphus:boulder-boost', {
+          detail: { minM: 8, maxM: 21, source: '撞墙反冲' },
+        }),
+      );
     };
 
     const lockDock = (edge: EdgeSide, vw: number, vh: number, now: number) => {
@@ -1596,9 +1740,13 @@ const tagIndex = tags.map(([name, count]) => ({
       if (!moved) return;
 
       dragAccumDist += Math.hypot(cvx, cvy);
-      if (dragAccumDist > 110) {
+      if (dragAccumDist > 240) {
         dragAccumDist = 0;
-        window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.012 } }));
+        window.dispatchEvent(
+          new CustomEvent('sisyphus:boulder-boost', {
+            detail: { minM: 4.5, maxM: 13.5, source: '拖拽蓄能' },
+          }),
+        );
       }
 
       samples.push({ x: e.clientX, y: e.clientY, t: now });
@@ -1706,7 +1854,11 @@ const tagIndex = tags.map(([name, count]) => ({
 
       const speed = Math.hypot(vx, vy);
       if (speed > 4) {
-        window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.03 } }));
+        window.dispatchEvent(
+          new CustomEvent('sisyphus:boulder-boost', {
+            detail: { minM: 15, maxM: 36, source: '甩出惯性' },
+          }),
+        );
       }
       const vw = window.innerWidth;
       const vh = window.innerHeight;
