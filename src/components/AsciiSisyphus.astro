@@ -12,11 +12,24 @@ const { initialSummits = 1 } = Astro.props;
   <div class="bento-head">
     <span class="bento-head-title">
       <span class="term-ascii-icon">/▲</span>
-      <span>01 // SISYPHUS_SLOPE.SH</span>
+      <span>01 // SISYPHUS_8H_CYCLE.SH</span>
     </span>
-    <div style="display: flex; align-items: center; gap: 0.4rem;">
-      <button type="button" class="term-btn is-primary" id="sisyphus-push-btn">
+    <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+      <button
+        type="button"
+        class="term-btn is-primary"
+        id="sisyphus-push-btn"
+        title="助推巨石（拖拽或发射悬浮导航窗也会同步助推）"
+      >
         [+PUSH 助推]
+      </button>
+      <button
+        type="button"
+        class="term-btn"
+        id="sisyphus-summit-btn"
+        title="快进体验完整冲顶 → 巨石崩落 → 走下山麓轮回衔接"
+      >
+        [⚡冲顶轮回]
       </button>
     </div>
   </div>
@@ -24,98 +37,669 @@ const { initialSummits = 1 } = Astro.props;
   <pre
     class="ascii-slope-pre"
     id="sisyphus-ascii-stage"
-    aria-label="西西弗斯推石上山实时 ASCII 动画"></pre>
+    aria-label="高分辨率 8 小时真实轮回西西弗斯推石 ASCII 舞台"></pre>
 
   <div class="bento-foot">
     <span id="sisyphus-telemetry" data-summits={initialSummits}>
-      ALT: 210m [▪▪▪▫▫▫▫▫] #{initialSummits}
+      ALT: 210.0m / 884.8m · ETA 06h 05m · CYCLE #{initialSummits}
     </span>
-    <span>"{CAMUS_QUOTE}"</span>
+    <span id="sisyphus-phase-quote">"{CAMUS_QUOTE}"</span>
   </div>
 </div>
 
 <script>
   const stageEl = document.getElementById('sisyphus-ascii-stage');
   const telemetryEl = document.getElementById('sisyphus-telemetry');
+  const quoteEl = document.getElementById('sisyphus-phase-quote');
   const pushBtn = document.getElementById('sisyphus-push-btn');
+  const summitBtn = document.getElementById('sisyphus-summit-btn');
 
   if (stageEl && telemetryEl) {
-    let progress = 0.24;
-    let rollingDown = false;
-    let rollVel = 0;
-    let summits = Number(telemetryEl.dataset.summits || '1');
+    const COLS = 74;
+    const ROWS = 15;
+    const CYCLE_MS = 8 * 60 * 60 * 1000; // 8 小时真实时间 = 一次完整推石轮回 (884.8m)
+    const PEAK_ALT = 884.8;
+    const STORAGE_KEY = 'sisyphus_8h_cycle_v2';
+    const baseSummits = Number(telemetryEl.dataset.summits || '1');
+
+    // 读取持久化的助推累计量与基准轮回纪元
+    interface CycleSave {
+      anchorEpoch: number;
+      boostAccum: number;
+      boostMeters: number;
+    }
+
+    const nowInit = Date.now();
+    const initEpoch = Math.floor(nowInit / CYCLE_MS);
+    let save: CycleSave = {
+      anchorEpoch: initEpoch,
+      boostAccum: 0,
+      boostMeters: 0,
+    };
+
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          typeof parsed.anchorEpoch === 'number' &&
+          typeof parsed.boostAccum === 'number'
+        ) {
+          save = {
+            anchorEpoch: parsed.anchorEpoch,
+            boostAccum: parsed.boostAccum,
+            boostMeters: Number(parsed.boostMeters || 0),
+          };
+        }
+      } else {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(save));
+      }
+    } catch {}
+
+    const persistSave = () => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(save));
+      } catch {}
+    };
+
+    const getTotalRawCycles = (nowMs: number) => {
+      const elapsedEpochs = nowMs / CYCLE_MS - save.anchorEpoch;
+      return Math.max(0, elapsedEpochs + save.boostAccum);
+    };
+
+    // 状态机：CLIMB（8h 推石上山） -> SUMMIT_BREATH（山巅驻足喘息） -> AVALANCHE（巨石滚落山谷） -> DESCENT_WALK（西西弗斯从容走下山坡）
+    type Phase = 'CLIMB' | 'SUMMIT_BREATH' | 'AVALANCHE' | 'DESCENT_WALK';
+    let phase: Phase = 'CLIMB';
+    let phaseElapsed = 0;
+
+    const initTotal = getTotalRawCycles(nowInit);
+    let activeCycleIndex = Math.floor(initTotal);
+    let displayFrac = initTotal - activeCycleIndex;
+    let boostVelocity = 0;
+    let sprintToSummit = false;
+    let boostBannerTimer = 0;
+    let lastBoostGainMeters = 0;
+
+    // 滚落与下山物理变量
+    let boulderProg = displayFrac;
+    let sisyphusProg = Math.max(0, displayFrac - 0.045);
+    let avalancheVel = 0;
+    let strideAccum = 0;
+
+    // 碎石尘埃粒子池
+    interface DustParticle {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      life: number;
+      maxLife: number;
+      ch: string;
+      cls: number;
+    }
+    const dusts: DustParticle[] = [];
+
+    const spawnDust = (
+      x: number,
+      y: number,
+      count: number,
+      dirX: number,
+      cls = 4
+    ) => {
+      const glyphs = ['*', '·', ':', "'", '▪', ','];
+      for (let i = 0; i < count; i++) {
+        if (dusts.length > 42) dusts.shift();
+        dusts.push({
+          x: x + (Math.random() - 0.5) * 1.4,
+          y: y + (Math.random() - 0.5) * 0.8,
+          vx: dirX * (2.5 + Math.random() * 6.5) + (Math.random() - 0.5) * 2,
+          vy: -(1.8 + Math.random() * 4.5),
+          life: 0,
+          maxLife: 0.45 + Math.random() * 0.55,
+          ch: glyphs[Math.floor(Math.random() * glyphs.length)],
+          cls,
+        });
+      }
+    };
+
+    // 外部助推注入（拖拽悬浮窗 / 撞墙反弹 / 弹射 / [+PUSH] / CLI push）
+    const applyBoost = (amount: number) => {
+      if (phase !== 'CLIMB') return;
+      const clamped = Math.max(0.003, Math.min(0.12, amount));
+      save.boostAccum += clamped;
+      const gainedM = clamped * PEAK_ALT;
+      save.boostMeters += gainedM;
+      lastBoostGainMeters = gainedM;
+      boostBannerTimer = 1.6;
+      boostVelocity = Math.min(0.38, boostVelocity + clamped * 2.4);
+      persistSave();
+
+      const sx = progToCol(sisyphusProg);
+      const sy = terrainY(sx);
+      spawnDust(sx - 1, sy - 0.3, 5, -1, 4);
+    };
 
     pushBtn?.addEventListener('click', () => {
-      if (!rollingDown) {
-        progress = Math.min(0.97, progress + 0.22);
+      applyBoost(0.028); // 每次点击助推约 +24.8m（约省去 13 分钟攀登）
+    });
+
+    summitBtn?.addEventListener('click', () => {
+      if (phase === 'CLIMB') {
+        sprintToSummit = true;
       }
     });
 
-    const cols = 42;
-    const rows = 7;
-    const slopeRow = (c: number) => Math.round(6 - (c / (cols - 1)) * 5);
+    window.addEventListener('sisyphus:boulder-boost', (ev: Event) => {
+      const detail = (ev as CustomEvent<{ amount?: number }>).detail;
+      applyBoost(detail?.amount ?? 0.018);
+    });
 
-    const draw = (t: number) => {
-      const grid = Array.from({ length: rows }, () => Array(cols).fill(' '));
-
-      for (let c = 0; c < cols; c++) {
-        const sr = slopeRow(c);
-        if (sr >= 0 && sr < rows) grid[sr][c] = '╱';
-        for (let r = sr + 1; r < rows; r++) {
-          grid[r][c] = (r + c) % 3 === 0 ? '▒' : '░';
-        }
+    window.addEventListener('sisyphus:trigger-summit', () => {
+      if (phase === 'CLIMB') {
+        sprintToSummit = true;
       }
+    });
 
-      if (!rollingDown) {
-        progress += 0.0015;
-        if (progress >= 0.96) {
-          rollingDown = true;
-          rollVel = 0.011;
-        }
-      } else {
-        rollVel += 0.0032;
-        progress -= rollVel;
-        if (progress <= 0.1) {
-          progress = 0.1;
-          rollingDown = false;
-          summits += 1;
-        }
-      }
-
-      const bCol = Math.max(3, Math.min(cols - 3, Math.round(progress * (cols - 5)) + 2));
-      const bRow = Math.max(0, slopeRow(bCol) - 1);
-      const boulderFrames = ['■', '▣', '▪', '□'];
-      grid[bRow][bCol] =
-        boulderFrames[Math.floor(t * (rollingDown ? 0.024 : 0.006)) % boulderFrames.length];
-
-      if (rollingDown && bCol + 2 < cols && bRow > 0) {
-        grid[bRow - 1][bCol + 1] = '▪';
-        grid[bRow][bCol + 2] = '·';
-      }
-
-      const sCol = Math.max(1, bCol - 2);
-      const sRow = Math.max(0, slopeRow(sCol) - 1);
-      grid[sRow][sCol] = rollingDown ? 'o' : 'λ';
-      if (!rollingDown && sCol + 1 < bCol) {
-        grid[sRow][sCol + 1] = '/';
-      }
-
-      // 静态像素星尘点缀
-      grid[0][5] = '▪';
-      grid[1][14] = '·';
-      grid[0][25] = '▪';
-      grid[2][8] = '·';
-
-      stageEl.textContent = grid.map((r) => r.join('')).join('\n');
-
-      const alt = Math.round(progress * 884);
-      const filled = Math.round(progress * 10);
-      const bar = '▪'.repeat(filled) + '▫'.repeat(10 - filled);
-      telemetryEl.textContent = `ALT:${String(alt).padStart(3, '0')}m [${bar}] SUMMIT#${summits}`;
-
-      requestAnimationFrame(draw);
+    // 高分辨率山形曲线：c ∈ [0, COLS-1] -> 行坐标 y ∈ [2.8, 13.2]
+    const terrainY = (c: number): number => {
+      if (c <= 5) return 13.1;
+      if (c >= 65 && c <= 69.5) return 3.0;
+      if (c > 69.5) return Math.min(13.2, 3.0 + (c - 69.5) * 2.1);
+      const u = (c - 5) / 60; // 0..1
+      const base = 13.1 - u * 10.1;
+      const crag =
+        Math.sin(u * Math.PI * 3.0) * 0.32 * Math.sin(u * Math.PI) +
+        Math.sin(u * Math.PI * 7.0) * 0.12 * Math.sin(u * Math.PI);
+      return base + crag;
     };
 
-    requestAnimationFrame(draw);
+    // 远景群山剪影
+    const farPeakY = (c: number): number => {
+      if (c < 2 || c > 48) return 99;
+      const p1 = 5.2 + Math.abs(c - 15) * 0.42;
+      const p2 = 6.4 + Math.abs(c - 31) * 0.38;
+      return Math.min(p1, p2);
+    };
+
+    const progToCol = (p: number): number => {
+      const clamped = Math.max(0, Math.min(1, p));
+      return 6.5 + clamped * 60.0; // 6.5 -> 66.5 (山麓 -> 峰顶平台)
+    };
+
+    // 3x2 多面体滚动巨石纹理（6 帧细腻旋转）
+    const BOULDER_SPRITES = [
+      ['╭▀╮', '╰▄╯'],
+      ['╭╱╮', '╰╲╯'],
+      ['╭◈╮', '╰▪╯'],
+      ['╭╲╮', '╰╱╯'],
+      ['╭●╮', '╰═╯'],
+      ['╭▪╮', '╰◈╯'],
+    ];
+
+    // 攀登腿部 4 相步态与下山 4 相步态
+    const CLIMB_LEGS = ['/ \\', '| /', '> \\', '\\ |'];
+    const WALK_DOWN_LEGS = ['/ \\', '| \\', '/ |', '\\ /'];
+
+    const escapeHtml = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const CLS_NAMES = [
+      '', // 0: 默认柔和前景
+      'as-dim', // 1: 远山与底层岩脉
+      'as-ridge', // 2: 清晰山脊线
+      'as-hero', // 3: 西西弗斯人物
+      'as-rock', // 4: 巨石与高光火花
+      'as-spark', // 5: 助推粒子与星月
+      'as-hud', // 6: 画布内嵌遥测角标
+    ];
+
+    const formatEta = (ms: number) => {
+      const totalSec = Math.max(0, Math.floor(ms / 1000));
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+    };
+
+    let lastTime = performance.now();
+    let lastRenderTime = 0;
+
+    const tick = (nowPerf: number) => {
+      const dt = Math.min(0.08, Math.max(0.001, (nowPerf - lastTime) / 1000));
+      lastTime = nowPerf;
+
+      const nowWall = Date.now();
+      const totalRaw = getTotalRawCycles(nowWall);
+
+      // 更新碎石粒子
+      for (let i = dusts.length - 1; i >= 0; i--) {
+        const p = dusts[i];
+        p.life += dt;
+        if (p.life >= p.maxLife) {
+          dusts.splice(i, 1);
+          continue;
+        }
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 9.5 * dt; // 重力回落
+      }
+
+      if (boostBannerTimer > 0) {
+        boostBannerTimer = Math.max(0, boostBannerTimer - dt);
+      }
+
+      // ================= 四阶段无缝轮回状态机 =================
+      if (phase === 'CLIMB') {
+        if (sprintToSummit) {
+          // 快进冲顶演示：将剩余进度平滑推至当前轮回终点
+          const step = Math.min(1.001 - displayFrac, dt * 0.42);
+          save.boostAccum += Math.max(0, step);
+          displayFrac += step;
+          strideAccum += step * 115;
+          const sx = progToCol(sisyphusProg);
+          if (Math.random() < 0.45) {
+            spawnDust(sx - 1, terrainY(sx) - 0.3, 1, -1, 5);
+          }
+          if (displayFrac >= 1.0) {
+            sprintToSummit = false;
+            persistSave();
+            phase = 'SUMMIT_BREATH';
+            phaseElapsed = 0;
+            boulderProg = 1.0;
+            sisyphusProg = 0.945;
+          }
+        } else {
+          const targetCycle = Math.floor(totalRaw);
+          if (targetCycle > activeCycleIndex) {
+            // 真实 8 小时跨过轮回点或助推冲过山顶！进入冲顶演出
+            displayFrac += Math.min(1.002 - displayFrac, dt * 0.55);
+            strideAccum += dt * 14;
+            if (displayFrac >= 1.0) {
+              phase = 'SUMMIT_BREATH';
+              phaseElapsed = 0;
+              boulderProg = 1.0;
+              sisyphusProg = 0.945;
+            }
+          } else {
+            const targetFrac = totalRaw - activeCycleIndex;
+            const diff = targetFrac - displayFrac;
+            if (Math.abs(diff) > 0.00001) {
+              const step = diff * Math.min(1, dt * 7.5);
+              displayFrac += step;
+              strideAccum += Math.abs(step) * 140;
+            }
+            if (boostVelocity > 0.001) {
+              strideAccum += boostVelocity * dt * 26;
+              boostVelocity *= Math.pow(0.18, dt);
+            }
+          }
+        }
+
+        // 8 小时慢速攀登时的微呼吸发力节律（每 2.8 秒一次肩部顶石微耸动，保持生命感）
+        const heavePulse = Math.max(0, Math.sin((nowPerf * 0.001 * Math.PI * 2) / 2.8));
+        boulderProg = Math.min(1, displayFrac + heavePulse * 0.0018);
+        sisyphusProg = Math.max(0, boulderProg - 0.048);
+      } else if (phase === 'SUMMIT_BREATH') {
+        phaseElapsed += dt;
+        boulderProg = 1.0;
+        sisyphusProg = 0.942;
+        // 2.4s 后峰顶边缘松动，碎砾滑落预示崩塌
+        if (phaseElapsed > 2.3 && Math.random() < 0.35) {
+          const bx = progToCol(boulderProg);
+          spawnDust(bx - 1.2, terrainY(bx) - 0.2, 1, -0.6, 5);
+        }
+        if (phaseElapsed >= 3.3) {
+          phase = 'AVALANCHE';
+          phaseElapsed = 0;
+          avalancheVel = 0.05;
+        }
+      } else if (phase === 'AVALANCHE') {
+        phaseElapsed += dt;
+        avalancheVel = Math.min(0.46, avalancheVel + dt * 0.24);
+        boulderProg = Math.max(0.015, boulderProg - avalancheVel * dt);
+
+        // 巨石撞击岩脊扬起烟尘
+        const bx = progToCol(boulderProg);
+        if (boulderProg > 0.02 && Math.random() < 0.65) {
+          spawnDust(bx + 1.2, terrainY(bx) - 0.5, 2, 0.8, 4);
+        }
+
+        // 西西弗斯在峰顶目送 1.4 秒后，转身先行迈步下山
+        if (phaseElapsed > 1.4) {
+          sisyphusProg = Math.max(0.76, sisyphusProg - dt * 0.08);
+          strideAccum += dt * 5.5;
+        }
+
+        if (boulderProg <= 0.018) {
+          boulderProg = 0.015;
+          spawnDust(progToCol(0.015) + 1, terrainY(7) - 0.5, 8, 0.3, 4);
+          phase = 'DESCENT_WALK';
+          phaseElapsed = 0;
+        }
+      } else if (phase === 'DESCENT_WALK') {
+        phaseElapsed += dt;
+        boulderProg = 0.015;
+        // 西西弗斯沿着山脊一步一步从容走回山脚巨石左侧
+        const targetS = 0.0;
+        if (sisyphusProg > targetS + 0.004) {
+          const walkSpeed = 0.175; // 约 4.5 秒走完下山全程
+          sisyphusProg = Math.max(targetS, sisyphusProg - walkSpeed * dt);
+          strideAccum += walkSpeed * dt * 52;
+        } else {
+          sisyphusProg = targetS;
+          // 抵达巨石旁蹲身抵肩，0.65 秒后无缝切回新一轮 8 小时攀登
+          if (phaseElapsed > 4.6) {
+            const latestTotal = getTotalRawCycles(Date.now());
+            activeCycleIndex = Math.floor(latestTotal);
+            displayFrac = Math.min(0.05, latestTotal - activeCycleIndex);
+            boulderProg = displayFrac;
+            sisyphusProg = Math.max(0, displayFrac - 0.048);
+            phase = 'CLIMB';
+            phaseElapsed = 0;
+          }
+        }
+      }
+
+      // 节流 ASCII DOM 渲染至 ~24fps，兼顾高帧率丝滑与极低 CPU 占用
+      if (nowPerf - lastRenderTime >= 40) {
+        lastRenderTime = nowPerf;
+        renderAsciiFrame(nowPerf, nowWall);
+      }
+
+      requestAnimationFrame(tick);
+    };
+
+    const renderAsciiFrame = (nowPerf: number, nowWall: number) => {
+      const chars: string[][] = Array.from({ length: ROWS }, () =>
+        Array(COLS).fill(' ')
+      );
+      const cls: number[][] = Array.from({ length: ROWS }, () =>
+        Array(COLS).fill(0)
+      );
+
+      const put = (r: number, c: number, ch: string, colorCls = 0) => {
+        const ri = Math.round(r);
+        const ci = Math.round(c);
+        if (ri >= 0 && ri < ROWS && ci >= 0 && ci < COLS) {
+          chars[ri][ci] = ch;
+          cls[ri][ci] = colorCls;
+        }
+      };
+
+      const putStr = (r: number, c: number, text: string, colorCls = 0) => {
+        const ri = Math.round(r);
+        const ciStart = Math.round(c);
+        for (let i = 0; i < text.length; i++) {
+          const ci = ciStart + i;
+          if (ri >= 0 && ri < ROWS && ci >= 0 && ci < COLS && text[i] !== ' ') {
+            chars[ri][ci] = text[i];
+            cls[ri][ci] = colorCls;
+          }
+        }
+      };
+
+      const realm = document.documentElement.dataset.realm || 'void';
+
+      // 1. 真实昼夜天象（06:00-18:00 日晷轨迹，18:00-06:00 弯月与闪烁星群）
+      const nowDate = new Date(nowWall);
+      const hourFloat = nowDate.getHours() + nowDate.getMinutes() / 60;
+      const isDaytime = hourFloat >= 6 && hourFloat < 18;
+
+      if (isDaytime) {
+        const dayRatio = (hourFloat - 6) / 12;
+        const sunCol = Math.round(10 + dayRatio * 34);
+        const sunRow = Math.round(1.4 + Math.sin(dayRatio * Math.PI) * -0.8 + 0.8);
+        put(sunRow, sunCol, '☼', 5);
+        if (Math.floor(nowPerf / 700) % 2 === 0) {
+          put(sunRow, sunCol - 2, '·', 1);
+          put(sunRow, sunCol + 2, '·', 1);
+        }
+      } else {
+        const stars = [
+          [1, 6, '·'],
+          [2, 14, '+'],
+          [1, 24, '✦'],
+          [3, 9, '·'],
+          [1, 37, '·'],
+          [2, 44, '+'],
+          [0, 52, '·'],
+        ] as const;
+        stars.forEach(([sr, sc, sch], idx) => {
+          const twinkle = Math.sin(nowPerf * 0.0025 + idx * 1.9) > 0.35;
+          put(sr, sc, twinkle && sch === '·' ? '+' : sch, twinkle ? 5 : 1);
+        });
+        put(1, 19, '☾', 5);
+      }
+
+      // 山巅流云与疾风丝线
+      const windShift = Math.floor(nowPerf * 0.009);
+      for (let w = 0; w < 3; w++) {
+        const wc = 68 - ((windShift + w * 23) % 58);
+        const wr = 1 + (w % 2);
+        if (wr < terrainY(wc) - 2) {
+          putStr(wr, wc, w === 1 ? '~─' : '··', 1);
+        }
+      }
+
+      // 2. 远景层叠山峦剪影
+      for (let c = 2; c < 48; c++) {
+        const fy = Math.round(farPeakY(c));
+        const sy = Math.round(terrainY(c));
+        if (fy < sy - 1 && fy >= 1 && fy < ROWS) {
+          const leftY = farPeakY(c - 1);
+          const rightY = farPeakY(c + 1);
+          const ch = fy < leftY && fy <= rightY ? '^' : leftY > fy ? '╱' : '╲';
+          put(fy, c, ch, 1);
+        }
+      }
+
+      // 3. 主山脊线与随风貌切换的地质岩层纹理
+      for (let c = 0; c < COLS; c++) {
+        const yExact = terrainY(c);
+        const sr = Math.round(yExact);
+        const nextY = terrainY(Math.min(COLS - 1, c + 1));
+        const diff = nextY - yExact;
+
+        let ridgeChar = '─';
+        if (c >= 65 && c <= 69) ridgeChar = '═';
+        else if (diff < -0.1) ridgeChar = '╱';
+        else if (diff > 0.25) ridgeChar = '╲';
+        else ridgeChar = '_';
+
+        if (sr >= 0 && sr < ROWS) {
+          put(sr, c, ridgeChar, 2);
+        }
+
+        for (let r = sr + 1; r < ROWS; r++) {
+          const depth = r - sr;
+          let fill = '░';
+          if (realm === 'crt') {
+            fill = depth === 1 ? ((r + c) % 2 === 0 ? '1' : '0') : depth === 2 ? '▒' : '░';
+          } else if (realm === 'paper') {
+            fill = depth === 1 ? '╱' : (r + c) % 3 === 0 ? ':' : '·';
+          } else if (realm === 'amber') {
+            fill = depth === 1 ? '▓' : depth === 2 ? '≈' : '░';
+          } else {
+            fill = depth === 1 ? '▓' : depth <= 3 ? '▒' : (r + c) % 2 === 0 ? '░' : '·';
+          }
+          put(r, c, fill, 1);
+        }
+      }
+
+      // 峰顶路标旗帜 (884.8m)
+      const flagR = Math.round(terrainY(69)) - 1;
+      put(flagR, 69, '⚑', 5);
+
+      // 4. 绘制 3x2 高分辨率滚动巨石
+      const bCol = progToCol(boulderProg);
+      let bGroundY = terrainY(bCol);
+
+      // 滚落阶段沿岩壁抛物弹跳
+      if (phase === 'AVALANCHE') {
+        const bounce = Math.abs(Math.sin(boulderProg * Math.PI * 6.5)) * 1.35;
+        bGroundY -= bounce;
+      } else if (phase === 'SUMMIT_BREATH' && phaseElapsed > 2.3) {
+        // 滚落前夕微颤
+        bGroundY -= (Math.random() - 0.5) * 0.2;
+      }
+
+      const rotIdx =
+        ((Math.floor(bCol * 1.65) % BOULDER_SPRITES.length) +
+          BOULDER_SPRITES.length) %
+        BOULDER_SPRITES.length;
+      const rockSprite = BOULDER_SPRITES[rotIdx];
+      const rockTopRow = Math.round(bGroundY) - 2;
+      const rockLeftCol = Math.round(bCol) - 1;
+      putStr(rockTopRow, rockLeftCol, rockSprite[0], 4);
+      putStr(rockTopRow + 1, rockLeftCol, rockSprite[1], 4);
+
+      // 5. 绘制 3 行关节化西西弗斯小人（无缝衔接推石、峰顶喘息、目送、走下山坡）
+      const sCol = progToCol(sisyphusProg);
+      const sGroundRow = Math.round(terrainY(sCol));
+      const sLeft = Math.round(sCol) - 1;
+
+      if (phase === 'CLIMB') {
+        const heaveCycle = (nowPerf * 0.001) % 2.8;
+        const isStraining =
+          boostVelocity > 0.015 || sprintToSummit || heaveCycle < 1.75;
+        const legIdx =
+          Math.floor(strideAccum + (isStraining ? nowPerf * 0.0035 : 0)) %
+          CLIMB_LEGS.length;
+
+        if (isStraining) {
+          // 俯身抵肩奋力推石姿态
+          putStr(sGroundRow - 3, sLeft, ' o_', 3);
+          putStr(sGroundRow - 2, sLeft, '/|═', 3);
+          putStr(sGroundRow - 1, sLeft, CLIMB_LEGS[legIdx], 3);
+          // 汗珠或助推火光
+          if (boostVelocity > 0.03 || sprintToSummit) {
+            put(sGroundRow - 3, sLeft - 1, '⚡', 5);
+          } else if (Math.floor(nowPerf / 450) % 3 === 0) {
+            put(sGroundRow - 3, sLeft, "'", 5);
+          }
+        } else {
+          // 短暂顶住巨石换气姿态
+          putStr(sGroundRow - 3, sLeft, ' o ', 3);
+          putStr(sGroundRow - 2, sLeft, ' |═', 3);
+          putStr(sGroundRow - 1, sLeft, '/ \\', 3);
+        }
+      } else if (phase === 'SUMMIT_BREATH') {
+        // 登顶直立喘息
+        if (phaseElapsed < 1.1) {
+          putStr(sGroundRow - 3, sLeft, '\\o/', 3);
+          putStr(sGroundRow - 2, sLeft, ' | ', 3);
+        } else {
+          putStr(sGroundRow - 3, sLeft, ' o ', 3);
+          putStr(sGroundRow - 2, sLeft, '/|\\', 3);
+        }
+        putStr(sGroundRow - 1, sLeft, '/ \\', 3);
+      } else if (phase === 'AVALANCHE') {
+        if (phaseElapsed <= 1.4) {
+          // 驻足峰顶凝视巨石滚落深谷
+          putStr(sGroundRow - 3, sLeft, 'o  ', 3);
+          putStr(sGroundRow - 2, sLeft, '|\\ ', 3);
+          putStr(sGroundRow - 1, sLeft, '/ \\', 3);
+        } else {
+          const legIdx = Math.floor(strideAccum) % WALK_DOWN_LEGS.length;
+          putStr(sGroundRow - 3, sLeft, ' o ', 3);
+          putStr(sGroundRow - 2, sLeft, '/|\\', 3);
+          putStr(sGroundRow - 1, sLeft, WALK_DOWN_LEGS[legIdx], 3);
+        }
+      } else if (phase === 'DESCENT_WALK') {
+        if (sisyphusProg > 0.008) {
+          // 加缪笔下“下山的时刻”：直立从容一步步走回山麓
+          const legIdx = Math.floor(strideAccum) % WALK_DOWN_LEGS.length;
+          const armSwing = Math.floor(strideAccum) % 2 === 0 ? '/|\\' : ' | ';
+          putStr(sGroundRow - 3, sLeft, ' o ', 3);
+          putStr(sGroundRow - 2, sLeft, armSwing, 3);
+          putStr(sGroundRow - 1, sLeft, WALK_DOWN_LEGS[legIdx], 3);
+        } else {
+          // 回到巨石前重新俯身抵肩，衔接下一轮攀登
+          putStr(sGroundRow - 3, sLeft, ' o_', 3);
+          putStr(sGroundRow - 2, sLeft, '/|═', 3);
+          putStr(sGroundRow - 1, sLeft, '/ \\', 3);
+        }
+      }
+
+      // 6. 渲染碎石烟尘粒子
+      for (const p of dusts) {
+        put(p.y, p.x, p.ch, p.cls);
+      }
+
+      // 7. 画布左上角实时内嵌 TUI 仪表盘角标
+      const shownCycle = baseSummits + activeCycleIndex;
+      const altNow = (boulderProg * PEAK_ALT).toFixed(1).padStart(5, '0');
+      const phaseTag =
+        phase === 'CLIMB'
+          ? sprintToSummit
+            ? 'SPRINT_PEAK'
+            : '8H_ASCENT'
+          : phase === 'SUMMIT_BREATH'
+            ? 'AT_SUMMIT'
+            : phase === 'AVALANCHE'
+              ? 'ROCK_FALL'
+              : 'WALK_DOWN';
+
+      putStr(0, 1, `[${phaseTag}] ALT:${altNow}m`, 6);
+      if (boostBannerTimer > 0) {
+        putStr(
+          2,
+          2,
+          `>> BOOST +${lastBoostGainMeters.toFixed(1)}m ⚡`,
+          5
+        );
+      }
+
+      // 8. 合并同行同色连续字符生成轻量 span HTML
+      const htmlLines: string[] = [];
+      for (let r = 0; r < ROWS; r++) {
+        let lineHtml = '';
+        let runCls = cls[r][0];
+        let runText = chars[r][0];
+
+        for (let c = 1; c < COLS; c++) {
+          if (cls[r][c] === runCls) {
+            runText += chars[r][c];
+          } else {
+            const escaped = escapeHtml(runText);
+            lineHtml += runCls
+              ? `<span class="${CLS_NAMES[runCls]}">${escaped}</span>`
+              : escaped;
+            runCls = cls[r][c];
+            runText = chars[r][c];
+          }
+        }
+        const escaped = escapeHtml(runText);
+        lineHtml += runCls
+          ? `<span class="${CLS_NAMES[runCls]}">${escaped}</span>`
+          : escaped;
+        htmlLines.push(lineHtml);
+      }
+
+      stageEl.innerHTML = htmlLines.join('\n');
+
+      // 9. 底部状态栏：8 小时倒计时 + 助推里程 + 阶段哲学注脚
+      const filled = Math.max(0, Math.min(10, Math.round(boulderProg * 10)));
+      const bar = '▪'.repeat(filled) + '▫'.repeat(10 - filled);
+      const remainMs = Math.max(0, (1 - displayFrac) * CYCLE_MS);
+      const boostNote =
+        save.boostMeters >= 0.5 ? ` · BOOST +${Math.round(save.boostMeters)}m` : '';
+
+      telemetryEl.textContent = `ALT ${altNow}m [${bar}] ETA ${formatEta(remainMs)} · #${shownCycle}${boostNote}`;
+
+      if (quoteEl) {
+        if (phase === 'SUMMIT_BREATH') {
+          quoteEl.textContent = '"山顶的片刻喘息，风正吹过荒原。"';
+        } else if (phase === 'AVALANCHE') {
+          quoteEl.textContent = '"诸神判定巨石终将滚落山脚……"';
+        } else if (phase === 'DESCENT_WALK') {
+          quoteEl.textContent = '"真正打动我的，是他走下山去的那段时刻。"';
+        } else {
+          quoteEl.textContent = `"${CAMUS_QUOTE}"`;
+        }
+      }
+    };
+
+    requestAnimationFrame(tick);
   }
 </script>

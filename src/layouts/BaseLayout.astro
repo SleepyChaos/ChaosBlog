@@ -33,14 +33,10 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <script is:inline>
-      const savedTheme =
-        localStorage.getItem('theme') ??
-        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      document.documentElement.dataset.theme = savedTheme;
-      const savedPalette = localStorage.getItem('accent_palette');
-      if (savedPalette) {
-        document.documentElement.dataset.palette = savedPalette;
-      }
+      const savedRealm =
+        localStorage.getItem('sisyphus_realm') ||
+        (window.matchMedia('(prefers-color-scheme: light)').matches ? 'paper' : 'void');
+      document.documentElement.dataset.realm = savedRealm;
     </script>
   </head>
   <body>
@@ -70,19 +66,22 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     </div>
 
     <script>
-      // 1. 背景微像素尘埃渲染（对齐 2px 像素网格，零模糊光晕）
+      // 1. 背景像素微粒画布（随四大风貌切换粒子性格：星尘上浮 / CRT 数据雨下落 / 纸墨微尘 / 琥珀火星）
       const bgCanvas = document.getElementById('bg-pixel-canvas') as HTMLCanvasElement | null;
       if (bgCanvas && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         const ctx = bgCanvas.getContext('2d');
-        let mutedColor = '#888fa3';
+        let mutedColor = '#8d96ad';
+        let accentColor = '#818cf8';
+        let curRealm = document.documentElement.dataset.realm || 'void';
 
         const syncPalette = () => {
-          mutedColor =
-            getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() ||
-            '#888fa3';
+          const cs = getComputedStyle(document.documentElement);
+          mutedColor = cs.getPropertyValue('--text-muted').trim() || '#8d96ad';
+          accentColor = cs.getPropertyValue('--accent').trim() || '#818cf8';
+          curRealm = document.documentElement.dataset.realm || 'void';
         };
         syncPalette();
-        window.addEventListener('sisyphus:themechange', syncPalette);
+        window.addEventListener('sisyphus:realmchange', syncPalette);
 
         const resize = () => {
           const dpr = window.devicePixelRatio || 1;
@@ -96,29 +95,50 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         resize();
         window.addEventListener('resize', resize);
 
-        const dust = Array.from({ length: 28 }, () => ({
+        const dust = Array.from({ length: 32 }, (_, idx) => ({
           x: Math.random() * window.innerWidth,
           y: Math.random() * window.innerHeight,
-          vx: (Math.random() - 0.5) * 0.22,
-          vy: -0.1 - Math.random() * 0.2,
+          seed: idx,
           size: Math.random() < 0.78 ? 2 : 3,
-          alpha: 0.12 + Math.random() * 0.18,
+          alpha: 0.14 + Math.random() * 0.2,
         }));
 
-        const tickDust = () => {
+        const tickDust = (t: number) => {
           if (ctx) {
             const w = window.innerWidth;
             const h = window.innerHeight;
             ctx.clearRect(0, 0, w, h);
-            ctx.fillStyle = mutedColor;
             for (const p of dust) {
-              p.x += p.vx;
-              p.y += p.vy;
-              if (p.x < 0) p.x = w;
-              if (p.x > w) p.x = 0;
-              if (p.y < 0) p.y = h;
-              ctx.globalAlpha = p.alpha;
-              ctx.fillRect(Math.round(p.x / 2) * 2, Math.round(p.y / 2) * 2, p.size, p.size);
+              if (curRealm === 'crt') {
+                // CRT 绿磷风貌：垂直数字荧光雨滴下落
+                p.y += 0.65 + (p.seed % 4) * 0.28;
+                if (p.y > h) {
+                  p.y = -4;
+                  p.x = Math.round((Math.random() * w) / 16) * 16;
+                }
+                ctx.fillStyle = p.seed % 3 === 0 ? accentColor : mutedColor;
+                ctx.globalAlpha = p.alpha * 1.15;
+                ctx.fillRect(Math.round(p.x / 2) * 2, Math.round(p.y / 2) * 2, 2, p.size * 2);
+              } else if (curRealm === 'amber') {
+                // 琥珀风貌：斜向飘升的暖金余烬
+                p.x += 0.22 + Math.sin(t * 0.001 + p.seed) * 0.18;
+                p.y -= 0.28 + (p.seed % 3) * 0.12;
+                if (p.x > w) p.x = 0;
+                if (p.y < 0) p.y = h;
+                ctx.fillStyle = p.seed % 2 === 0 ? accentColor : mutedColor;
+                ctx.globalAlpha = p.alpha;
+                ctx.fillRect(Math.round(p.x / 2) * 2, Math.round(p.y / 2) * 2, p.size, p.size);
+              } else {
+                // 星图与手稿风貌：静谧缓升微尘
+                p.x += Math.sin(t * 0.0007 + p.seed) * 0.16;
+                p.y -= 0.12 + (p.seed % 3) * 0.08;
+                if (p.x < 0) p.x = w;
+                if (p.x > w) p.x = 0;
+                if (p.y < 0) p.y = h;
+                ctx.fillStyle = mutedColor;
+                ctx.globalAlpha = p.alpha;
+                ctx.fillRect(Math.round(p.x / 2) * 2, Math.round(p.y / 2) * 2, p.size, p.size);
+              }
             }
             ctx.globalAlpha = 1;
           }

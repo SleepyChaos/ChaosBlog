@@ -8,7 +8,7 @@ const rawRoute = Astro.url.pathname.startsWith(base)
 
 const displayCmd =
   rawRoute === '/'
-    ? 'cd ~/home && ./status.sh'
+    ? 'cd ~/home && ./sisyphus --cycle=8h'
     : `cat .${rawRoute.replace(/\/$/, '')}.md`;
 ---
 
@@ -27,17 +27,25 @@ const displayCmd =
           type="button"
           class="term-btn is-primary"
           id="hud-kick-trigger"
-          title="高速弹射浮动 ASCII 导航块"
+          title="高速弹射浮动 ASCII 导航块（同时助推西西弗斯）"
         >
-          [::弹射HUD]
+          [⚡弹射HUD]
         </button>
         <button
           type="button"
           class="term-btn"
           id="hud-dock-trigger"
-          title="将浮动导航块吸附/释放"
+          title="将浮动导航块挂靠侧边栏/释放"
         >
-          [::贴顶/释放]
+          [::侧挂/释放]
+        </button>
+        <button
+          type="button"
+          class="term-btn"
+          id="realm-cycle-btn"
+          title="切换全站终端主题风貌（星图 / 绿磷CRT / 纸墨蓝图 / 沙丘琥珀）"
+        >
+          <span id="realm-label">[❖ 星图]</span>
         </button>
         <a class="term-btn" href={GITHUB_URL} target="_blank" rel="noopener">
           [@{GITHUB_HANDLE}]
@@ -45,39 +53,29 @@ const displayCmd =
         <a class="term-btn" href={`${base}/rss.xml`} aria-label="RSS 订阅">
           [RSS]
         </a>
-        <button
-          type="button"
-          class="term-btn"
-          id="theme-toggle"
-          aria-label="切换明暗主题"
-        >
-          <span id="theme-label">[◐ THEME]</span>
-        </button>
       </div>
     </div>
   </div>
 </header>
 
 <script>
-  const themeBtn = document.getElementById('theme-toggle');
-  const themeLabel = document.getElementById('theme-label');
+  const REALM_NAMES: Record<string, string> = {
+    void: '[❖ 星图]',
+    crt: '[❖ 绿磷CRT]',
+    paper: '[❖ 纸墨手稿]',
+    amber: '[❖ 沙丘琥珀]',
+  };
 
-  function refreshThemeLabel() {
-    const isDark = document.documentElement.dataset.theme === 'dark';
-    if (themeLabel) {
-      themeLabel.textContent = isDark ? '[☀ LIGHT]' : '[☾ DARK]';
-    }
-  }
-  refreshThemeLabel();
-  window.addEventListener('sisyphus:themechange', refreshThemeLabel);
+  const realmLabel = document.getElementById('realm-label');
+  const refreshRealmLabel = () => {
+    const r = document.documentElement.dataset.realm || 'void';
+    if (realmLabel) realmLabel.textContent = REALM_NAMES[r] || '[❖ 星图]';
+  };
+  refreshRealmLabel();
+  window.addEventListener('sisyphus:realmchange', refreshRealmLabel);
 
-  themeBtn?.addEventListener('click', () => {
-    const root = document.documentElement;
-    const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
-    root.dataset.theme = next;
-    localStorage.setItem('theme', next);
-    refreshThemeLabel();
-    window.dispatchEvent(new CustomEvent('sisyphus:themechange', { detail: { theme: next } }));
+  document.getElementById('realm-cycle-btn')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('sisyphus:cycle-realm'));
   });
 
   document.getElementById('hud-kick-trigger')?.addEventListener('click', () => {

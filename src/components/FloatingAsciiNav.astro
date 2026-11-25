@@ -1,5 +1,5 @@
 ---
-import { getAllPosts, formatDateShort } from '../lib/content';
+import { getAllPosts, getAllTags, formatDateShort, readingTime } from '../lib/content';
 import { GITHUB_URL } from '../consts';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -18,12 +18,14 @@ const navItems = [
   { label: '?关于', href: `${base}/about/`, active: isAbout },
 ];
 
-// 构建期生成轻量全站检索索引（支持标题、标签、摘要与正文关键词秒级 grep）
 const posts = await getAllPosts();
-const searchIndex = posts.map((p) => ({
+const tags = getAllTags(posts);
+const searchIndex = posts.map((p, idx) => ({
+  idx: idx + 1,
   title: p.title,
   url: `${base}/posts/${p.slug}/`,
   date: formatDateShort(p.pubDate),
+  read: readingTime(p.body),
   tags: p.tags,
   desc: p.description || '',
   body: p.body
@@ -32,29 +34,32 @@ const searchIndex = posts.map((p) => ({
     .replace(/\s+/g, ' ')
     .slice(0, 600),
 }));
+const tagIndex = tags.map(([name, count]) => ({
+  name,
+  count,
+  url: `${base}/tags/${encodeURIComponent(name)}/`,
+}));
 ---
 
 <canvas id="fx-pixel-canvas" aria-hidden="true"></canvas>
 <div id="pixel-dock-ruler" class="pixel-dock-ruler" aria-hidden="true"></div>
 
+<!-- 主模块：始终只保留纯粹的 4 个路由按钮（侧挂时化作 74px 极细长条刀锋！） -->
 <nav
   id="ascii-float-nav"
   class="ascii-float-nav"
-  aria-label="浮动 ASCII 终端导航"
-  style="width: 150px; height: 72px; visibility: hidden;"
+  aria-label="浮动 ASCII 终端导航主舱"
+  data-base={base}
+  style="width: 146px; height: 68px; visibility: hidden;"
 >
-  <!-- 内部高透模糊毛玻璃芯（带次级弹簧滞后） -->
   <div
     id="ascii-inner-frost"
     class="ascii-inner-frost"
     style="left: 11px; right: 11px; top: 11px; bottom: 11px;"
   >
   </div>
-
-  <!-- 外圈耦合弹簧质量惯性 ASCII 边界 + 武器架机械挂钩画布 -->
   <canvas id="ascii-border-canvas" class="ascii-border-canvas" aria-hidden="true"></canvas>
 
-  <!-- 4 个核心路由按钮（悬浮态保留这 4 个且内部每个字符随失重浮动，吸附后字符定格！） -->
   {
     navItems.map((item, idx) => (
       <a
@@ -71,96 +76,119 @@ const searchIndex = posts.map((p) => ({
       </a>
     ))
   }
-
-  <!-- 吸附固定后展开的扩展终端控制台：输入检索终端 + 弹射 + 换色 + 明暗 + GitHub -->
-  <div id="hud-dock-extras" class="hud-dock-extras" aria-hidden="true">
-    <label class="hud-search-shell" id="hud-search-shell" aria-label="终端搜索文章">
-      <span class="hud-search-prompt">&gt;_</span>
-      <input
-        id="hud-search-input"
-        class="hud-search-input"
-        type="text"
-        placeholder="grep 搜索文章/标签..."
-        autocomplete="off"
-        spellcheck="false"
-      />
-    </label>
-
-    <button
-      type="button"
-      id="hud-btn-eject"
-      class="hud-util-btn is-eject"
-      title="脱离挂架高速弹射"
-    >
-      [⚡弹射]
-    </button>
-    <button
-      type="button"
-      id="hud-btn-palette"
-      class="hud-util-btn"
-      title="切换全站终端强调色（靛紫 / 磷光绿 / 琥珀橙 / 冰川青）"
-    >
-      [◈换色]
-    </button>
-    <button
-      type="button"
-      id="hud-btn-theme"
-      class="hud-util-btn"
-      title="切换明暗背景主题"
-    >
-      [◐明暗]
-    </button>
-    <a
-      href={GITHUB_URL}
-      target="_blank"
-      rel="noopener"
-      draggable="false"
-      id="hud-btn-github"
-      class="hud-util-btn"
-      title="访问 Sisyphus 的 GitHub 主页"
-    >
-      [@GH↗]
-    </a>
-  </div>
 </nav>
 
-<!-- 终端检索实时下拉结果框 -->
-<div id="hud-search-dropdown" class="hud-search-dropdown" role="listbox" aria-label="文章搜索结果">
-</div>
+<!-- 链式独立挂件 1：无框融底闪烁命令终端（直接融入透明毛玻璃，支持 help/ls/neofetch/theme/push 及全文搜索） -->
+<label id="pendant-cli" class="naked-cli-pendant" aria-label="交互式终端命令行与搜索">
+  <span class="naked-cli-prompt">$</span>
+  <span class="naked-cli-stage">
+    <input
+      id="naked-cli-input"
+      class="naked-cli-input"
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <span id="naked-cli-ambient" class="naked-cli-ambient">
+      <span id="naked-cli-typer"></span><span class="naked-cli-cursor">█</span>
+    </span>
+  </span>
+</label>
+
+<!-- 链式独立挂件 2：弹射脱钩铭牌 -->
+<button
+  type="button"
+  id="pendant-eject"
+  class="hud-pendant is-eject"
+  title="脱离挂架高速弹射（同时助推西西弗斯）"
+>
+  <span class="pendant-lug">╠</span><span>⚡弹射</span><span class="pendant-lug">╣</span>
+</button>
+
+<!-- 链式独立挂件 3：四重终端风貌切换铭牌（合并换色、明暗、字体与器物细节） -->
+<button
+  type="button"
+  id="pendant-realm"
+  class="hud-pendant"
+  title="切换全站终端风貌（深空星图 / 绿磷CRT / 纸墨蓝图 / 沙丘琥珀）"
+>
+  <span class="pendant-lug">╠</span><span id="pendant-realm-text">❖星图</span><span class="pendant-lug">╣</span>
+</button>
+
+<!-- 链式独立挂件 4：GitHub 身份铭牌 -->
+<a
+  href={GITHUB_URL}
+  target="_blank"
+  rel="noopener"
+  draggable="false"
+  id="pendant-gh"
+  class="hud-pendant"
+  title="访问 Sisyphus 的 GitHub 主页"
+>
+  <span class="pendant-lug">╠</span><span>@GH↗</span><span class="pendant-lug">╣</span>
+</a>
+
+<!-- 终端执行输出与搜索匹配透明浮层 -->
+<div id="hud-term-overlay" class="hud-term-overlay" role="region" aria-label="终端输出面板"></div>
 
 <script
   type="application/json"
-  id="hud-search-index-data"
-  set:html={JSON.stringify(searchIndex).replace(/</g, '\\u003c')}
+  id="hud-cli-payload"
+  set:html={JSON.stringify({ posts: searchIndex, tags: tagIndex }).replace(/</g, '\\u003c')}
 />
 
 <script>
-  const STORAGE_KEY = 'sisyphus_ascii_hud_v5';
-  const PALETTES = ['indigo', 'emerald', 'amber', 'cyan'] as const;
+  const STORAGE_KEY = 'sisyphus_ascii_hud_v6';
+  const REALMS = ['void', 'crt', 'paper', 'amber'] as const;
+  type RealmId = (typeof REALMS)[number];
+  const REALM_SHORT: Record<RealmId, string> = {
+    void: '❖星图',
+    crt: '❖绿磷',
+    paper: '❖纸墨',
+    amber: '❖琥珀',
+  };
+  const REALM_DESC: Record<RealmId, string> = {
+    void: 'VOID_GLASS (深空星图 · 暗色高透玻璃)',
+    crt: 'PHOSPHOR_CRT (1984 绿磷显像管 · 等宽双线框)',
+    paper: 'PAPER_BLUEPRINT (手稿蓝图 · 亮色衬线宋体)',
+    amber: 'AMBER_DUNE (沙丘琥珀 · 暖金工业终端)',
+  };
+
   const BORDER_PAD = 76;
 
   interface PostIndexItem {
+    idx: number;
     title: string;
     url: string;
     date: string;
+    read: string;
     tags: string[];
     desc: string;
     body: string;
   }
+  interface TagIndexItem {
+    name: string;
+    count: number;
+    url: string;
+  }
 
   const nav = document.getElementById('ascii-float-nav') as HTMLElement | null;
+  const baseUrl = nav?.dataset.base || '';
   const innerFrost = document.getElementById('ascii-inner-frost') as HTMLElement | null;
   const borderCanvas = document.getElementById('ascii-border-canvas') as HTMLCanvasElement | null;
   const ruler = document.getElementById('pixel-dock-ruler') as HTMLElement | null;
   const fxCanvas = document.getElementById('fx-pixel-canvas') as HTMLCanvasElement | null;
-  const dockExtras = document.getElementById('hud-dock-extras') as HTMLElement | null;
-  const searchShell = document.getElementById('hud-search-shell') as HTMLElement | null;
-  const searchInput = document.getElementById('hud-search-input') as HTMLInputElement | null;
-  const searchDropdown = document.getElementById('hud-search-dropdown') as HTMLElement | null;
-  const btnEject = document.getElementById('hud-btn-eject') as HTMLButtonElement | null;
-  const btnPalette = document.getElementById('hud-btn-palette') as HTMLButtonElement | null;
-  const btnTheme = document.getElementById('hud-btn-theme') as HTMLButtonElement | null;
-  const btnGithub = document.getElementById('hud-btn-github') as HTMLAnchorElement | null;
+
+  const pendantCli = document.getElementById('pendant-cli') as HTMLElement | null;
+  const cliInput = document.getElementById('naked-cli-input') as HTMLInputElement | null;
+  const cliAmbient = document.getElementById('naked-cli-ambient') as HTMLElement | null;
+  const cliTyper = document.getElementById('naked-cli-typer') as HTMLElement | null;
+  const pendantEject = document.getElementById('pendant-eject') as HTMLButtonElement | null;
+  const pendantRealm = document.getElementById('pendant-realm') as HTMLButtonElement | null;
+  const pendantRealmText = document.getElementById('pendant-realm-text') as HTMLElement | null;
+  const pendantGh = document.getElementById('pendant-gh') as HTMLAnchorElement | null;
+  const termOverlay = document.getElementById('hud-term-overlay') as HTMLElement | null;
+
   const links = Array.from(
     document.querySelectorAll<HTMLAnchorElement>('#ascii-float-nav .ascii-nav-item'),
   );
@@ -173,11 +201,16 @@ const searchIndex = posts.map((p) => ({
   }));
 
   let postsData: PostIndexItem[] = [];
+  let tagsData: TagIndexItem[] = [];
   try {
-    const rawJson = document.getElementById('hud-search-index-data')?.textContent;
-    if (rawJson) postsData = JSON.parse(rawJson);
+    const raw = document.getElementById('hud-cli-payload')?.textContent;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      postsData = parsed.posts || [];
+      tagsData = parsed.tags || [];
+    }
   } catch {
-    postsData = [];
+    // ignore
   }
 
   if (
@@ -186,36 +219,52 @@ const searchIndex = posts.map((p) => ({
     borderCanvas &&
     ruler &&
     fxCanvas &&
-    dockExtras &&
-    searchShell &&
-    searchInput &&
-    searchDropdown &&
-    btnEject &&
-    btnPalette &&
-    btnTheme &&
-    btnGithub
+    pendantCli &&
+    cliInput &&
+    cliAmbient &&
+    cliTyper &&
+    pendantEject &&
+    pendantRealm &&
+    pendantRealmText &&
+    pendantGh &&
+    termOverlay
   ) {
     const fxCtx = fxCanvas.getContext('2d');
     const bCtx = borderCanvas.getContext('2d');
 
     let accentColor = '#818cf8';
-    let mutedColor = '#8e96ab';
-    let borderColor = '#394059';
+    let mutedColor = '#8d96ad';
+    let borderColor = '#4a5578';
     let monoFont = '600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
     const syncThemePalette = () => {
       const cs = getComputedStyle(document.documentElement);
       accentColor = cs.getPropertyValue('--accent').trim() || '#818cf8';
-      mutedColor = cs.getPropertyValue('--text-muted').trim() || '#8e96ab';
-      borderColor = cs.getPropertyValue('--border-strong').trim() || '#394059';
+      mutedColor = cs.getPropertyValue('--text-muted').trim() || '#8d96ad';
+      borderColor = cs.getPropertyValue('--border-strong').trim() || '#4a5578';
       const family = cs.getPropertyValue('--font-mono').trim() || 'monospace';
       monoFont = `600 11px ${family}`;
 
-      const isDark = document.documentElement.dataset.theme === 'dark';
-      btnTheme.textContent = isDark ? '[☀亮色]' : '[☾暗色]';
+      const curRealm = (document.documentElement.dataset.realm || 'void') as RealmId;
+      pendantRealmText.textContent = REALM_SHORT[curRealm] || '❖星图';
     };
     syncThemePalette();
-    window.addEventListener('sisyphus:themechange', syncThemePalette);
+    window.addEventListener('sisyphus:realmchange', syncThemePalette);
+
+    const applyRealm = (next: RealmId) => {
+      document.documentElement.dataset.realm = next;
+      localStorage.setItem('sisyphus_realm', next);
+      syncThemePalette();
+      window.dispatchEvent(new CustomEvent('sisyphus:realmchange', { detail: { realm: next } }));
+    };
+
+    const cycleRealm = () => {
+      const cur = (document.documentElement.dataset.realm || 'void') as RealmId;
+      const next = REALMS[(REALMS.indexOf(cur) + 1) % REALMS.length];
+      applyRealm(next);
+      return next;
+    };
+    window.addEventListener('sisyphus:cycle-realm', cycleRealm);
 
     let lastFxW = 0;
     let lastFxH = 0;
@@ -268,108 +317,49 @@ const searchIndex = posts.map((p) => ({
       }
     };
 
-    // 根据视口宽度动态计算三种形态的目标尺寸与各子控件坐标（悬浮态精简 4 按钮，吸附态展开完整搜索控制台！）
-    interface LayoutConfig {
-      w: number;
-      h: number;
-      inset: { l: number; r: number; t: number; b: number };
-      navCoords: [number, number][];
-      searchPos: { x: number; y: number; w: number };
-      utilCoords: [number, number][]; // [eject, palette, theme, github]
-    }
-
-    const getShapeLayout = (key: 'block' | 'bar' | 'rail', vw: number): LayoutConfig => {
-      if (key === 'block') {
-        return {
-          w: 150,
-          h: 72,
-          inset: { l: 11, r: 11, t: 11, b: 11 },
-          navCoords: [
-            [-30, -9],
-            [30, -9],
-            [-30, 10],
-            [30, 10],
-          ],
-          searchPos: { x: 0, y: 0, w: 90 },
-          utilCoords: [
-            [0, 0],
-            [0, 0],
-            [0, 0],
-            [0, 0],
-          ],
-        };
-      }
-
-      if (key === 'bar') {
-        // 窄屏紧凑双行控制台 vs 桌面端宽体单行终端栏
-        if (vw < 720) {
-          const w = Math.max(308, Math.min(vw - 16, 420));
-          return {
-            w,
-            h: 68,
-            inset: { l: 12, r: 12, t: 6, b: 6 },
-            navCoords: [
-              [-112, -13],
-              [-52, -13],
-              [6, -13],
-              [60, -13],
-            ],
-            searchPos: { x: -66, y: 13, w: 142 },
-            utilCoords: [
-              [118, -13],
-              [34, 13],
-              [84, 13],
-              [130, 13],
-            ],
-          };
-        }
-        return {
-          w: Math.min(vw - 28, 686),
-          h: 44,
-          inset: { l: 16, r: 16, t: 6, b: 6 },
-          navCoords: [
-            [-282, 0],
-            [-224, 0],
-            [-168, 0],
-            [-116, 0],
-          ],
-          searchPos: { x: 4, y: 0, w: 184 },
-          utilCoords: [
-            [132, 0],
-            [188, 0],
-            [244, 0],
-            [296, 0],
-          ],
-        };
-      }
-
-      // rail: 挂在左右侧边武器架上的竖向战术终端面板
-      return {
-        w: 188,
-        h: 226,
+    // 主模块始终保持纤细精干！侧挂时仅 74px 宽单列刀锋，扩展功能全部作为独立挂件串在后面！
+    const SHAPES = {
+      block: {
+        w: 146,
+        h: 68,
         inset: { l: 11, r: 11, t: 11, b: 11 },
-        navCoords: [
-          [-38, -74],
-          [38, -74],
-          [-38, -45],
-          [38, -45],
+        coords: [
+          [-29, -9],
+          [29, -9],
+          [-29, 10],
+          [29, 10],
         ],
-        searchPos: { x: 0, y: -4, w: 152 },
-        utilCoords: [
-          [-38, 38],
-          [38, 38],
-          [-38, 68],
-          [38, 68],
+      },
+      bar: {
+        w: 234,
+        h: 34,
+        inset: { l: 14, r: 14, t: 5, b: 5 },
+        coords: [
+          [-80, 0],
+          [-26, 0],
+          [28, 0],
+          [80, 0],
         ],
-      };
-    };
+      },
+      rail: {
+        // 细长竖条（仅 74px 宽！比之前窄一半多！）
+        w: 74,
+        h: 126,
+        inset: { l: 9, r: 9, t: 10, b: 10 },
+        coords: [
+          [0, -37],
+          [0, -12],
+          [0, 12],
+          [0, 37],
+        ],
+      },
+    } as const;
 
-    const SIDE_RACK_GAP = 28;
+    const SIDE_RACK_GAP = 26;
     const BAR_RACK_GAP = 14;
     const UNHOOK_PULL_DIST = 30;
-
     const CAPTURE_SPEED = 3.8;
-    const MAGNET_ZONE = 62;
+    const MAGNET_ZONE = 60;
     const CRUISE_SPEED = 0.82;
     const RESTITUTION = 0.85;
     const AIR_DRAG = 0.986;
@@ -390,7 +380,438 @@ const searchIndex = posts.map((p) => ({
     let rackVelY = 0;
     let magnetImmunityUntil = 0;
 
-    // 28 节点耦合弹簧-质量惯性周界环
+    // ========= 4 个链式独立外挂件的弹簧摆锤状态 =========
+    interface SatPendant {
+      el: HTMLElement;
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      w: number;
+      h: number;
+      alpha: number;
+    }
+    const satellites: SatPendant[] = [
+      { el: pendantCli, x: 400, y: 160, vx: 0, vy: 0, w: 170, h: 30, alpha: 0 },
+      { el: pendantEject, x: 400, y: 160, vx: 0, vy: 0, w: 66, h: 26, alpha: 0 },
+      { el: pendantRealm, x: 400, y: 160, vx: 0, vy: 0, w: 68, h: 26, alpha: 0 },
+      { el: pendantGh, x: 400, y: 160, vx: 0, vy: 0, w: 64, h: 26, alpha: 0 },
+    ];
+    let cliFocused = false;
+    let cliHovered = false;
+
+    pendantCli.addEventListener('pointerenter', () => {
+      cliHovered = true;
+    });
+    pendantCli.addEventListener('pointerleave', () => {
+      cliHovered = false;
+    });
+
+    // ========= 无框闪烁终端：空闲自动打字呼吸 + 真实 UNIX 命令引擎 + 全文检索 =========
+    const AMBIENT_HINTS = [
+      'help',
+      'grep rust...',
+      'neofetch',
+      'ls -l posts',
+      'theme',
+      'push --boulder',
+      'camus',
+    ];
+    let hintIdx = 0;
+    let hintChar = 0;
+    let hintDeleting = false;
+    let nextTypeTick = 0;
+
+    const updateAmbientTyper = (t: number) => {
+      const active = cliFocused || cliInput.value.length > 0;
+      cliAmbient.style.opacity = active ? '0' : '1';
+      if (active || t < nextTypeTick) return;
+
+      const word = AMBIENT_HINTS[hintIdx];
+      if (!hintDeleting) {
+        hintChar++;
+        cliTyper.textContent = word.slice(0, hintChar);
+        if (hintChar >= word.length) {
+          hintDeleting = true;
+          nextTypeTick = t + 1850;
+        } else {
+          nextTypeTick = t + 75 + Math.random() * 55;
+        }
+      } else {
+        hintChar--;
+        cliTyper.textContent = word.slice(0, Math.max(0, hintChar));
+        if (hintChar <= 0) {
+          hintDeleting = false;
+          hintIdx = (hintIdx + 1) % AMBIENT_HINTS.length;
+          nextTypeTick = t + 420;
+        } else {
+          nextTypeTick = t + 36;
+        }
+      }
+    };
+
+    let overlayOpen = false;
+    let matchedPosts: PostIndexItem[] = [];
+    let selectedIdx = 0;
+    let isCommandOutputMode = false;
+
+    const closeOverlay = () => {
+      overlayOpen = false;
+      termOverlay.classList.remove('is-open');
+    };
+
+    const positionOverlay = () => {
+      if (!overlayOpen) return;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const cliSat = satellites[0];
+      const ow = Math.min(vw * 0.92, 410);
+      termOverlay.style.width = `${ow}px`;
+
+      if (state === 'top') {
+        const left = Math.max(8, Math.min(vw - ow - 8, cliSat.x - ow * 0.4));
+        termOverlay.style.left = `${Math.round(left)}px`;
+        termOverlay.style.top = `${Math.round(cliSat.y + 22)}px`;
+        termOverlay.style.bottom = 'auto';
+      } else if (state === 'bottom') {
+        const left = Math.max(8, Math.min(vw - ow - 8, cliSat.x - ow * 0.4));
+        termOverlay.style.left = `${Math.round(left)}px`;
+        termOverlay.style.top = 'auto';
+        termOverlay.style.bottom = `${Math.round(vh - (cliSat.y - 22))}px`;
+      } else if (state === 'left') {
+        termOverlay.style.left = `${Math.round(cliSat.x + cliSat.w * 0.5 + 12)}px`;
+        termOverlay.style.top = `${Math.max(12, Math.min(vh - 320, Math.round(cliSat.y - 24)))}px`;
+        termOverlay.style.bottom = 'auto';
+      } else if (state === 'right') {
+        termOverlay.style.left = `${Math.max(8, Math.round(cliSat.x - cliSat.w * 0.5 - ow - 12))}px`;
+        termOverlay.style.top = `${Math.max(12, Math.min(vh - 320, Math.round(cliSat.y - 24)))}px`;
+        termOverlay.style.bottom = 'auto';
+      }
+    };
+
+    const showTerminalText = (header: string, bodyHtml: string) => {
+      isCommandOutputMode = true;
+      matchedPosts = [];
+      termOverlay.innerHTML = `<div class="hud-search-head"><span>${header}</span><span>[ESC 关闭]</span></div>${bodyHtml}`;
+      overlayOpen = true;
+      termOverlay.classList.add('is-open');
+      positionOverlay();
+    };
+
+    const CAMUS_QUOTES = [
+      '“迈向高处的挣扎本身就足以充实人的心灵。应当想象西西弗斯是幸福的。” —— 阿尔贝·加缪',
+      '“正在努力从 vibecoding 的浪潮中寻找属于我的石头。” —— Sisyphus',
+      '“他走下山时那短暂的停顿，正是意识觉醒、高于他命运的时刻。” ——《西西弗神话》',
+      '“希望过一阵回头看，能发现自己又多弄懂了一点。(´･ω･)” —— Sisyphus',
+    ];
+
+    const executeCliCommand = (rawInput: string): boolean => {
+      const trimmed = rawInput.trim();
+      if (!trimmed) return false;
+      const [cmdRaw, ...rest] = trimmed.split(/\s+/);
+      const cmd = cmdRaw.toLowerCase();
+      const arg = rest.join(' ').trim();
+
+      if (cmd === 'help' || cmd === '?' || cmd === 'man') {
+        showTerminalText(
+          'SISYPHUS-SH :: BUILTIN COMMANDS',
+          `<pre class="hud-term-pre" style="color: var(--text);">  <strong style="color:var(--accent)">ls</strong> / <strong style="color:var(--accent)">posts</strong>      列出全部已发布文章
+  <strong style="color:var(--accent)">tags</strong>            列出全部标签索引
+  <strong style="color:var(--accent)">open &lt;#&gt;</strong>        按序号打开文章 (如 open 1)
+  <strong style="color:var(--accent)">neofetch</strong>        查看系统与 8h 推石轮回遥测
+  <strong style="color:var(--accent)">theme [name]</strong>    切换风貌 (void/crt/paper/amber)
+  <strong style="color:var(--accent)">push</strong> / <strong style="color:var(--accent)">summit</strong>   助推巨石 / 直接冲顶演示滚落与下山
+  <strong style="color:var(--accent)">eject</strong>           脱离武器挂架高速弹射
+  <strong style="color:var(--accent)">whoami</strong> / <strong style="color:var(--accent)">camus</strong>  打印西西弗斯语录与身份宣言
+  <strong style="color:var(--accent)">cd ~|tags|about</strong> 终端路由跳转  |  直接输入任意词全文搜索</pre>`,
+        );
+        return true;
+      }
+
+      if (cmd === 'ls' || cmd === 'll' || cmd === 'posts') {
+        if (arg === 'tags') {
+          const tagHtml = tagsData
+            .map((t) => `<a href="${t.url}" class="tag-chip" style="margin:2px">#${t.name} [${t.count}]</a>`)
+            .join('');
+          showTerminalText('LS ./TAGS', `<div style="display:flex;flex-wrap:wrap;gap:4px;">${tagHtml}</div>`);
+          return true;
+        }
+        const rows = postsData
+          .map(
+            (p) =>
+              `<a href="${p.url}" class="hud-search-item"><div class="hud-search-item-title"><span>[${String(p.idx).padStart(2, '0')}] ${p.title}</span><span style="color:var(--text-muted);font-weight:400">${p.date}</span></div></a>`,
+          )
+          .join('');
+        showTerminalText(`LS -LH ./POSTS (${postsData.length})`, rows);
+        return true;
+      }
+
+      if (cmd === 'tags') {
+        const tagHtml = tagsData
+          .map((t) => `<a href="${t.url}" class="tag-chip" style="margin:2px">#${t.name} [${t.count}]</a>`)
+          .join('');
+        showTerminalText(`TAGS (${tagsData.length})`, `<div style="display:flex;flex-wrap:wrap;gap:4px;">${tagHtml}</div>`);
+        return true;
+      }
+
+      if (cmd === 'open' || cmd === 'cat') {
+        const num = Number(arg);
+        if (Number.isInteger(num) && postsData[num - 1]) {
+          window.location.href = postsData[num - 1].url;
+          return true;
+        }
+        if (arg === 'about' || arg === 'about.md') {
+          window.location.href = `${baseUrl}/about/`;
+          return true;
+        }
+      }
+
+      if (cmd === 'cd') {
+        const target = arg.replace(/^\/+|\/+$/g, '');
+        if (!target || target === '~' || target === 'home') {
+          window.location.href = `${baseUrl}/`;
+          return true;
+        }
+        if (target === 'tags') {
+          window.location.href = `${baseUrl}/tags/`;
+          return true;
+        }
+        if (target === 'about') {
+          window.location.href = `${baseUrl}/about/`;
+          return true;
+        }
+      }
+
+      if (cmd === 'whoami' || cmd === 'camus' || cmd === 'fortune') {
+        const quote =
+          cmd === 'whoami'
+            ? 'Sisyphus (@SleepyChaos) · 杭师大在读 · 正在努力从 vibecoding 的浪潮中寻找属于我的石头。\nStack: Rust · CodeQL (SemFlow Audit) · Astro'
+            : CAMUS_QUOTES[Math.floor(Math.random() * CAMUS_QUOTES.length)];
+        showTerminalText(`STDOUT :: ${cmd.toUpperCase()}`, `<pre class="hud-term-pre">${quote}</pre>`);
+        return true;
+      }
+
+      if (cmd === 'neofetch' || cmd === 'fastfetch' || cmd === 'uptime') {
+        const r = (document.documentElement.dataset.realm || 'void') as RealmId;
+        const cycleMs = 8 * 3600 * 1000;
+        const pct = (((Date.now() % cycleMs) / cycleMs) * 100).toFixed(1);
+        showTerminalText(
+          'NEOFETCH :: SISYPHUS@CHAOS',
+          `<pre class="hud-term-pre"><span style="color:var(--accent)">      ╱▒░     </span>  <strong>sisyphus@chaos</strong>
+<span style="color:var(--accent)">    o_ (@)    </span>  ──────────────────────
+<span style="color:var(--accent)">   /| ╱▒▒░    </span>  <strong>REALM</strong>: ${REALM_DESC[r]}
+<span style="color:var(--accent)">   / \\▒▒▒░    </span>  <strong>POSTS</strong>: ${postsData.length} published · ${tagsData.length} tags
+<span style="color:var(--accent)"> ╱▒▒▒▒▒▒▒░    </span>  <strong>EPOCH</strong>: 8h Boulder Cycle (${pct}% elapsed)
+                <strong>SHELL</strong>: sisyphus-sh (glass-melted)</pre>`,
+        );
+        return true;
+      }
+
+      if (cmd === 'theme' || cmd === 'realm') {
+        const argL = arg.toLowerCase() as RealmId;
+        const next = REALMS.includes(argL) ? argL : cycleRealm();
+        if (REALMS.includes(argL)) applyRealm(argL);
+        showTerminalText('REALM SWITCHED', `<pre class="hud-term-pre">→ Active Realm: <strong style="color:var(--accent)">${REALM_DESC[next]}</strong></pre>`);
+        return true;
+      }
+
+      if (cmd === 'push' || cmd === 'boost') {
+        window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.06 } }));
+        showTerminalText('BOULDER BOOST', `<pre class="hud-term-pre">▲ 已向山坡上的西西弗斯注入 +53m 推石动能！</pre>`);
+        return true;
+      }
+
+      if (cmd === 'summit' || cmd === 'roll') {
+        window.dispatchEvent(new CustomEvent('sisyphus:trigger-summit'));
+        showTerminalText('SUMMIT SEQUENCE', `<pre class="hud-term-pre">▲ 已触发登顶 → 巨石崩落 → 转身下山完整轮回演示（请看首页 01 画布）！</pre>`);
+        return true;
+      }
+
+      if (cmd === 'eject' || cmd === 'launch') {
+        cliInput.value = '';
+        launchBallistic();
+        return true;
+      }
+
+      if (cmd === 'clear' || cmd === 'cls' || cmd === 'exit') {
+        cliInput.value = '';
+        cliInput.blur();
+        closeOverlay();
+        return true;
+      }
+
+      return false;
+    };
+
+    const renderLiveSearch = () => {
+      const q = cliInput.value.trim();
+      if (!q) {
+        // 空输入聚焦时展示快捷终端提示 + 最新文章
+        isCommandOutputMode = false;
+        matchedPosts = postsData.slice(0, 5);
+        selectedIdx = 0;
+        const rows = matchedPosts
+          .map(
+            (p, idx) =>
+              `<a href="${p.url}" class="hud-search-item${idx === 0 ? ' is-selected' : ''}"><div class="hud-search-item-title"><span>${idx === matchedPosts.length - 1 ? '└─' : '├─'} ${p.title}</span><span style="color:var(--text-muted);font-weight:400">${p.date}</span></div></a>`,
+          )
+          .join('');
+        termOverlay.innerHTML = `<div class="hud-search-head"><span>输入关键词搜索，或敲 help / ls / neofetch / theme / push</span><span>[ESC]</span></div>${rows}`;
+        overlayOpen = true;
+        termOverlay.classList.add('is-open');
+        positionOverlay();
+        return;
+      }
+
+      // 若正在输入明显的内置无参指令前缀，不抢占回车，实时过滤文章同时提示可回车执行命令
+      const ql = q.toLowerCase();
+      const tokens = ql.split(/\s+/).filter(Boolean);
+      matchedPosts = postsData
+        .map((item) => {
+          const titleL = item.title.toLowerCase();
+          const tagsL = item.tags.join(' ').toLowerCase();
+          const descL = item.desc.toLowerCase();
+          const bodyL = item.body.toLowerCase();
+          let score = 0;
+          for (const tk of tokens) {
+            let hit = 0;
+            if (titleL.includes(tk)) hit += 10;
+            if (tagsL.includes(tk)) hit += 7;
+            if (descL.includes(tk)) hit += 4;
+            if (bodyL.includes(tk)) hit += 2;
+            if (hit === 0) return { item, score: 0 };
+            score += hit;
+          }
+          return { item, score };
+        })
+        .filter((r) => r.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 7)
+        .map((r) => r.item);
+
+      isCommandOutputMode = false;
+      if (selectedIdx >= matchedPosts.length) selectedIdx = 0;
+
+      const isKnownCmd = [
+        'help',
+        '?',
+        'ls',
+        'll',
+        'posts',
+        'tags',
+        'open',
+        'cat',
+        'cd',
+        'whoami',
+        'camus',
+        'fortune',
+        'neofetch',
+        'fastfetch',
+        'uptime',
+        'theme',
+        'realm',
+        'push',
+        'boost',
+        'summit',
+        'roll',
+        'eject',
+        'launch',
+        'clear',
+      ].includes(tokens[0]);
+
+      const cmdBanner = isKnownCmd
+        ? `<div style="padding:4px 6px;margin-bottom:4px;background:var(--accent-soft);color:var(--accent);border-left:2px solid var(--accent);">⚡ 按 Enter 执行终端命令: <strong>$ ${q}</strong></div>`
+        : '';
+
+      const rows =
+        matchedPosts.length === 0
+          ? `<div style="padding:6px;color:var(--text-muted);">${isKnownCmd ? '直接回车运行该命令。' : '未匹配到文章，试试敲 help 查看终端指令。'}</div>`
+          : matchedPosts
+              .map((p, idx) => {
+                const tagStr = p.tags.slice(0, 3).map((t) => `#${t}`).join(' ');
+                return `<a href="${p.url}" class="hud-search-item${idx === selectedIdx && !isKnownCmd ? ' is-selected' : ''}">
+                  <div class="hud-search-item-title">
+                    <span>${idx === matchedPosts.length - 1 ? '└─' : '├─'} ${p.title}</span>
+                    <span style="color:var(--text-muted);font-weight:400;flex-shrink:0">${p.date}</span>
+                  </div>
+                  <div class="hud-search-item-sub">${tagStr ? `[${tagStr}] ` : ''}${p.desc}</div>
+                </a>`;
+              })
+              .join('');
+
+      termOverlay.innerHTML = `<div class="hud-search-head"><span>$ grep -i "${q}" (${matchedPosts.length})</span><span>[Enter 执行]</span></div>${cmdBanner}${rows}`;
+      overlayOpen = true;
+      termOverlay.classList.add('is-open');
+      positionOverlay();
+    };
+
+    cliInput.addEventListener('focus', () => {
+      cliFocused = true;
+      renderLiveSearch();
+    });
+    cliInput.addEventListener('blur', () => {
+      cliFocused = false;
+    });
+    cliInput.addEventListener('input', () => {
+      selectedIdx = 0;
+      renderLiveSearch();
+    });
+    cliInput.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' && !isCommandOutputMode && matchedPosts.length > 0) {
+        e.preventDefault();
+        selectedIdx = (selectedIdx + 1) % matchedPosts.length;
+        renderLiveSearch();
+      } else if (e.key === 'ArrowUp' && !isCommandOutputMode && matchedPosts.length > 0) {
+        e.preventDefault();
+        selectedIdx = (selectedIdx - 1 + matchedPosts.length) % matchedPosts.length;
+        renderLiveSearch();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = cliInput.value.trim();
+        if (executeCliCommand(val)) {
+          cliInput.select();
+          return;
+        }
+        if (matchedPosts[selectedIdx]) {
+          saveState();
+          window.location.href = matchedPosts[selectedIdx].url;
+        }
+      } else if (e.key === 'Escape') {
+        cliInput.value = '';
+        cliInput.blur();
+        closeOverlay();
+      }
+    });
+
+    // 全局按 `/` 键快速唤醒无框终端！
+    window.addEventListener('keydown', (e) => {
+      if (
+        e.key === '/' &&
+        document.activeElement !== cliInput &&
+        !(document.activeElement instanceof HTMLInputElement) &&
+        !(document.activeElement instanceof HTMLTextAreaElement)
+      ) {
+        e.preventDefault();
+        if (state === 'free' || state === 'dragging') {
+          lockDock('top', window.innerWidth, window.innerHeight, performance.now());
+        }
+        setTimeout(() => cliInput.focus(), 60);
+      }
+    });
+
+    document.addEventListener('pointerdown', (e) => {
+      const target = e.target as Node | null;
+      if (
+        overlayOpen &&
+        target &&
+        !pendantCli.contains(target) &&
+        !termOverlay.contains(target)
+      ) {
+        closeOverlay();
+      }
+    });
+
+    // ========= 28 节点耦合弹簧-质量惯性环 + 鼠标“拨弦”效应 + 脉冲孤子波 =========
     const RING_COUNT = 28;
     interface RingMass {
       ux: number;
@@ -420,15 +841,7 @@ const searchIndex = posts.map((p) => ({
         uy = 1 - frac * 2;
       }
       const midness = Math.sin(frac * Math.PI);
-      return {
-        ux,
-        uy,
-        mass: 0.86 + midness * 0.54,
-        dx: 0,
-        dy: 0,
-        vx: 0,
-        vy: 0,
-      };
+      return { ux, uy, mass: 0.86 + midness * 0.54, dx: 0, dy: 0, vx: 0, vy: 0 };
     });
 
     let coreDX = 0;
@@ -469,16 +882,12 @@ const searchIndex = posts.map((p) => ({
     let rackDeploy = 0;
     let rackEdge: EdgeSide | null = null;
 
-    const initShape = getShapeLayout('block', 1200);
-    let curW = initShape.w;
-    let curH = initShape.h;
+    let curW: number = SHAPES.block.w;
+    let curH: number = SHAPES.block.h;
     let velW = 0;
     let velH = 0;
-    let curInset = { ...initShape.inset };
-    const itemSpring = initShape.navCoords.map(([ix, iy]) => ({ x: ix, y: iy, vx: 0, vy: 0 }));
-    const searchSpring = { x: 0, y: 0, w: 120 };
-    const utilEls: HTMLElement[] = [btnEject, btnPalette, btnTheme, btnGithub];
-    const utilSpring = initShape.utilCoords.map(([ux, uy]) => ({ x: ux, y: uy }));
+    let curInset = { ...SHAPES.block.inset };
+    const itemSpring = SHAPES.block.coords.map(([ix, iy]) => ({ x: ix, y: iy, vx: 0, vy: 0 }));
 
     const saveState = () => {
       if (!initialized || window.innerWidth < 160 || window.innerHeight < 140) return;
@@ -500,163 +909,43 @@ const searchIndex = posts.map((p) => ({
     };
     window.addEventListener('pagehide', saveState);
 
-    // ========= 终端搜索逻辑（支持全文匹配、上下方向键选文章、回车跳转） =========
-    let dropdownOpen = false;
-    let matchedPosts: PostIndexItem[] = [];
-    let selectedIdx = 0;
-
-    const closeSearchDropdown = () => {
-      dropdownOpen = false;
-      searchDropdown.classList.remove('is-open');
-    };
-
-    const positionDropdown = () => {
-      if (!dropdownOpen) return;
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const dropW = Math.min(vw * 0.9, 360);
-      searchDropdown.style.width = `${dropW}px`;
-
-      if (state === 'top') {
-        const left = Math.max(8, Math.min(vw - dropW - 8, x - dropW * 0.5));
-        searchDropdown.style.left = `${Math.round(left)}px`;
-        searchDropdown.style.top = `${Math.round(y + curH * 0.5 + 8)}px`;
-        searchDropdown.style.bottom = 'auto';
-      } else if (state === 'bottom') {
-        const left = Math.max(8, Math.min(vw - dropW - 8, x - dropW * 0.5));
-        searchDropdown.style.left = `${Math.round(left)}px`;
-        searchDropdown.style.top = 'auto';
-        searchDropdown.style.bottom = `${Math.round(vh - (y - curH * 0.5) + 8)}px`;
-      } else if (state === 'left') {
-        searchDropdown.style.left = `${Math.round(x + curW * 0.5 + 10)}px`;
-        searchDropdown.style.top = `${Math.max(12, Math.min(vh - 270, Math.round(y - 80)))}px`;
-        searchDropdown.style.bottom = 'auto';
-      } else if (state === 'right') {
-        searchDropdown.style.left = `${Math.max(8, Math.round(x - curW * 0.5 - dropW - 10))}px`;
-        searchDropdown.style.top = `${Math.max(12, Math.min(vh - 270, Math.round(y - 80)))}px`;
-        searchDropdown.style.bottom = 'auto';
-      }
-    };
-
-    const renderSearchResults = () => {
-      const q = searchInput.value.trim().toLowerCase();
-      if (!q) {
-        matchedPosts = postsData.slice(0, 6);
-      } else {
-        const tokens = q.split(/\s+/).filter(Boolean);
-        matchedPosts = postsData
-          .map((item) => {
-            const titleL = item.title.toLowerCase();
-            const tagsL = item.tags.join(' ').toLowerCase();
-            const descL = item.desc.toLowerCase();
-            const bodyL = item.body.toLowerCase();
-            let score = 0;
-            for (const tk of tokens) {
-              let hit = 0;
-              if (titleL.includes(tk)) hit += 10;
-              if (tagsL.includes(tk)) hit += 7;
-              if (descL.includes(tk)) hit += 4;
-              if (bodyL.includes(tk)) hit += 2;
-              if (hit === 0) return { item, score: 0 };
-              score += hit;
+    // 页面滚动微风耦合：滚动页面时挂架上的主舱与独立挂件串产生随风摆荡！
+    let lastScrollY = window.scrollY;
+    window.addEventListener(
+      'scroll',
+      () => {
+        const dy = Math.max(-28, Math.min(28, window.scrollY - lastScrollY));
+        lastScrollY = window.scrollY;
+        if (Math.abs(dy) > 1) {
+          impulseRing(0, -dy * 0.14, 0);
+          satellites.forEach((sat, idx) => {
+            sat.vy -= dy * (0.12 + idx * 0.04);
+            if (state === 'left' || state === 'right') {
+              sat.vx += (idx % 2 === 0 ? 1 : -1) * Math.abs(dy) * 0.05;
             }
-            return { item, score };
-          })
-          .filter((r) => r.score > 0)
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 8)
-          .map((r) => r.item);
-      }
+          });
+        }
+      },
+      { passive: true },
+    );
 
-      if (selectedIdx >= matchedPosts.length) selectedIdx = 0;
-      const headText = q
-        ? `GREP "${q}" :: ${matchedPosts.length} MATCHES`
-        : `RECENT_POSTS :: ↑↓ 选择 / Enter 跳转`;
-
-      if (matchedPosts.length === 0) {
-        searchDropdown.innerHTML = `<div class="hud-search-head"><span>${headText}</span><span>[ESC]</span></div><div style="padding: 8px 6px; color: var(--text-muted);">0 matches found.</div>`;
-      } else {
-        const rows = matchedPosts
-          .map((p, idx) => {
-            const tagStr = p.tags.slice(0, 3).map((t) => `#${t}`).join(' ');
-            return `<a href="${p.url}" class="hud-search-item${idx === selectedIdx ? ' is-selected' : ''}" data-ridx="${idx}">
-              <div class="hud-search-item-title">
-                <span>${idx === matchedPosts.length - 1 ? '└─' : '├─'} ${p.title}</span>
-                <span style="color: var(--text-muted); font-weight: 400; flex-shrink: 0;">${p.date}</span>
-              </div>
-              <div class="hud-search-item-sub">${tagStr ? `[${tagStr}] ` : ''}${p.desc}</div>
-            </a>`;
-          })
-          .join('');
-        searchDropdown.innerHTML = `<div class="hud-search-head"><span>${headText}</span><span>[ESC]</span></div>${rows}`;
-      }
-
-      dropdownOpen = true;
-      searchDropdown.classList.add('is-open');
-      positionDropdown();
+    const wallVector = (edge: EdgeSide | null): [number, number] => {
+      if (edge === 'top') return [0, -1];
+      if (edge === 'bottom') return [0, 1];
+      if (edge === 'left') return [-1, 0];
+      if (edge === 'right') return [1, 0];
+      return [0, 0];
     };
 
-    // 阻止搜索框与功能按钮冒泡触发拖拽
-    [searchShell, searchInput, btnEject, btnPalette, btnTheme, btnGithub].forEach((el) => {
-      el.addEventListener('pointerdown', (e) => {
-        e.stopPropagation();
-      });
-    });
-
-    searchInput.addEventListener('focus', () => {
-      renderSearchResults();
-    });
-    searchInput.addEventListener('input', () => {
-      selectedIdx = 0;
-      renderSearchResults();
-    });
-    searchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (matchedPosts.length > 0) {
-          selectedIdx = (selectedIdx + 1) % matchedPosts.length;
-          renderSearchResults();
-        }
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (matchedPosts.length > 0) {
-          selectedIdx = (selectedIdx - 1 + matchedPosts.length) % matchedPosts.length;
-          renderSearchResults();
-        }
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (matchedPosts[selectedIdx]) {
-          saveState();
-          window.location.href = matchedPosts[selectedIdx].url;
-        }
-      } else if (e.key === 'Escape') {
-        searchInput.blur();
-        closeSearchDropdown();
-      }
-    });
-
-    document.addEventListener('pointerdown', (e) => {
-      const target = e.target as Node | null;
-      if (
-        dropdownOpen &&
-        target &&
-        !searchShell.contains(target) &&
-        !searchDropdown.contains(target)
-      ) {
-        closeSearchDropdown();
-      }
-    });
-
-    // 集成功能按钮 1：弹射脱离挂架
     const launchBallistic = () => {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       if (vw < 160) return;
-      closeSearchDropdown();
-      searchInput.blur();
+      closeOverlay();
+      cliInput.blur();
       if (state !== 'free' && state !== 'dragging') {
         const [wx, wy] = wallVector(state);
-        spawnBurst(x, y, -wx, -wy, 12, 1.3);
+        spawnBurst(x, y, -wx, -wy, 14, 1.35);
       }
       state = 'free';
       ambientOrbit = false;
@@ -668,38 +957,29 @@ const searchIndex = posts.map((p) => ({
       vy = Math.sin(ang) * power;
       impulseRing(-vx * 0.65, -vy * 0.65, 3.0);
       magnetImmunityUntil = performance.now() + 260;
+      // 发射联动助推西西弗斯！
+      window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.045 } }));
       saveState();
     };
 
-    btnEject.addEventListener('click', launchBallistic);
-
-    // 集成功能按钮 2：循环切换终端强调色配色方案
-    btnPalette.addEventListener('click', () => {
-      const root = document.documentElement;
-      const cur = (root.dataset.palette || 'indigo') as (typeof PALETTES)[number];
-      const next = PALETTES[(PALETTES.indexOf(cur) + 1) % PALETTES.length];
-      if (next === 'indigo') {
-        delete root.dataset.palette;
-      } else {
-        root.dataset.palette = next;
-      }
-      localStorage.setItem('accent_palette', next);
-      syncThemePalette();
-      spawnBurst(x, y, 0, -1, 8, 0.9);
-      window.dispatchEvent(new CustomEvent('sisyphus:themechange', { detail: { palette: next } }));
+    pendantEject.addEventListener('click', launchBallistic);
+    pendantRealm.addEventListener('click', () => {
+      cycleRealm();
+      // 点挂件时挂件本身弹跳晃动一下
+      satellites[2].vy -= 3.5;
+      satellites[2].vx += (Math.random() - 0.5) * 3;
+      spawnBurst(satellites[2].x, satellites[2].y, 0, -1, 8, 0.9);
     });
 
-    // 集成功能按钮 3：切换明暗背景主题
-    btnTheme.addEventListener('click', () => {
-      const root = document.documentElement;
-      const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
-      root.dataset.theme = next;
-      localStorage.setItem('theme', next);
-      syncThemePalette();
-      window.dispatchEvent(new CustomEvent('sisyphus:themechange', { detail: { theme: next } }));
+    // 鼠标划过挂件时产生清脆的碰撞微摆（像手指拨动挂牌串！）
+    satellites.forEach((sat, sIdx) => {
+      sat.el.addEventListener('pointerenter', () => {
+        if (sIdx === 0) return; // CLI 不乱晃方便输入
+        sat.vx += (Math.random() - 0.5) * 2.8;
+        sat.vy += state === 'top' || state === 'bottom' ? 2.4 : (Math.random() - 0.5) * 2.2;
+      });
     });
 
-    // ========= 边界画布与物理工具 =========
     let lastCanvasW = 0;
     let lastCanvasH = 0;
     const syncBorderCanvasSize = (w: number, h: number) => {
@@ -721,14 +1001,6 @@ const searchIndex = posts.map((p) => ({
       }
     };
 
-    const wallVector = (edge: EdgeSide | null): [number, number] => {
-      if (edge === 'top') return [0, -1];
-      if (edge === 'bottom') return [0, 1];
-      if (edge === 'left') return [-1, 0];
-      if (edge === 'right') return [1, 0];
-      return [0, 0];
-    };
-
     const dockedAnchorPos = (
       edge: EdgeSide,
       cx: number,
@@ -739,10 +1011,11 @@ const searchIndex = posts.map((p) => ({
       vh: number,
     ): [number, number] => {
       if (edge === 'top') {
-        return [Math.max(hw + 12, Math.min(vw - hw - 12, cx)), hh + BAR_RACK_GAP];
+        // 默认偏左停靠一点，给右侧串联的独立挂件留足舒展空间
+        return [Math.max(hw + 14, Math.min(vw - hw - 14, cx)), hh + BAR_RACK_GAP];
       }
       if (edge === 'bottom') {
-        return [Math.max(hw + 12, Math.min(vw - hw - 12, cx)), vh - hh - BAR_RACK_GAP];
+        return [Math.max(hw + 14, Math.min(vw - hw - 14, cx)), vh - hh - BAR_RACK_GAP];
       }
       if (edge === 'left') {
         return [hw + SIDE_RACK_GAP, Math.max(hh + 16, Math.min(vh - hh - 16, cy))];
@@ -783,7 +1056,7 @@ const searchIndex = posts.map((p) => ({
       ruler.style.opacity = Math.min(0.95, 0.3 + strength * 0.7).toFixed(2);
       if (edge === 'top' || edge === 'bottom') {
         ruler.classList.remove('is-vert');
-        const span = Math.round((160 + strength * 180) / 6) * 6;
+        const span = Math.round((130 + strength * 110) / 6) * 6;
         const left = Math.max(8, Math.min(vw - span - 8, Math.round((cx - span * 0.5) / 2) * 2));
         ruler.style.width = `${span}px`;
         ruler.style.height = '3px';
@@ -791,7 +1064,7 @@ const searchIndex = posts.map((p) => ({
         ruler.style.top = edge === 'top' ? '1px' : `${vh - 4}px`;
       } else {
         ruler.classList.add('is-vert');
-        const vSpan = Math.round((90 + strength * 90) / 6) * 6;
+        const vSpan = Math.round((70 + strength * 60) / 6) * 6;
         const top = Math.max(8, Math.min(vh - vSpan - 8, Math.round((cy - vSpan * 0.5) / 2) * 2));
         ruler.style.width = '3px';
         ruler.style.height = `${vSpan}px`;
@@ -806,6 +1079,8 @@ const searchIndex = posts.map((p) => ({
       impactW = Math.min(1, Math.max(0.5, speed / 13));
       impactStart = now;
       impulseRing(nx * Math.min(9, speed * 0.55), ny * Math.min(9, speed * 0.55), 3.2);
+      // 撞墙动能同样传导给山坡上的西西弗斯助推一把！
+      window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.015 } }));
     };
 
     const lockDock = (edge: EdgeSide, vw: number, vh: number, now: number) => {
@@ -817,29 +1092,39 @@ const searchIndex = posts.map((p) => ({
       rackEdge = edge;
       lastPullEdge = edge;
 
-      const targetBar = getShapeLayout('bar', vw);
-      const targetRail = getShapeLayout('rail', vw);
-
       if (edge === 'top' || edge === 'bottom') {
-        velW += 9;
+        velW += 7.5;
         velH -= 3.5;
-        x = Math.max(targetBar.w * 0.5 + 12, Math.min(vw - targetBar.w * 0.5 - 12, x));
-        rackVelY = edge === 'top' ? 2.6 : -2.6;
-        impulseRing(0, edge === 'top' ? 3.5 : -3.5, 1.8);
-        spawnBurst(x - 120, edge === 'top' ? 6 : vh - 6, 0, edge === 'top' ? 1 : -1, 5, 0.8);
-        spawnBurst(x + 120, edge === 'top' ? 6 : vh - 6, 0, edge === 'top' ? 1 : -1, 5, 0.8);
+        // 如果靠右太近则往左让出一点位置以便右侧挂件串展开
+        if (vw > 720 && x > vw - 420) {
+          x = Math.max(SHAPES.bar.w * 0.5 + 24, vw - 440);
+        } else {
+          x = Math.max(SHAPES.bar.w * 0.5 + 14, Math.min(vw - SHAPES.bar.w * 0.5 - 14, x));
+        }
+        rackVelY = edge === 'top' ? 2.8 : -2.8;
+        impulseRing(0, edge === 'top' ? 3.8 : -3.8, 1.8);
       } else {
-        velW += 4;
-        velH += 8;
-        y = Math.max(targetRail.h * 0.5 + 16, Math.min(vh - targetRail.h * 0.5 - 16, y));
+        velW -= 4;
+        velH += 7.5;
+        // 侧挂时如果太靠下，往上收一点给下方串联的 4 个细长挂件留空间
+        if (vh > 520 && y > vh - 260) {
+          y = Math.max(SHAPES.rail.h * 0.5 + 24, vh - 270);
+        } else {
+          y = Math.max(SHAPES.rail.h * 0.5 + 16, Math.min(vh - SHAPES.rail.h * 0.5 - 16, y));
+        }
         rackVelY = 3.8;
         rackVelX = edge === 'left' ? 2.2 : -2.2;
         impulseRing(edge === 'left' ? 3.2 : -3.2, 4.2, 1.6);
-        const wallX = edge === 'left' ? 6 : vw - 6;
-        const dirX = edge === 'left' ? 1 : -1;
-        spawnBurst(wallX, y - 55, dirX, 0, 6, 0.85);
-        spawnBurst(wallX, y + 55, dirX, 0, 6, 0.85);
       }
+
+      // 挂件从主舱位置依次弹射展开（火车挂钩级联弹开效果！）
+      satellites.forEach((sat, idx) => {
+        sat.x = x;
+        sat.y = y;
+        sat.vx = (edge === 'top' || edge === 'bottom' ? 1 : 0) * (3 + idx * 1.4);
+        sat.vy = (edge === 'left' || edge === 'right' ? 1 : 0) * (3 + idx * 1.4);
+      });
+
       void now;
       saveState();
       window.dispatchEvent(new CustomEvent('sisyphus:hud-state', { detail: { state: edge } }));
@@ -852,10 +1137,10 @@ const searchIndex = posts.map((p) => ({
       const vh = window.innerHeight;
       if (vw < 160) return;
       const now = performance.now();
-      closeSearchDropdown();
+      closeOverlay();
       if (state === 'free') {
-        x = vw * 0.5;
-        lockDock('top', vw, vh, now);
+        y = Math.max(120, Math.min(vh - 280, vh * 0.24));
+        lockDock('left', vw, vh, now);
       } else {
         state = 'free';
         ambientOrbit = true;
@@ -870,7 +1155,7 @@ const searchIndex = posts.map((p) => ({
       }
     });
 
-    // 指针拖拽与挂钩阻尼挣脱
+    // 指针拖拽、鼠标拨弦感应与拖拽助推蓄力
     let pointerId: number | null = null;
     let startPX = 0;
     let startPY = 0;
@@ -884,6 +1169,9 @@ const searchIndex = posts.map((p) => ({
     let samples: { x: number; y: number; t: number }[] = [];
     let cursorX = -9999;
     let cursorY = -9999;
+    let prevCursorX = -9999;
+    let prevCursorY = -9999;
+    let dragAccumDist = 0;
 
     nav.addEventListener('pointerdown', (e) => {
       pointerId = e.pointerId;
@@ -892,6 +1180,7 @@ const searchIndex = posts.map((p) => ({
       grabOffsetX = e.clientX - x;
       grabOffsetY = e.clientY - y;
       moved = false;
+      dragAccumDist = 0;
       const isDocked =
         state === 'top' || state === 'bottom' || state === 'left' || state === 'right';
       grabbedFromDock = isDocked ? state : null;
@@ -901,22 +1190,53 @@ const searchIndex = posts.map((p) => ({
     });
 
     window.addEventListener('pointermove', (e) => {
+      const cvx = prevCursorX < -9000 ? 0 : e.clientX - prevCursorX;
+      const cvy = prevCursorY < -9000 ? 0 : e.clientY - prevCursorY;
+      prevCursorX = cursorX;
+      prevCursorY = cursorY;
       cursorX = e.clientX;
       cursorY = e.clientY;
+
+      // 【吸附态趣味边缘互动】：鼠标掠过吸附边缘时像“拨动琴弦”一样拨动对应方位的 ASCII 边框质点！
+      const isDockedNow =
+        state === 'top' || state === 'bottom' || state === 'left' || state === 'right';
+      if (isDockedNow && pointerId === null && Math.hypot(cvx, cvy) > 1.2) {
+        const relX = cursorX - x;
+        const relY = cursorY - y;
+        if (Math.abs(relX) < curW * 0.5 + 32 && Math.abs(relY) < curH * 0.5 + 32) {
+          for (const m of ring) {
+            const mx = m.ux * (curW * 0.5 - 5);
+            const my = m.uy * (curH * 0.5 - 5);
+            const d = Math.hypot(relX - mx, relY - my);
+            if (d < 34) {
+              const pluck = (1 - d / 34) * 0.32;
+              m.vx += cvx * pluck + m.ux * 1.1 * pluck;
+              m.vy += cvy * pluck + m.uy * 1.1 * pluck;
+            }
+          }
+        }
+      }
 
       if (e.pointerId !== pointerId) return;
       const now = performance.now();
       if (!moved && Math.hypot(e.clientX - startPX, e.clientY - startPY) > 4) {
         moved = true;
         ambientOrbit = false;
-        closeSearchDropdown();
-        searchInput.blur();
+        closeOverlay();
+        cliInput.blur();
         nav.setPointerCapture(e.pointerId);
         if (!grabbedFromDock) {
           state = 'dragging';
         }
       }
       if (!moved) return;
+
+      // 拖动晃动悬浮窗时持续给西西弗斯输送推石动力！
+      dragAccumDist += Math.hypot(cvx, cvy);
+      if (dragAccumDist > 110) {
+        dragAccumDist = 0;
+        window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.012 } }));
+      }
 
       samples.push({ x: e.clientX, y: e.clientY, t: now });
       while (samples.length > 6 && now - samples[0].t > 80) samples.shift();
@@ -952,7 +1272,7 @@ const searchIndex = posts.map((p) => ({
             y = Math.max(hh + 16, Math.min(vh - hh - 16, rawTargetY));
             dockBaseY = y;
           } else {
-            x = Math.max(hw + 12, Math.min(vw - hw - 12, rawTargetX));
+            x = Math.max(hw + 14, Math.min(vw - hw - 14, rawTargetX));
             y = dockBaseY + pullDY * 0.42;
             dockBaseX = x;
           }
@@ -1021,6 +1341,9 @@ const searchIndex = posts.map((p) => ({
       }
 
       const speed = Math.hypot(vx, vy);
+      if (speed > 4) {
+        window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.03 } }));
+      }
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const hw = curW * 0.5;
@@ -1085,6 +1408,144 @@ const searchIndex = posts.map((p) => ({
       }
     };
 
+    // ========= 更新并绘制串联独立外挂件与铰接挂链（Mechanical Chain Couplings） =========
+    const stepAndDrawSatelliteChain = (t: number, vw: number, vh: number, isDocked: boolean) => {
+      // 侧边栏模式下，CLI 平时窄至 76px 保持整串细长；悬停或聚焦输入时丝滑横向舒展至 186px！
+      const isSide = state === 'left' || state === 'right';
+      const wantCliW = isSide
+        ? cliFocused || cliHovered || cliInput.value.length > 0
+          ? 186
+          : 76
+        : vw < 720
+          ? Math.min(150, vw - 180)
+          : 196;
+      satellites[0].w += (wantCliW - satellites[0].w) * 0.22;
+      pendantCli.style.width = `${Math.round(satellites[0].w)}px`;
+
+      satellites[1].w = pendantEject.offsetWidth || 66;
+      satellites[2].w = pendantRealm.offsetWidth || 68;
+      satellites[3].w = pendantGh.offsetWidth || 64;
+
+      if (!isDocked) {
+        // 太空浮动态：挂件收拢回主舱并隐去，只留纯粹 4 按钮主舱漫游！
+        for (const sat of satellites) {
+          sat.x += (x - sat.x) * 0.25;
+          sat.y += (y - sat.y) * 0.25;
+          sat.alpha *= 0.78;
+          if (sat.alpha < 0.03) {
+            sat.alpha = 0;
+            sat.el.classList.remove('is-deployed');
+          }
+          sat.el.style.opacity = sat.alpha.toFixed(2);
+          sat.el.style.transform = `translate3d(${Math.round(sat.x - sat.w * 0.5)}px, ${Math.round(sat.y - sat.h * 0.5)}px, 0)`;
+        }
+        return;
+      }
+
+      // 计算挂件串联方向：默认顶/底向右串（若右边空间不够则向左串），左/右侧向下串（若底部不够则向上串）
+      const CHAIN_GAP = isSide ? 11 : 13;
+      const totalChainSpan = isSide
+        ? satellites.reduce((acc, s) => acc + s.h + CHAIN_GAP, 0)
+        : satellites.reduce((acc, s) => acc + s.w + CHAIN_GAP, 0);
+
+      if (!isSide && vw < 680) {
+        // 手机窄屏吸顶/吸底时：挂件串优雅折到第二排居中悬挂在主舱正下方/正上方！
+        const rowDir = state === 'top' ? 1 : -1;
+        const rowY = y + rowDir * (curH * 0.5 + 22);
+        const subGap = 6;
+        const rowTotalW = satellites.reduce((a, s) => a + s.w, 0) + subGap * 3;
+        let cursorLeft = Math.max(8, Math.min(vw - rowTotalW - 8, x - rowTotalW * 0.5));
+
+        satellites.forEach((sat, idx) => {
+          const tx = cursorLeft + sat.w * 0.5;
+          const ty = rowY + Math.sin(t * 0.003 + idx * 1.1) * 1.2;
+          cursorLeft += sat.w + subGap;
+          sat.vx = (sat.vx + (tx - sat.x) * 0.22) * 0.75;
+          sat.vy = (sat.vy + (ty - sat.y) * 0.22) * 0.75;
+          sat.x += sat.vx;
+          sat.y += sat.vy;
+          sat.alpha += (1 - sat.alpha) * 0.2;
+          sat.el.classList.add('is-deployed');
+          sat.el.style.opacity = sat.alpha.toFixed(2);
+          sat.el.style.transform = `translate3d(${Math.round(sat.x - sat.w * 0.5)}px, ${Math.round(sat.y - sat.h * 0.5)}px, 0)`;
+        });
+        return;
+      }
+
+      const dir = isSide
+        ? y + curH * 0.5 + totalChainSpan < vh - 12
+          ? 1
+          : -1
+        : x + curW * 0.5 + totalChainSpan < vw - 12
+          ? 1
+          : -1;
+
+      let prevAnchorX = isSide ? x : x + dir * (curW * 0.5);
+      let prevAnchorY = isSide ? y + dir * (curH * 0.5) : y;
+
+      satellites.forEach((sat, idx) => {
+        // 侧边挂靠且 CLI 展开变宽时，CLI 挂件贴合导轨内侧向屏幕内伸展，绝不撞墙！
+        let tx = x;
+        let ty = y;
+        if (isSide) {
+          const baseRailHalf = SHAPES.rail.w * 0.5;
+          const extraW = Math.max(0, sat.w - SHAPES.rail.w);
+          tx = state === 'left' ? x + extraW * 0.5 : x - extraW * 0.5;
+          ty = prevAnchorY + dir * (CHAIN_GAP + sat.h * 0.5);
+          // 轻微钟摆呼吸摆动（越末端的挂件摆幅越灵动！）
+          tx += Math.sin(t * 0.0026 - idx * 0.85) * (0.9 + idx * 0.45) * (idx === 0 && cliFocused ? 0 : 1);
+          void baseRailHalf;
+        } else {
+          tx = prevAnchorX + dir * (CHAIN_GAP + sat.w * 0.5);
+          ty = y + Math.sin(t * 0.0028 - idx * 0.9) * (1.1 + idx * 0.4) * (idx === 0 && cliFocused ? 0 : 1);
+        }
+
+        // 链式弹簧摆锤耦合：前一个模块的运动带动后一个挂件甩摆！
+        const stiff = 0.2 - idx * 0.018;
+        sat.vx = (sat.vx + (tx - sat.x) * stiff) * 0.76;
+        sat.vy = (sat.vy + (ty - sat.y) * stiff) * 0.76;
+        sat.x += sat.vx;
+        sat.y += sat.vy;
+        sat.alpha += (1 - sat.alpha) * 0.22;
+
+        sat.el.classList.add('is-deployed');
+        sat.el.style.opacity = sat.alpha.toFixed(2);
+        sat.el.style.transform = `translate3d(${Math.round(sat.x - sat.w * 0.5)}px, ${Math.round(sat.y - sat.h * 0.5)}px, 0)`;
+
+        // 在全屏画布 fxCtx 上绘制连接两个模块之间的机械挂钩链扣（══◈══ 或双股竖向吊链 ┆ ◈ ┆）
+        if (fxCtx && sat.alpha > 0.15) {
+          fxCtx.save();
+          fxCtx.globalAlpha = sat.alpha * 0.88;
+          if (isSide) {
+            const linkTopY = dir > 0 ? prevAnchorY : sat.y + sat.h * 0.5;
+            const linkBotY = dir > 0 ? sat.y - sat.h * 0.5 : prevAnchorY;
+            const chainX = x; // 沿主轴中心对齐挂链
+            fxCtx.fillStyle = borderColor;
+            drawPixelLine(fxCtx, chainX - 10, linkTopY + 1, chainX - 10, linkBotY - 1, 3);
+            drawPixelLine(fxCtx, chainX + 10, linkTopY + 1, chainX + 10, linkBotY - 1, 3);
+            // 中央锁扣销钉
+            fxCtx.fillStyle = accentColor;
+            const midY = Math.round((linkTopY + linkBotY) * 0.5);
+            fxCtx.fillRect(Math.round(chainX - 11), midY - 1, 3, 3);
+            fxCtx.fillRect(Math.round(chainX + 9), midY - 1, 3, 3);
+          } else {
+            const linkLX = dir > 0 ? prevAnchorX : sat.x + sat.w * 0.5;
+            const linkRX = dir > 0 ? sat.x - sat.w * 0.5 : prevAnchorX;
+            const midX = Math.round((linkLX + linkRX) * 0.5);
+            const midY = Math.round((prevAnchorY + sat.y) * 0.5);
+            fxCtx.fillStyle = borderColor;
+            drawPixelLine(fxCtx, linkLX + 1, prevAnchorY, linkRX - 1, sat.y, 2);
+            fxCtx.fillStyle = accentColor;
+            fxCtx.fillRect(midX - 2, midY - 2, 4, 4);
+          }
+          fxCtx.restore();
+        }
+
+        prevAnchorX = isSide ? x : sat.x + dir * (sat.w * 0.5);
+        prevAnchorY = isSide ? sat.y + dir * (sat.h * 0.5) : sat.y;
+      });
+    };
+
     const drawWeaponRackMounts = (
       ox: number,
       oy: number,
@@ -1140,7 +1601,7 @@ const searchIndex = posts.map((p) => ({
 
           bCtx.fillStyle = mutedColor;
           bCtx.globalAlpha = 0.75 * deploy;
-          drawPixelLine(bCtx, wallX + sign * 3, wallArmY + 15, jointX, jointY + 2, 2);
+          drawPixelLine(bCtx, wallX + sign * 3, wallArmY + 14, jointX, jointY + 2, 2);
 
           bCtx.fillStyle = accentColor;
           bCtx.globalAlpha = 0.94 * deploy;
@@ -1182,7 +1643,7 @@ const searchIndex = posts.map((p) => ({
           bCtx.globalAlpha = 0.72 * deploy;
           drawPixelLine(
             bCtx,
-            wallHX + (hIdx === 0 ? -14 : 14),
+            wallHX + (hIdx === 0 ? -12 : 12),
             wallY + sign * 2,
             lugX,
             wallY + (reachY - wallY) * 0.68,
@@ -1255,7 +1716,7 @@ const searchIndex = posts.map((p) => ({
             : smoothPullW > 0.3
               ? `::HOOK`
               : dockEdge
-                ? `[CONSOLE::DOCKED]`
+                ? `::NAV`
                 : `::0G`;
       const botLabel = dockEdge ? '' : `${Math.round(x)},${Math.round(y)}`;
 
@@ -1293,8 +1754,7 @@ const searchIndex = posts.map((p) => ({
 
         const tCharIdx = i - topStartIdx;
         const hasTopChar = tCharIdx >= 0 && tCharIdx < topLabel.length;
-        const waveTopGlyph =
-          Math.sin(t * 0.004 + i * 0.7) > 0.72 && smoothDockW < 0.4 ? '═' : '─';
+        const waveTopGlyph = Math.sin(t * 0.004 + i * 0.7) > 0.72 ? '═' : '─';
         nodes.push({
           bx: px,
           by: -ry,
@@ -1311,8 +1771,7 @@ const searchIndex = posts.map((p) => ({
 
         const bCharIdx = i - botStartIdx;
         const hasBotChar = botLabel.length > 0 && bCharIdx >= 0 && bCharIdx < botLabel.length;
-        const waveBotGlyph =
-          Math.sin(t * 0.004 - i * 0.7) > 0.72 && smoothDockW < 0.4 ? '═' : '─';
+        const waveBotGlyph = Math.sin(t * 0.004 - i * 0.7) > 0.72 ? '═' : '─';
         nodes.push({
           bx: px,
           by: ry,
@@ -1369,6 +1828,9 @@ const searchIndex = posts.map((p) => ({
       const impactAge = t - impactStart;
       const shockFront = 1 - (impactAge / 240) * 2.2;
 
+      // 【吸附态孤子脉冲巡检波】：每 3.4 秒一道电流孤子波沿整圈框线轻快环绕一圈，并轻轻弹起沿途字符！
+      const solitonPos = ((t * 0.0095) % 36) - 4; // 沿 0..28 环绕
+
       const satAlpha = (1 - smoothDockW) * (1 - sprintW * 0.7) * 0.5;
       if (satAlpha > 0.04) {
         bCtx.fillStyle = accentColor;
@@ -1390,21 +1852,50 @@ const searchIndex = posts.map((p) => ({
         let dy = inerDY * labelDamp;
         let glyph = nd.glyph;
 
-        const localStrain = Math.hypot(inerDX, inerDY);
-        if (localStrain > 6.5 && !nd.isLabel && !nd.isCorner) {
-          if (Math.abs(nd.ny) > 0.5) {
-            glyph = localStrain > 12 ? '~' : '═';
-          } else {
-            glyph = localStrain > 12 ? '¦' : '║';
+        // 1. 鼠标靠近时的磁流体“琴弦起峰”形变（吸附态下尤其明显好玩！）
+        const worldCharX = x + nd.bx;
+        const worldCharY = y + nd.by;
+        const distCursor = Math.hypot(cursorX - worldCharX, cursorY - worldCharY);
+        if (distCursor < 44 && !nd.isLabel) {
+          const magnetSpike = (1 - distCursor / 44) * (smoothDockW > 0.5 ? 5.2 : 3.2);
+          dx += nd.nx * magnetSpike;
+          dy += nd.ny * magnetSpike;
+          if (!nd.isCorner && distCursor < 26) {
+            glyph = Math.abs(nd.ny) > 0.5 ? (nd.ny < 0 ? '^' : 'v') : nd.nx < 0 ? '‹' : '›';
           }
         }
 
+        // 2. 吸附态孤子脉冲巡检波拱起效应
+        if (smoothDockW > 0.5 && !nd.isLabel) {
+          const ringDiff = Math.abs(nd.ringPos - solitonPos);
+          if (ringDiff < 2.2) {
+            const pulse = Math.cos((ringDiff / 2.2) * (Math.PI * 0.5)) * 3.4 * smoothDockW;
+            const kissCheck = dockEdge ? nd.nx * dockWX + nd.ny * dockWY : -1;
+            if (kissCheck < 0.4) {
+              dx += nd.nx * pulse;
+              dy += nd.ny * pulse;
+              if (!nd.isCorner && ringDiff < 0.9) glyph = '╬';
+            }
+          }
+        }
+
+        // 3. 大幅惯性拉扯波纹符号
+        const localStrain = Math.hypot(inerDX, inerDY);
+        if (localStrain > 5.2 && !nd.isLabel && !nd.isCorner) {
+          if (Math.abs(nd.ny) > 0.5) {
+            glyph = localStrain > 10 ? '~' : '═';
+          } else {
+            glyph = localStrain > 10 ? '¦' : '║';
+          }
+        }
+
+        // 4. 呼吸驻波（吸附态暴露侧保留灵动的 2 阶弦驻波起伏！）
         const kissAlign = dockEdge ? nd.nx * dockWX + nd.ny * dockWY : -1;
-        const freeFactor = kissAlign > 0.4 ? 1 - smoothDockW * 0.85 : 1 - smoothDockW * 0.35;
-        const floatAmp = (nd.isLabel ? 1.0 : 2.3) * freeFactor;
+        const freeFactor = kissAlign > 0.4 ? 1 - smoothDockW * 0.82 : 1 - smoothDockW * 0.15;
+        const floatAmp = (nd.isLabel ? 0.9 : 2.3) * freeFactor;
         const waveN =
-          Math.sin(t * 0.0034 + nd.phase) * floatAmp +
-          Math.cos(t * 0.0021 - nd.phase * 0.7) * (floatAmp * 0.45);
+          Math.sin(t * 0.0036 + nd.phase) * floatAmp +
+          Math.cos(t * 0.0022 - nd.phase * 0.7) * (floatAmp * 0.45);
         const waveT = Math.cos(t * 0.0026 + nd.phase * 0.9) * (1.0 * freeFactor);
         dx += nd.nx * waveN + nd.tx * waveT;
         dy += nd.ny * waveN + nd.ty * waveT;
@@ -1483,7 +1974,6 @@ const searchIndex = posts.map((p) => ({
           }
         }
 
-        // 四边统一强调色（默认靛紫，支持 [◈换色] 一键联动变色）
         bCtx.fillStyle = accentColor;
         bCtx.globalAlpha = nd.isLabel ? 0.96 : 0.92;
         bCtx.fillText(glyph, Math.round(ox + nd.bx + dx), Math.round(oy + nd.by + dy));
@@ -1504,8 +1994,8 @@ const searchIndex = posts.map((p) => ({
           const [wx, wy] = wallVector(rackEdge);
           if (m.ux * wx + m.uy * wy > 0.5) mountStiff = 0.45;
         }
-        m.dx -= stepDX * 0.76 * m.mass * mountStiff;
-        m.dy -= stepDY * 0.76 * m.mass * mountStiff;
+        m.dx -= stepDX * 0.78 * m.mass * mountStiff;
+        m.dy -= stepDY * 0.78 * m.mass * mountStiff;
         m.dx += -m.uy * torque * 24 * m.mass;
         m.dy += m.ux * torque * 24 * m.mass;
       }
@@ -1516,12 +2006,12 @@ const searchIndex = posts.map((p) => ({
         const prev = ring[(i - 1 + RING_COUNT) % RING_COUNT];
         const next = ring[(i + 1) % RING_COUNT];
         const cur = ring[i];
-        coupleFX[i] = (prev.dx + next.dx - 2 * cur.dx) * 0.17;
-        coupleFY[i] = (prev.dy + next.dy - 2 * cur.dy) * 0.17;
+        coupleFX[i] = (prev.dx + next.dx - 2 * cur.dx) * 0.18;
+        coupleFY[i] = (prev.dy + next.dy - 2 * cur.dy) * 0.18;
       }
 
-      const kSpring = 0.17;
-      const damping = 0.82;
+      const kSpring = 0.165;
+      const damping = 0.83;
       const maxDisp = 26;
       for (let i = 0; i < RING_COUNT; i++) {
         const m = ring[i];
@@ -1561,9 +2051,8 @@ const searchIndex = posts.map((p) => ({
         initialized = true;
         state = vw < 640 ? 'top' : 'free';
         ambientOrbit = state === 'free';
-        const initBar = getShapeLayout('bar', vw);
         x = vw < 640 ? vw * 0.5 : vw * 0.72;
-        y = vw < 640 ? initBar.h * 0.5 + BAR_RACK_GAP : Math.max(150, Math.min(260, vh * 0.3));
+        y = vw < 640 ? SHAPES.bar.h * 0.5 + BAR_RACK_GAP : Math.max(150, Math.min(260, vh * 0.3));
 
         try {
           const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -1578,8 +2067,8 @@ const searchIndex = posts.map((p) => ({
             ) {
               state = saved.state || state;
               ambientOrbit = Boolean(saved.ambientOrbit);
-              x = Math.max(80, Math.min(vw - 80, saved.xNorm * vw));
-              y = Math.max(24, Math.min(vh - 24, saved.yNorm * vh));
+              x = Math.max(46, Math.min(vw - 46, saved.xNorm * vw));
+              y = Math.max(22, Math.min(vh - 22, saved.yNorm * vh));
               vx = Number.isFinite(saved.vx) ? saved.vx : vx;
               vy = Number.isFinite(saved.vy) ? saved.vy : vy;
             }
@@ -1594,20 +2083,16 @@ const searchIndex = posts.map((p) => ({
             : state === 'left' || state === 'right'
               ? 'rail'
               : 'block';
-        const initCfg = getShapeLayout(k, vw);
-        curW = initCfg.w;
-        curH = initCfg.h;
-        curInset = { ...initCfg.inset };
-        initCfg.navCoords.forEach(([ix, iy], idx) => {
+        curW = SHAPES[k].w;
+        curH = SHAPES[k].h;
+        curInset = { ...SHAPES[k].inset };
+        SHAPES[k].coords.forEach(([ix, iy], idx) => {
           itemSpring[idx].x = ix;
           itemSpring[idx].y = iy;
         });
-        searchSpring.x = initCfg.searchPos.x;
-        searchSpring.y = initCfg.searchPos.y;
-        searchSpring.w = initCfg.searchPos.w;
-        initCfg.utilCoords.forEach(([ux, uy], idx) => {
-          utilSpring[idx].x = ux;
-          utilSpring[idx].y = uy;
+        satellites.forEach((sat) => {
+          sat.x = x;
+          sat.y = y;
         });
 
         if (state !== 'free') {
@@ -1621,6 +2106,8 @@ const searchIndex = posts.map((p) => ({
       }
 
       ensureFxCanvas(vw, vh);
+      updateAmbientTyper(t);
+
       const hw = curW * 0.5;
       const hh = curH * 0.5;
 
@@ -1660,8 +2147,8 @@ const searchIndex = posts.map((p) => ({
           pullStrength = 1 - Math.max(0, nw.dist) / MAGNET_ZONE;
           const accel = 0.16 + pullStrength * 0.44;
           const standOff = nw.edge === 'left' || nw.edge === 'right' ? SIDE_RACK_GAP : BAR_RACK_GAP;
-          const barHalf = getShapeLayout('bar', vw).w * 0.5 + 12;
-          const railHalf = getShapeLayout('rail', vw).h * 0.5 + 16;
+          const barHalf = SHAPES.bar.w * 0.5 + 14;
+          const railHalf = SHAPES.rail.h * 0.5 + 16;
 
           if (nw.edge === 'top') {
             vy -= accel;
@@ -1834,7 +2321,7 @@ const searchIndex = posts.map((p) => ({
       let targetKey: 'block' | 'bar' | 'rail' = 'block';
       const activeEdge: EdgeSide | null = isDockedState
         ? state
-        : pullStrength > 0.45
+        : pullStrength > 0.42
           ? pullingEdge
           : null;
 
@@ -1844,7 +2331,7 @@ const searchIndex = posts.map((p) => ({
         targetKey = 'rail';
       }
 
-      const target = getShapeLayout(targetKey, vw);
+      const target = SHAPES[targetKey];
       velW = (velW + (target.w - curW) * 0.18) * 0.72;
       velH = (velH + (target.h - curH) * 0.18) * 0.72;
       curW += velW;
@@ -1870,8 +2357,7 @@ const searchIndex = posts.map((p) => ({
       const sy = 1 - sprintStretchX + impactSquashY - breath;
       innerFrost.style.transform = `translate3d(${coreDX.toFixed(1)}px, ${coreDY.toFixed(1)}px, 0) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
 
-      // 1) 更新 4 个核心导航按钮位置
-      target.navCoords.forEach(([tx, ty], i) => {
+      target.coords.forEach(([tx, ty], i) => {
         const sp = itemSpring[i];
         sp.vx = (sp.vx + (tx - sp.x) * 0.2) * 0.74;
         sp.vy = (sp.vy + (ty - sp.y) * 0.2) * 0.74;
@@ -1882,7 +2368,7 @@ const searchIndex = posts.map((p) => ({
         }
       });
 
-      // 2) 按钮内的文字逐字符失重微浮动（悬浮态灵动飘浮，吸附态自动平滑定格归零！）
+      // 按钮内单字失重微浮动（吸附后平滑定格）
       const charFloatAmp = Math.max(0, 1 - smoothDockW * 1.15);
       if (charFloatAmp > 0.02) {
         for (const cs of charSpans) {
@@ -1901,25 +2387,9 @@ const searchIndex = posts.map((p) => ({
         }
       }
 
-      // 3) 吸附态扩展控制台（终端搜索框 + 弹射/换色/明暗/GitHub）平滑显隐与排版插值
-      const showExtras = isDockedState && smoothDockW > 0.55;
-      dockExtras.classList.toggle('is-visible', showExtras);
-      dockExtras.style.visibility = showExtras ? 'visible' : 'hidden';
-      dockExtras.setAttribute('aria-hidden', showExtras ? 'false' : 'true');
-
-      searchSpring.x += (target.searchPos.x - searchSpring.x) * 0.24;
-      searchSpring.y += (target.searchPos.y - searchSpring.y) * 0.24;
-      searchSpring.w += (target.searchPos.w - searchSpring.w) * 0.24;
-      searchShell.style.width = `${Math.round(searchSpring.w)}px`;
-      searchShell.style.transform = `translate3d(calc(-50% + ${Math.round(searchSpring.x)}px), calc(-50% + ${Math.round(searchSpring.y)}px), 0)`;
-
-      target.utilCoords.forEach(([ux, uy], idx) => {
-        utilSpring[idx].x += (ux - utilSpring[idx].x) * 0.24;
-        utilSpring[idx].y += (uy - utilSpring[idx].y) * 0.24;
-        utilEls[idx].style.transform = `translate3d(calc(-50% + ${Math.round(utilSpring[idx].x)}px), calc(-50% + ${Math.round(utilSpring[idx].y)}px), 0)`;
-      });
-
-      if (dropdownOpen) positionDropdown();
+      // 推进并绘制链式独立外挂件与连接挂扣！
+      stepAndDrawSatelliteChain(t, vw, vh, isDockedState);
+      if (overlayOpen) positionOverlay();
 
       drawDynamicAsciiBorder(
         t,

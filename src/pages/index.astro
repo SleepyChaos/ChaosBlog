@@ -19,7 +19,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 <BaseLayout>
   <div class="bento-grid">
-    <!-- [01] 西西弗斯实时 ASCII 推石画布 -->
+    <!-- [01] 西西弗斯 8 小时真实时间轮回高分 ASCII 舞台 -->
     <AsciiSisyphus initialSummits={Math.max(1, posts.length)} />
 
     <!-- [02] 身份与浮动 HUD 物理控制台 -->
@@ -37,7 +37,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           你好，我是 <span class="handle">{GITHUB_HANDLE}</span> ({SITE_SUB_AUTHOR})
         </h1>
         <p class="identity-desc">
-          在代码与字符之间日复一日推石上山。这里记录我的技术探索、踩坑复盘与学习思考。
+          正在努力从 vibecoding 的浪潮中寻找属于我的石头。希望过一阵回头看，能发现自己又多弄懂了一点 (´･ω･)
         </p>
 
         <div class="kv-list">
@@ -48,15 +48,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
             </a>
           </div>
           <div>
-            <span class="prompt">$</span>hud_nav:
-            <strong>拖拽 / 用力甩出弹射 / 贴边磁吸</strong>
+            <span class="prompt">$</span>hud_chain:
+            <strong>拖拽助推推石 / 贴边细刃挂链 / 按 / 唤醒无框终端</strong>
           </div>
           <div style="display: flex; gap: 0.45rem; padding-top: 0.25rem; flex-wrap: wrap;">
             <button type="button" class="term-btn is-primary" id="bento-kick-btn">
-              [LAUNCH 弹射导航块]
+              [⚡ 弹射 HUD + 助推]
             </button>
-            <button type="button" class="term-btn" id="bento-dock-btn">
-              [DOCK 贴顶/释放]
+            <button type="button" class="term-btn" id="bento-realm-btn">
+              [❖ 切换全站风貌]
             </button>
             <a class="term-btn" href={`${base}/about/`}>[?ABOUT]</a>
           </div>
@@ -65,7 +65,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
       <div class="bento-foot">
         <span>POSTS: {posts.length}</span>
-        <span>TAGS: {tags.length} · COMMITS: ∞</span>
+        <span>TAGS: {tags.length} · 8H/CYCLE</span>
       </div>
     </section>
 
@@ -198,8 +198,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <script>
   document.getElementById('bento-kick-btn')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('sisyphus:hud-kick'));
+    window.dispatchEvent(
+      new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.035 } })
+    );
   });
-  document.getElementById('bento-dock-btn')?.addEventListener('click', () => {
-    window.dispatchEvent(new CustomEvent('sisyphus:hud-toggle-dock'));
+  document.getElementById('bento-realm-btn')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('sisyphus:cycle-realm'));
   });
 </script>

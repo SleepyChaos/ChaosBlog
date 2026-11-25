@@ -1,94 +1,120 @@
-/* ================= 主题设计变量（高透毛玻璃模糊 × 像素粒子 × ASCII 终端） ================= */
-:root {
-  --bg: #edf0f7;
-  --bg-veil: rgba(237, 240, 247, 0.18);
-  --surface: rgba(255, 255, 255, 0.52);
-  --surface-strong: rgba(255, 255, 255, 0.62);
-  --surface-inner: rgba(255, 255, 255, 0.44);
-  --surface-hud: rgba(255, 255, 255, 0.46);
-  --glass-rim: rgba(255, 255, 255, 0.75);
-  --bg-code: rgba(230, 234, 244, 0.68);
-  --text: #141720;
-  --text-muted: #5a6175;
-  --border: rgba(148, 158, 184, 0.36);
-  --border-strong: rgba(112, 124, 156, 0.58);
-  --accent: #4338ca;
-  --accent-fg: #ffffff;
-  --accent-soft: rgba(67, 56, 202, 0.12);
-  --orb-1: rgba(79, 70, 229, 0.26);
-  --orb-2: rgba(14, 165, 233, 0.22);
-  --orb-3: rgba(168, 85, 247, 0.18);
-  --shadow-card: 0 10px 30px -12px rgba(15, 23, 42, 0.12), inset 0 1px 0 var(--glass-rim);
-  --shadow-float: 0 12px 32px -8px rgba(15, 23, 42, 0.22), inset 0 1px 0 var(--glass-rim);
+/* ================= 四大终端美学风貌（REALMS：合并明暗、配色、字体与全站器物细节） ================= */
+:root,
+:root[data-realm='void'] {
+  --bg: #07080e;
+  --bg-veil: rgba(7, 8, 14, 0.18);
+  --surface: rgba(15, 18, 30, 0.46);
+  --surface-strong: rgba(17, 21, 35, 0.56);
+  --surface-inner: rgba(11, 14, 25, 0.40);
+  --surface-hud: rgba(13, 16, 28, 0.42);
+  --glass-rim: rgba(255, 255, 255, 0.15);
+  --bg-code: rgba(10, 13, 22, 0.64);
+  --text: #e6e9f4;
+  --text-muted: #8d96ad;
+  --border: rgba(130, 144, 184, 0.24);
+  --border-strong: rgba(150, 166, 212, 0.44);
+  --accent: #818cf8;
+  --accent-fg: #07080e;
+  --accent-soft: rgba(129, 140, 248, 0.15);
+  --orb-1: rgba(129, 140, 248, 0.28);
+  --orb-2: rgba(34, 211, 238, 0.21);
+  --orb-3: rgba(192, 132, 252, 0.18);
+  --shadow-card: 0 12px 32px -12px rgba(0, 0, 0, 0.50), inset 0 1px 0 var(--glass-rim);
+  --shadow-float: 0 14px 34px -8px rgba(0, 0, 0, 0.62), inset 0 1px 0 var(--glass-rim);
   --font-mono: ui-monospace, SFMono-Regular, 'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas,
     'Liberation Mono', monospace;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'PingFang SC',
     'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  color-scheme: light;
-}
-
-:root[data-theme='dark'] {
-  --bg: #07080d;
-  --bg-veil: rgba(7, 8, 13, 0.20);
-  --surface: rgba(16, 19, 30, 0.48);
-  --surface-strong: rgba(18, 22, 35, 0.58);
-  --surface-inner: rgba(12, 15, 26, 0.42);
-  --surface-hud: rgba(14, 17, 29, 0.44);
-  --glass-rim: rgba(255, 255, 255, 0.14);
-  --bg-code: rgba(12, 14, 23, 0.68);
-  --text: #e6e9f2;
-  --text-muted: #8e96ab;
-  --border: rgba(130, 142, 178, 0.22);
-  --border-strong: rgba(148, 163, 205, 0.40);
-  --accent: #818cf8;
-  --accent-fg: #07080d;
-  --accent-soft: rgba(129, 140, 248, 0.15);
-  --orb-1: rgba(129, 140, 248, 0.27);
-  --orb-2: rgba(34, 211, 238, 0.20);
-  --orb-3: rgba(192, 132, 252, 0.18);
-  --shadow-card: 0 12px 32px -12px rgba(0, 0, 0, 0.48), inset 0 1px 0 var(--glass-rim);
-  --shadow-float: 0 14px 34px -8px rgba(0, 0, 0, 0.62), inset 0 1px 0 var(--glass-rim);
+  --font-serif: 'Songti SC', 'STSong', 'Noto Serif SC', 'Source Han Serif SC', Georgia,
+    'Times New Roman', serif;
+  --font-body: var(--font-sans);
+  --font-heading: var(--font-sans);
+  --h2-prefix: '## ';
+  --h3-prefix: '### ';
   color-scheme: dark;
 }
 
-/* 可切换终端磷光配色方案（Indigo 默认 / Emerald 磷光绿 / Amber 琥珀橙 / Cyan 冰川青） */
-:root[data-palette='emerald'] {
-  --accent: #059669;
-  --accent-soft: rgba(5, 150, 105, 0.12);
-  --orb-1: rgba(16, 185, 129, 0.24);
-  --orb-2: rgba(20, 184, 166, 0.20);
-}
-:root[data-theme='dark'][data-palette='emerald'] {
+/* 风貌 02：PHOSPHOR_CRT（1984 绿磷显像管 · 全站等宽字体 + 双线终端框 + 扫描线） */
+:root[data-realm='crt'] {
+  --bg: #030905;
+  --bg-veil: rgba(3, 9, 5, 0.22);
+  --surface: rgba(6, 20, 11, 0.48);
+  --surface-strong: rgba(7, 24, 13, 0.58);
+  --surface-inner: rgba(4, 15, 8, 0.42);
+  --surface-hud: rgba(5, 18, 10, 0.44);
+  --glass-rim: rgba(52, 211, 153, 0.22);
+  --bg-code: rgba(3, 12, 6, 0.70);
+  --text: #d1fae5;
+  --text-muted: #6ee7b7;
+  --border: rgba(52, 211, 153, 0.26);
+  --border-strong: rgba(52, 211, 153, 0.52);
   --accent: #34d399;
+  --accent-fg: #021208;
   --accent-soft: rgba(52, 211, 153, 0.15);
-  --orb-1: rgba(52, 211, 153, 0.24);
-  --orb-2: rgba(45, 212, 191, 0.18);
+  --orb-1: rgba(16, 185, 129, 0.26);
+  --orb-2: rgba(20, 184, 166, 0.18);
+  --orb-3: rgba(52, 211, 153, 0.15);
+  --font-body: var(--font-mono);
+  --font-heading: var(--font-mono);
+  --h2-prefix: '>_ ';
+  --h3-prefix: '├─ ';
+  color-scheme: dark;
 }
 
-:root[data-palette='amber'] {
-  --accent: #d97706;
-  --accent-soft: rgba(217, 119, 6, 0.12);
-  --orb-1: rgba(245, 158, 11, 0.24);
-  --orb-2: rgba(249, 115, 22, 0.18);
+/* 风貌 03：PAPER_BLUEPRINT（手稿工程蓝图 · 亮色宣纸玻璃 + 文学衬线宋体 + 制图虚线框） */
+:root[data-realm='paper'] {
+  --bg: #f3efe6;
+  --bg-veil: rgba(243, 239, 230, 0.16);
+  --surface: rgba(255, 253, 247, 0.52);
+  --surface-strong: rgba(255, 253, 249, 0.64);
+  --surface-inner: rgba(255, 252, 244, 0.44);
+  --surface-hud: rgba(255, 252, 245, 0.48);
+  --glass-rim: rgba(255, 255, 255, 0.82);
+  --bg-code: rgba(232, 226, 213, 0.66);
+  --text: #1c1917;
+  --text-muted: #675f56;
+  --border: rgba(120, 113, 108, 0.30);
+  --border-strong: rgba(87, 83, 78, 0.54);
+  --accent: #1d4ed8;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(29, 78, 216, 0.10);
+  --orb-1: rgba(37, 99, 235, 0.20);
+  --orb-2: rgba(217, 119, 6, 0.18);
+  --orb-3: rgba(194, 65, 12, 0.13);
+  --shadow-card: 0 10px 28px -12px rgba(28, 25, 23, 0.12), inset 0 1px 0 var(--glass-rim);
+  --shadow-float: 0 12px 30px -8px rgba(28, 25, 23, 0.20), inset 0 1px 0 var(--glass-rim);
+  --font-body: var(--font-serif);
+  --font-heading: var(--font-serif);
+  --h2-prefix: '§ ';
+  --h3-prefix: '¶ ';
+  color-scheme: light;
 }
-:root[data-theme='dark'][data-palette='amber'] {
+
+/* 风貌 04：AMBER_DUNE（沙丘琥珀磁带未来主义 · 暖金终端 + 工业斜纹顶栏 + λ 哲学符号） */
+:root[data-realm='amber'] {
+  --bg: #0c0906;
+  --bg-veil: rgba(12, 9, 6, 0.20);
+  --surface: rgba(26, 18, 11, 0.48);
+  --surface-strong: rgba(30, 21, 13, 0.58);
+  --surface-inner: rgba(20, 14, 8, 0.42);
+  --surface-hud: rgba(24, 16, 10, 0.45);
+  --glass-rim: rgba(251, 191, 36, 0.20);
+  --bg-code: rgba(18, 12, 7, 0.70);
+  --text: #fef3c7;
+  --text-muted: #d6a86c;
+  --border: rgba(245, 158, 11, 0.25);
+  --border-strong: rgba(251, 191, 36, 0.48);
   --accent: #fbbf24;
+  --accent-fg: #140d04;
   --accent-soft: rgba(251, 191, 36, 0.15);
-  --orb-1: rgba(251, 191, 36, 0.23);
-  --orb-2: rgba(251, 146, 60, 0.17);
-}
-
-:root[data-palette='cyan'] {
-  --accent: #0284c7;
-  --accent-soft: rgba(2, 132, 199, 0.12);
-  --orb-1: rgba(14, 165, 233, 0.25);
-  --orb-2: rgba(99, 102, 241, 0.20);
-}
-:root[data-theme='dark'][data-palette='cyan'] {
-  --accent: #22d3ee;
-  --accent-soft: rgba(34, 211, 238, 0.15);
-  --orb-1: rgba(34, 211, 238, 0.25);
-  --orb-2: rgba(129, 140, 248, 0.19);
+  --orb-1: rgba(245, 158, 11, 0.26);
+  --orb-2: rgba(234, 88, 12, 0.20);
+  --orb-3: rgba(217, 119, 6, 0.16);
+  --font-body: var(--font-sans);
+  --font-heading: var(--font-mono);
+  --h2-prefix: 'λ ';
+  --h3-prefix: '∷ ';
+  color-scheme: dark;
 }
 
 /* ================= 全局基础 ================= */
@@ -102,17 +128,66 @@ html {
 
 body {
   margin: 0;
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   font-size: 1rem;
   line-height: 1.78;
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.28s ease, color 0.25s ease;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+h1,
+h2,
+h3,
+.post-row-title,
+.featured-post-box h3 {
+  font-family: var(--font-heading);
+}
+
+/* CRT 风貌专属：全屏细微显像管扫描线 + 卡片双线复古框 */
+:root[data-realm='crt'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 98;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.16) 3px
+  );
+}
+
+:root[data-realm='crt'] .bento-card,
+:root[data-realm='crt'] .article-card,
+:root[data-realm='crt'] .top-term-inner {
+  border-style: double;
+  border-width: 3px;
+}
+
+/* PAPER 蓝图手稿风貌专属：工程制图虚线边与十字裁切角标 */
+:root[data-realm='paper'] .bento-card,
+:root[data-realm='paper'] .ascent-box {
+  border-style: dashed;
+}
+
+/* AMBER 工业琥珀风貌专属：模块顶栏斜纹警示底纹 */
+:root[data-realm='amber'] .bento-head {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0px,
+    transparent 8px,
+    rgba(251, 191, 36, 0.05) 8px,
+    rgba(251, 191, 36, 0.05) 16px
+  );
+  padding: 0.35rem 0.5rem 0.5rem;
+  margin: -0.2rem -0.3rem 0.75rem;
 }
 
 a {
@@ -464,16 +539,44 @@ main.page-main {
 
 .ascii-slope-pre {
   margin: 0;
-  padding: 0.35rem 0.5rem;
-  background: var(--bg-code);
+  padding: 0.5rem 0.65rem;
+  background: color-mix(in srgb, var(--bg-code) 68%, transparent);
   border: 1px solid var(--border);
   border-radius: 1px;
   font-family: var(--font-mono);
-  font-size: 0.76rem;
-  line-height: 1.22;
-  color: var(--text);
-  overflow-x: hidden;
+  font-size: 0.64rem;
+  line-height: 1.16;
+  letter-spacing: 0.005em;
+  color: var(--text-muted);
+  overflow-x: auto;
   user-select: none;
+}
+
+.ascii-slope-pre .as-dim {
+  color: color-mix(in srgb, var(--text-muted) 68%, transparent);
+}
+
+.ascii-slope-pre .as-ridge {
+  color: var(--text);
+}
+
+.ascii-slope-pre .as-hero {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.ascii-slope-pre .as-rock {
+  color: var(--text);
+  font-weight: 700;
+  text-shadow: 0 0 8px var(--accent-glow);
+}
+
+.ascii-slope-pre .as-spark {
+  color: var(--accent);
+}
+
+.ascii-slope-pre .as-hud {
+  color: var(--text-muted);
 }
 
 .featured-post-box {
@@ -778,131 +881,196 @@ main.page-main {
   will-change: transform;
 }
 
-/* 吸附固定后展开的终端扩展控制台（搜索终端 + 弹射 + 换色 + 明暗 + GitHub） */
-.hud-dock-extras {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.18s ease;
-}
-
-.hud-dock-extras.is-visible {
-  opacity: 1;
-}
-
-.hud-search-shell {
-  position: absolute;
-  left: 50%;
-  top: 50%;
+/* ================= 链式独立外挂件（Satellite Pendants）与无框融底闪烁终端 ================= */
+.hud-pendant {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 90;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  background: color-mix(in srgb, var(--bg) 62%, transparent);
-  border: 1px solid var(--border-strong);
-  border-radius: 1px;
-  pointer-events: auto;
-  cursor: text;
-  will-change: transform, width;
-}
-
-.hud-search-shell:focus-within {
-  border-color: var(--accent);
-}
-
-.hud-search-prompt {
-  color: var(--accent);
-  font-weight: 700;
-  font-size: 11px;
-  flex-shrink: 0;
-}
-
-.hud-search-input {
-  width: 100%;
-  min-width: 0;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: var(--text);
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 7px;
   font-family: var(--font-mono);
   font-size: 11px;
-  line-height: 1.2;
-  padding: 1px 0;
-}
-
-.hud-search-input::placeholder {
-  color: var(--text-muted);
-  opacity: 0.8;
-}
-
-.hud-util-btn {
-  position: absolute;
-  left: 50%;
-  top: 50%;
+  line-height: 1.1;
   white-space: nowrap;
-  padding: 2px 5px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.15;
   color: var(--text);
-  background: color-mix(in srgb, var(--bg) 52%, transparent);
-  border: 1px solid var(--border);
+  background: var(--surface-hud);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  backdrop-filter: blur(14px) saturate(180%);
+  border: 1px solid color-mix(in srgb, var(--accent) 52%, transparent);
   border-radius: 1px;
+  box-shadow: var(--shadow-float);
   cursor: pointer;
-  pointer-events: auto;
+  user-select: none;
   text-decoration: none;
-  transition: border-color 0.1s steps(2), color 0.1s steps(2), background-color 0.1s steps(2);
-  will-change: transform;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transition: background-color 0.12s steps(2), color 0.12s steps(2), border-color 0.12s steps(2);
 }
 
-.hud-util-btn:hover {
+.hud-pendant.is-deployed {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.hud-pendant:hover {
   border-color: var(--accent);
   color: var(--accent);
+  background: var(--accent-soft);
   text-decoration: none;
 }
 
-.hud-util-btn.is-eject {
+.hud-pendant.is-eject {
   color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 65%, transparent);
 }
 
-.hud-util-btn.is-eject:hover {
+.hud-pendant.is-eject:hover {
   background: var(--accent);
   color: var(--accent-fg);
 }
 
-/* 终端搜索实时匹配下拉结果面板 */
-.hud-search-dropdown {
+.pendant-lug {
+  color: var(--accent);
+  opacity: 0.75;
+  font-size: 10px;
+}
+
+/* 无框融底闪烁终端挂件（去掉丑陋的传统输入框，字符直接浮在底部透明毛玻璃上！） */
+.naked-cli-pendant {
   position: fixed;
-  z-index: 95;
-  display: none;
-  width: min(90vw, 360px);
-  max-height: 260px;
-  overflow-y: auto;
-  background: var(--surface-strong);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--accent);
-  border-radius: 2px;
-  box-shadow: var(--shadow-float);
-  padding: 6px;
+  left: 0;
+  top: 0;
+  z-index: 90;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 8px;
+  background: color-mix(in srgb, var(--surface-hud) 68%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  backdrop-filter: blur(14px) saturate(180%);
+  border: none;
+  border-bottom: 1px dashed color-mix(in srgb, var(--accent) 58%, transparent);
   font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text);
+  cursor: text;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  will-change: transform, width, opacity;
+}
+
+.naked-cli-pendant.is-deployed {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.naked-cli-pendant:focus-within {
+  border-bottom-style: solid;
+  border-bottom-color: var(--accent);
+  background: color-mix(in srgb, var(--surface-hud) 86%, transparent);
+}
+
+.naked-cli-prompt {
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.naked-cli-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.naked-cli-input {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  color: var(--text);
+  caret-color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 0;
+  margin: 0;
+}
+
+.naked-cli-ambient {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--text-muted);
   font-size: 11px;
 }
 
-.hud-search-dropdown.is-open {
+.naked-cli-cursor {
+  display: inline-block;
+  color: var(--accent);
+  animation: term-blink 0.95s steps(1) infinite;
+  margin-left: 1px;
+}
+
+/* 交互式终端命令输出 & 搜索结果浮层 */
+.hud-term-overlay {
+  position: fixed;
+  z-index: 95;
+  display: none;
+  width: min(92vw, 410px);
+  max-height: 310px;
+  overflow-y: auto;
+  background: var(--surface-strong);
+  -webkit-backdrop-filter: blur(22px) saturate(185%);
+  backdrop-filter: blur(22px) saturate(185%);
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  box-shadow: var(--shadow-float);
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.hud-term-overlay.is-open {
   display: block;
 }
 
 .hud-search-head {
   display: flex;
   justify-content: space-between;
-  padding: 2px 4px 5px;
-  margin-bottom: 4px;
+  padding: 0 2px 5px;
+  margin-bottom: 5px;
   border-bottom: 1px dashed var(--border-strong);
   color: var(--text-muted);
   font-size: 10px;
+}
+
+.hud-term-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .hud-search-item {
@@ -953,8 +1121,8 @@ main.page-main {
 
 .article-card {
   background: var(--surface-strong);
-  -webkit-backdrop-filter: blur(26px) saturate(120%);
-  backdrop-filter: blur(26px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(175%);
+  backdrop-filter: blur(20px) saturate(175%);
   border: 1px solid var(--border);
   border-radius: 2px;
   box-shadow: var(--shadow-card);
@@ -1076,7 +1244,7 @@ main.page-main {
 }
 
 .prose h2::before {
-  content: '## ';
+  content: var(--h2-prefix, '## ');
   font-family: var(--font-mono);
   font-size: 0.95rem;
   color: var(--accent);
@@ -1088,10 +1256,20 @@ main.page-main {
 }
 
 .prose h3::before {
-  content: '### ';
+  content: var(--h3-prefix, '### ');
   font-family: var(--font-mono);
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+/* Shiki 代码块在暗色系风貌（void / crt / amber）下自动切到暗色语法高亮，仅在亮色纸墨风貌（paper）保持浅色语法高亮 */
+:root:not([data-realm='paper']) .astro-code,
+:root:not([data-realm='paper']) .astro-code span {
+  color: var(--shiki-dark, inherit) !important;
+  background-color: var(--shiki-dark-bg) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+  text-decoration: var(--shiki-dark-text-decoration) !important;
 }
 
 .prose p {
@@ -1228,16 +1406,6 @@ main.page-main {
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0.4rem 0;
-}
-
-/* Shiki 双主题切换 */
-:root[data-theme='dark'] .astro-code,
-:root[data-theme='dark'] .astro-code span {
-  color: var(--shiki-dark, inherit) !important;
-  background-color: var(--shiki-dark-bg) !important;
-  font-style: var(--shiki-dark-font-style) !important;
-  font-weight: var(--shiki-dark-font-weight) !important;
-  text-decoration: var(--shiki-dark-text-decoration) !important;
 }
 
 /* Callout 适配 */
