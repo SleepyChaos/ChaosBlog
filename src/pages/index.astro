@@ -34,8 +34,8 @@ const computePostTerrain = (body: string) => {
     <!-- [01] 西西弗斯 8 小时真实时间轮回高分多彩科幻剧场 -->
     <AsciiSisyphus initialSummits={Math.max(1, posts.length)} />
 
-    <!-- [02] 身份与浮动 HUD 物理控制台 -->
-    <section class="bento-card col-5">
+    <!-- [02] 身份与浮动 HUD 物理控制台（随四大科幻世界切换专属艺术字体与身份印章） -->
+    <section class="bento-card col-5 whoami-card">
       <div>
         <div class="bento-head">
           <span class="bento-head-title">
@@ -45,11 +45,17 @@ const computePostTerrain = (body: string) => {
           <span class="bento-head-meta">ID::{GITHUB_HANDLE.toUpperCase()}</span>
         </div>
 
+        <div class="whoami-insignia-row" id="whoami-world-insignia">
+          <span>[▮ 1:4:9]</span>
+          <span>DISCOVERY_ONE // 深空推石档案</span>
+        </div>
+
         <h1 class="identity-title">
-          你好，我是 <span class="handle">{GITHUB_HANDLE}</span> ({SITE_SUB_AUTHOR})
+          你好，我是 <span class="handle">{GITHUB_HANDLE}</span>{' '}
+          <span class="sub-author">({SITE_SUB_AUTHOR})</span>
         </h1>
         <p class="identity-desc">
-          正在努力从 vibecoding 的浪潮中寻找属于我的石头。希望过一阵回头看，能发现自己又多弄懂了一点 (´･ω･)
+          “正在努力从 vibecoding 的浪潮中寻找属于我的石头。希望过一阵回头看，能发现自己又多弄懂了一点 (´･ω･)”
         </p>
 
         <div class="kv-list">
@@ -65,14 +71,14 @@ const computePostTerrain = (body: string) => {
           </div>
           <div>
             <span class="prompt">$</span>hud_rig:
-            <strong>顶栏双层挂链 / 侧栏细刃 / 点击左图召唤天象助推</strong>
+            <strong>三段机械棘轮挂架 / 168x72 亚像素点阵 / 点击左图天象助推</strong>
           </div>
           <div style="display: flex; gap: 0.45rem; padding-top: 0.25rem; flex-wrap: wrap;">
             <button type="button" class="term-btn is-primary" id="bento-kick-btn">
-              [⚡ 弹射 HUD + 助推]
+              [&gt;&gt; 弹射 HUD + 助推]
             </button>
             <button type="button" class="term-btn" id="bento-realm-btn">
-              [❖ 跃迁科幻世界]
+              [╬ 跃迁科幻世界]
             </button>
             <a class="term-btn" href={`${base}/about/`}>[?ABOUT]</a>
           </div>
@@ -100,7 +106,7 @@ const computePostTerrain = (body: string) => {
 
             <a class="featured-post-box" href={`${base}/posts/${latestPost.slug}/`}>
               <span class="featured-badge">
-                [NEW_ENTRY · {readingTime(latestPost.body)} · ⛰ {computePostTerrain(latestPost.body).profile} {computePostTerrain(latestPost.body).alt}m]
+                [NEW_ENTRY · {readingTime(latestPost.body)} · /▲ {computePostTerrain(latestPost.body).profile} {computePostTerrain(latestPost.body).alt}m]
               </span>
               <h3>{latestPost.title}</h3>
               {latestPost.description && <p>{latestPost.description}</p>}
@@ -264,6 +270,20 @@ const computePostTerrain = (body: string) => {
   document.getElementById('bento-realm-btn')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('sisyphus:cycle-realm'));
   });
+
+  const insigniaEl = document.getElementById('whoami-world-insignia');
+  const INSIGNIA_MAP: Record<string, string> = {
+    void: '[▮ 1:4:9] DISCOVERY_ONE // 克拉维斯深空推石档案',
+    paper: '〘 Ψ 〙 ENCYCLOPEDIA GALACTICA // 端点星第一基地编纂官',
+    crt: '[▛╬▜] ZION_MAINFRAME // 尼布甲尼撒号构造层领航员',
+    amber: '◈ SIETCH_TABR // 厄拉科斯障壁山脉弗雷曼行者',
+  };
+  const syncInsignia = () => {
+    const r = document.documentElement.dataset.realm || 'void';
+    if (insigniaEl) insigniaEl.textContent = INSIGNIA_MAP[r] || INSIGNIA_MAP.void;
+  };
+  syncInsignia();
+  window.addEventListener('sisyphus:realmchange', syncInsignia);
 
   // ========= 原地交互式标签过滤 + 悬停联动 + j/k 终端键盘流选文 =========
   const tagChips = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-filter-tag]'));

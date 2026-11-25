@@ -1,7 +1,7 @@
 /* ================= 四大 ASCII 艺术世界（统一半衬线书卷排版 = 零切换抖动 + 高对比度 + 7 通道多彩剧场色板） ================= */
 :root,
 :root[data-realm='void'] {
-  /* 世界 01：星渊神殿 · ASTRAL MYTH（古典双线星盘 ASCII ╔═✦═╗） */
+  /* 世界 01：星渊神殿 · ASTRAL MYTH（古典双线星盘 ASCII ╔═══╗） */
   --bg: #080913;
   --bg-veil: rgba(8, 9, 19, 0.14);
   --surface: rgba(16, 19, 36, 0.54);
@@ -38,7 +38,7 @@
   /* 卡片 ASCII 装饰符 */
   --card-corner-tl: '╔═';
   --card-corner-br: '═╝';
-  --h2-prefix: '✦ ';
+  --h2-prefix: ':: ';
   --h3-prefix: '├─ ';
 
   --orb-1: rgba(129, 140, 248, 0.30);
@@ -57,7 +57,7 @@
   color-scheme: dark;
 }
 
-/* 世界 02：浮世纸墨 · UKIYO SCROLL（宣纸版画印章 ASCII ┏━❖━┓ · 朱砂与松烟墨） */
+/* 世界 02：浮世纸墨 · UKIYO SCROLL（宣纸版画印章 ASCII ┏━━━┓ · 朱砂与松烟墨） */
 :root[data-realm='paper'] {
   --bg: #f5f0e4;
   --bg-veil: rgba(245, 240, 228, 0.12);
@@ -580,24 +580,110 @@ main.page-main {
   color: var(--text-muted);
 }
 
-/* ================= 首页模块与多彩高分 ASCII 西西弗斯剧场 ================= */
+/* ================= 首页模块与四大世界风格化艺术自我介绍卡（WHOAMI） ================= */
+.whoami-insignia-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.16rem 0.55rem;
+  margin-bottom: 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: 1px;
+}
+
 .identity-title {
-  font-size: 1.55rem;
-  line-height: 1.34;
-  letter-spacing: -0.01em;
-  margin: 0.1rem 0 0.55rem;
+  font-size: 1.62rem;
+  line-height: 1.32;
+  margin: 0.05rem 0 0.55rem;
+  transition: text-shadow 0.25s ease, letter-spacing 0.2s ease;
 }
 
 .identity-title .handle {
-  font-family: var(--font-mono);
   color: var(--accent);
+  font-weight: 700;
+}
+
+.identity-title .sub-author {
+  font-size: 1.05rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* 世界 01（太空漫游）：库布里克宽字距几何雕刻艺术体 */
+:root[data-realm='void'] .whoami-card .identity-title {
+  font-family: 'Optima', 'Avenir Next', 'Futura', 'Cinzel', 'Didot', var(--font-serif);
+  letter-spacing: 0.07em;
+  text-shadow: 0 0 18px rgba(165, 180, 252, 0.35);
+}
+
+:root[data-realm='void'] .whoami-card .identity-title .handle {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--accent-2);
+}
+
+/* 世界 02（银河帝国）：典藏楷宋行书碑刻与朱砂官印风格 */
+:root[data-realm='paper'] .whoami-card .identity-title {
+  font-family: 'Kaiti SC', 'STKaiti', 'Baskerville', 'Palatino', 'Songti SC', Georgia, serif;
+  letter-spacing: 0.03em;
+}
+
+:root[data-realm='paper'] .whoami-card .identity-title .handle {
+  font-style: italic;
+  padding: 0 0.3rem;
+  border: 1.5px solid var(--accent);
+  background: rgba(185, 56, 41, 0.08);
+}
+
+:root[data-realm='paper'] .whoami-card .identity-desc {
+  font-family: 'Kaiti SC', 'STKaiti', 'Songti SC', Georgia, serif;
+  font-size: 1rem;
+}
+
+/* 世界 03（黑客帝国）：锡安主机红青色差故障终端艺术字 */
+:root[data-realm='crt'] .whoami-card .identity-title {
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-shadow:
+    -1.5px 0 rgba(255, 77, 148, 0.78),
+    1.5px 0 rgba(0, 229, 255, 0.82);
+}
+
+:root[data-realm='crt'] .whoami-card .identity-title .handle {
+  text-transform: uppercase;
+  background: rgba(34, 255, 136, 0.12);
+  padding: 0 0.25rem;
+}
+
+/* 世界 04（沙丘）：厄拉科斯古典铜版碑铭体 (Copperplate / Didot) */
+:root[data-realm='amber'] .whoami-card .identity-title {
+  font-family: 'Copperplate', 'Cinzel', 'Didot', 'Bodoni 72', 'Songti SC', Georgia, serif;
+  letter-spacing: 0.08em;
+  font-variant: small-caps;
+  text-shadow: 0 2px 14px rgba(255, 183, 3, 0.36);
+}
+
+:root[data-realm='amber'] .whoami-card .identity-title .handle {
+  color: var(--accent);
+  border-bottom: 1px dashed var(--accent-3);
 }
 
 .identity-desc {
+  position: relative;
   margin: 0 0 0.85rem;
-  color: var(--text-muted);
-  font-size: 0.96rem;
-  line-height: 1.75;
+  padding: 0.45rem 0.75rem;
+  color: var(--text);
+  background: var(--surface-inner);
+  border-left: 2.5px solid var(--accent);
+  border-radius: 0 2px 2px 0;
+  font-size: 0.95rem;
+  line-height: 1.72;
 }
 
 .kv-list {
@@ -1475,7 +1561,7 @@ main.page-main {
 }
 
 .prose h2::before {
-  content: var(--h2-prefix, '✦ ');
+  content: var(--h2-prefix, ':: ');
   font-family: var(--font-mono);
   font-size: 0.95rem;
   color: var(--accent);

@@ -105,7 +105,7 @@ const tagIndex = tags.map(([name, count]) => ({
   class="hud-pendant pendant-eject"
   title="脱离挂架高速弹射至零重力（同时助推西西弗斯推石）"
 >
-  <span id="pendant-eject-label">⟪⚡ 弹射⟫</span>
+  <span id="pendant-eject-label">⟪&gt;&gt; 弹射⟫</span>
 </button>
 
 <!-- 异构挂件 C：双线印章卡带式科幻世界切换器（Sci-Fi World Cartridge） -->
@@ -164,34 +164,34 @@ const tagIndex = tags.map(([name, count]) => ({
     satB: string;
   }
 
-  // 四大科幻经典各自的 ASCII 边框艺术词法与图腾配置
+  // 四大科幻经典各自的 ASCII 边框艺术词法与原著名词配置
   const REALM_SPECS: Record<RealmId, RealmSpec> = {
     void: {
       glyph: '◉',
       fullName: '太空漫游',
       shortName: '漫游',
-      desc: '2001: A SPACE ODYSSEY (黑石碑 1:4:9 · HAL-9000 深空舱)',
-      dockTag: '::HAL-9000',
-      floatTag: '::EVA-0G',
+      desc: '2001: A SPACE ODYSSEY (TMA-1 · 发现号深空终端)',
+      dockTag: '::DISCOVERY-1',
+      floatTag: '::TMA-1',
       corners: ['╔', '╗', '╝', '╚'],
       hMain: '═',
       hWave: '▮',
       vLeft: '║',
       vRight: '║',
       soliton: '◉',
-      satA: '✦',
+      satA: '*',
       satB: '▮',
     },
     paper: {
       glyph: 'Ψ',
       fullName: '银河帝国',
       shortName: '帝国',
-      desc: 'FOUNDATION / GALACTIC EMPIRE (川陀百科典藏 · 谢顿第一辐光)',
-      dockTag: '::TRANTOR',
-      floatTag: '::SELDON',
+      desc: 'FOUNDATION / GALACTIC EMPIRE (端点星百科全书 · 第一辐光)',
+      dockTag: '::TERMINUS',
+      floatTag: '::TRANTOR',
       corners: ['┏', '┓', '┛', '┗'],
       hMain: '━',
-      hWave: '❖',
+      hWave: '╬',
       vLeft: '┃',
       vRight: '┃',
       soliton: 'Ψ',
@@ -202,9 +202,9 @@ const tagIndex = tags.map(([name, count]) => ({
       glyph: '▓',
       fullName: '黑客帝国',
       shortName: '母体',
-      desc: 'THE MATRIX (母体构造层 · 半块像素流与片假名代码雨)',
-      dockTag: '::MATRIX',
-      floatTag: '::ZION',
+      desc: 'THE MATRIX (锡安主机 · 尼布甲尼撒号构造层)',
+      dockTag: '::NEBUCHADNEZZAR',
+      floatTag: '::CONSTRUCT',
       corners: ['▛', '▜', '▟', '▙'],
       hMain: '▀',
       hWave: '▓',
@@ -216,10 +216,10 @@ const tagIndex = tags.map(([name, count]) => ({
     },
     amber: {
       glyph: '◐',
-      fullName: '沙丘香料',
+      fullName: '沙丘',
       shortName: '沙丘',
-      desc: 'DUNE: ARRAKIS (厄拉科斯双月 · 香料金尘与弗雷曼蓝眼)',
-      dockTag: '::ARRAKIS',
+      desc: 'DUNE: ARRAKIS (厄拉科斯 · 塔布尔穴地与障壁山脉)',
+      dockTag: '::SIETCH-TABR',
       floatTag: '::SHAI-HULUD',
       corners: ['╭', '╮', '╯', '╰'],
       hMain: '─',
@@ -333,7 +333,7 @@ const tagIndex = tags.map(([name, count]) => ({
       const spec = REALM_SPECS[curRealm] || REALM_SPECS.void;
       pendantRealmGlyph.textContent = spec.glyph;
       pendantRealmText.textContent = isSide ? spec.shortName : spec.fullName;
-      pendantEjectLabel.textContent = isSide ? '⚡弹射' : '⟪⚡ 弹射⟫';
+      pendantEjectLabel.textContent = isSide ? '>>弹射' : '⟪>> 弹射⟫';
       pendantGhLabel.textContent = isSide ? 'GH↗' : '@Sisyphus ↗';
 
       pendantEject.classList.toggle('is-rail-compact', isSide);
@@ -896,7 +896,7 @@ const tagIndex = tags.map(([name, count]) => ({
         const nextOn = arg === 'on' ? toggleSfx(true) : arg === 'off' ? toggleSfx(false) : toggleSfx();
         showTerminalText(
           'SYNTHESIZER :: AUDIO_HARP',
-          `<pre class="hud-term-pre">♪ 五声音阶 ASCII 边框拨弦与科幻合成器音效已切换为: <strong style="color:var(--accent)">${nextOn ? 'ON (扫过边框即可弹奏)' : 'OFF'}</strong></pre>`,
+          `<pre class="hud-term-pre">[SFX] 五声音阶 ASCII 边框拨弦与科幻合成器音效已切换为: <strong style="color:var(--accent)">${nextOn ? 'ON (扫过边框即可弹奏)' : 'OFF'}</strong></pre>`,
         );
         return true;
       }
@@ -999,7 +999,7 @@ const tagIndex = tags.map(([name, count]) => ({
       ].includes(tokens[0]);
 
       const cmdBanner = isKnownCmd
-        ? `<div style="padding:5px 8px;margin-bottom:5px;background:var(--accent-soft);color:var(--accent);border-left:2px solid var(--accent);">⚡ 按 Enter 执行舰载命令: <strong>$ ${q}</strong></div>`
+        ? `<div style="padding:5px 8px;margin-bottom:5px;background:var(--accent-soft);color:var(--accent);border-left:2px solid var(--accent);">&gt;&gt; 按 Enter 执行舰载命令: <strong>$ ${q}</strong></div>`
         : '';
 
       const rows =
@@ -1172,6 +1172,16 @@ const tagIndex = tags.map(([name, count]) => ({
     let smoothDockW = 1;
     let rackDeploy = 1;
     let rackEdge: EdgeSide | null = 'top';
+    let dockLockTime = -1000;
+
+    // 机械棘轮段落推进曲线（5 齿量化步进 + 零过冲锁死，杜绝吸附时的果冻感！）
+    const mechRatchet = (ageMs: number, delayMs: number, durMs: number): number => {
+      if (ageMs <= delayMs) return 0;
+      if (ageMs >= delayMs + durMs) return 1;
+      const u = (ageMs - delayMs) / durMs;
+      const ticks = Math.floor(u * 5) / 5;
+      return ticks * 0.48 + (1 - Math.pow(1 - u, 2.2)) * 0.52;
+    };
 
     let curW: number = SHAPES.bar.w;
     let curH: number = SHAPES.bar.h;
@@ -1389,41 +1399,55 @@ const tagIndex = tags.map(([name, count]) => ({
       ambientOrbit = false;
       vx = 0;
       vy = 0;
+      velW = 0;
+      velH = 0;
+      rackVelX = 0;
+      rackVelY = 0;
       rackEdge = edge;
       lastPullEdge = edge;
+      dockLockTime = now;
       syncDocDockAttr();
 
+      // 吸附瞬间清空弹簧环残余晃动，进入精密机械导轨锁定态
+      for (const m of ring) {
+        m.dx *= 0.2;
+        m.dy *= 0.2;
+        m.vx = 0;
+        m.vy = 0;
+      }
+      coreDX = 0;
+      coreDY = 0;
+      coreVX = 0;
+      coreVY = 0;
+
       if (edge === 'top' || edge === 'bottom') {
-        velW += 7.5;
-        velH -= 3.5;
         if (vw >= 720 && x > vw - 390) {
           x = Math.max(SHAPES.bar.w * 0.5 + 24, vw - 405);
         } else {
           x = Math.max(SHAPES.bar.w * 0.5 + 14, Math.min(vw - SHAPES.bar.w * 0.5 - 14, x));
         }
-        rackVelY = edge === 'top' ? 2.8 : -2.8;
-        impulseRing(0, edge === 'top' ? 3.8 : -3.8, 1.8);
       } else {
-        velW -= 4;
-        velH += 7.5;
         if (vh > 520 && y > vh - 260) {
           y = Math.max(SHAPES.rail.h * 0.5 + 24, vh - 270);
         } else {
           y = Math.max(SHAPES.rail.h * 0.5 + 16, Math.min(vh - SHAPES.rail.h * 0.5 - 16, y));
         }
-        rackVelY = 3.8;
-        rackVelX = edge === 'left' ? 2.2 : -2.2;
-        impulseRing(edge === 'left' ? 3.2 : -3.2, 4.2, 1.6);
       }
 
-      satellites.forEach((sat, idx) => {
+      satellites.forEach((sat) => {
         sat.x = x;
         sat.y = y;
-        sat.vx = (edge === 'top' || edge === 'bottom' ? 1 : 0) * (2.4 + idx * 1.1);
-        sat.vy = (edge === 'left' || edge === 'right' ? 1 : 0.6) * (2.6 + idx * 1.1);
+        sat.vx = 0;
+        sat.vy = 0;
+        sat.alpha = 0;
       });
 
-      void now;
+      if (sfxEnabled) {
+        playTone(185, 0.035, 'triangle', 0.028, 0);
+        playTone(260, 0.035, 'triangle', 0.028, 0.085);
+        playTone(340, 0.045, 'triangle', 0.032, 0.18);
+      }
+
       saveState();
     };
 
@@ -1710,7 +1734,7 @@ const tagIndex = tags.map(([name, count]) => ({
       }
     };
 
-    // ========= 异构独立挂件编排：上下贴边为“第一排主舱+三枚异构挂牌，第二排悬挂宽幅顶栏式搜索终端”！ =========
+    // ========= 异构独立挂件编排：三段式机械棘轮展开（1.主舱落锁 -> 2.三枚挂件逐级沿导轨滑出卡死 -> 3.第二排搜索终端垂直降下锁死） =========
     const stepAndDrawSatelliteChain = (t: number, vw: number, vh: number, isDocked: boolean) => {
       const isSide = state === 'left' || state === 'right';
       const cliSat = satellites[0];
@@ -1723,9 +1747,9 @@ const tagIndex = tags.map(([name, count]) => ({
 
       if (!isDocked) {
         for (const sat of satellites) {
-          sat.x += (x - sat.x) * 0.25;
-          sat.y += (y - sat.y) * 0.25;
-          sat.alpha *= 0.78;
+          sat.x += (x - sat.x) * 0.35;
+          sat.y += (y - sat.y) * 0.35;
+          sat.alpha *= 0.72;
           if (sat.alpha < 0.03) {
             sat.alpha = 0;
             sat.el.classList.remove('is-deployed');
@@ -1736,11 +1760,14 @@ const tagIndex = tags.map(([name, count]) => ({
         return;
       }
 
+      const dockAge = Math.max(0, t - dockLockTime);
+
       if (isSide) {
-        // ====== 左右侧边吸附模式：极简细条终端 + 紧凑三挂件纵向垂挂 ======
+        // ====== 左右侧边吸附模式：4 个模块沿垂直导轨逐级机械滑出锁定 ======
         const wantCliW =
           cliFocused || cliHovered || cliInput.value.length > 0 ? 192 : SHAPES.rail.w;
-        cliSat.w += (wantCliW - cliSat.w) * 0.24;
+        cliSat.w += (wantCliW - cliSat.w) * 0.38;
+        if (Math.abs(wantCliW - cliSat.w) < 0.5) cliSat.w = wantCliW;
         cliSat.h = 28;
         pendantCli.style.width = `${Math.round(cliSat.w)}px`;
 
@@ -1750,28 +1777,26 @@ const tagIndex = tags.map(([name, count]) => ({
         let prevAnchorY = y + dir * (curH * 0.5);
 
         satellites.forEach((sat, idx) => {
+          const stageU = mechRatchet(dockAge, 55 + idx * 52, 55);
           const extraW = Math.max(0, sat.w - SHAPES.rail.w);
-          let tx = state === 'left' ? x + extraW * 0.5 : x - extraW * 0.5;
-          const ty = prevAnchorY + dir * (CHAIN_GAP + sat.h * 0.5);
-          tx +=
-            Math.sin(t * 0.0026 - idx * 0.85) *
-            (0.9 + idx * 0.45) *
-            (idx === 0 && cliFocused ? 0 : 1);
+          const tx = state === 'left' ? x + extraW * 0.5 : x - extraW * 0.5;
+          const slotY = prevAnchorY + dir * (CHAIN_GAP + sat.h * 0.5);
 
-          const stiff = 0.2 - idx * 0.018;
-          sat.vx = (sat.vx + (tx - sat.x) * stiff) * 0.76;
-          sat.vy = (sat.vy + (ty - sat.y) * stiff) * 0.76;
-          sat.x += sat.vx;
-          sat.y += sat.vy;
-          sat.alpha += (1 - sat.alpha) * 0.22;
+          sat.x = tx;
+          sat.y = prevAnchorY + (slotY - prevAnchorY) * stageU;
+          sat.alpha = stageU;
 
-          sat.el.classList.add('is-deployed');
+          if (stageU > 0.02) {
+            sat.el.classList.add('is-deployed');
+          } else {
+            sat.el.classList.remove('is-deployed');
+          }
           sat.el.style.opacity = sat.alpha.toFixed(2);
           sat.el.style.transform = `translate3d(${Math.round(sat.x - sat.w * 0.5)}px, ${Math.round(sat.y - sat.h * 0.5)}px, 0)`;
 
           if (fxCtx && sat.alpha > 0.15) {
             fxCtx.save();
-            fxCtx.globalAlpha = sat.alpha * 0.9;
+            fxCtx.globalAlpha = sat.alpha * 0.92;
             const linkTopY = dir > 0 ? prevAnchorY : sat.y + sat.h * 0.5;
             const linkBotY = dir > 0 ? sat.y - sat.h * 0.5 : prevAnchorY;
             fxCtx.fillStyle = borderColor;
@@ -1789,9 +1814,10 @@ const tagIndex = tags.map(([name, count]) => ({
         return;
       }
 
-      // ====== 上下贴边模式：双层顶栏结构！ ======
-      // 第一层（Row 1）：主导航舱 + 横向串联的 3 枚异构器物挂件（弹射扳机、世界卡带、金属狗牌）
-      // 第二层（Row 2）：独立悬挂在双吊索下方的宽幅顶栏式搜索/命令终端（[>_] sisyphus@chaos:~$ ...）！
+      // ====== 上下贴边模式：三段式机械结构展开 ======
+      // 阶段 1 (0..65ms)   : 主舱液压卡爪锁紧
+      // 阶段 2 (65..220ms) : 第一排右侧 3 枚异构挂件沿水平导轨逐槽滑出并刚性锁定
+      // 阶段 3 (210..310ms): 双垂直吊臂钢索降下，第二排宽幅顶栏式搜索终端落锁就位
       const H_GAP = 14;
       const actionTotalW = actionSats.reduce((a, s) => a + s.w + H_GAP, 0);
       const rowDir = state === 'top' ? 1 : -1;
@@ -1799,52 +1825,46 @@ const tagIndex = tags.map(([name, count]) => ({
       if (vw >= 720) {
         const hDir = x + curW * 0.5 + actionTotalW < vw - 12 ? 1 : -1;
         let prevAnchorX = x + hDir * (curW * 0.5);
-        let prevAnchorY = y;
 
         actionSats.forEach((sat, idx) => {
-          const tx = prevAnchorX + hDir * (H_GAP + sat.w * 0.5);
-          const ty = y + Math.sin(t * 0.0028 - idx * 0.95) * (1.1 + idx * 0.45);
+          const stageU = mechRatchet(dockAge, 65 + idx * 52, 54);
+          const slotX = prevAnchorX + hDir * (H_GAP + sat.w * 0.5);
 
-          const stiff = 0.21 - idx * 0.02;
-          sat.vx = (sat.vx + (tx - sat.x) * stiff) * 0.75;
-          sat.vy = (sat.vy + (ty - sat.y) * stiff) * 0.75;
-          sat.x += sat.vx;
-          sat.y += sat.vy;
-          sat.alpha += (1 - sat.alpha) * 0.22;
+          sat.x = prevAnchorX + (slotX - prevAnchorX) * stageU;
+          sat.y = y;
+          sat.alpha = stageU;
 
-          sat.el.classList.add('is-deployed');
+          if (stageU > 0.02) {
+            sat.el.classList.add('is-deployed');
+          } else {
+            sat.el.classList.remove('is-deployed');
+          }
           sat.el.style.opacity = sat.alpha.toFixed(2);
           sat.el.style.transform = `translate3d(${Math.round(sat.x - sat.w * 0.5)}px, ${Math.round(sat.y - sat.h * 0.5)}px, 0)`;
 
           if (fxCtx && sat.alpha > 0.15) {
             fxCtx.save();
-            fxCtx.globalAlpha = sat.alpha * 0.9;
+            fxCtx.globalAlpha = sat.alpha * 0.92;
             const linkLX = hDir > 0 ? prevAnchorX : sat.x + sat.w * 0.5;
             const linkRX = hDir > 0 ? sat.x - sat.w * 0.5 : prevAnchorX;
             const midX = Math.round((linkLX + linkRX) * 0.5);
-            const midY = Math.round((prevAnchorY + sat.y) * 0.5);
             fxCtx.fillStyle = borderColor;
-            drawPixelLine(fxCtx, linkLX + 1, prevAnchorY, linkRX - 1, sat.y, 2);
+            drawPixelLine(fxCtx, linkLX + 1, y, linkRX - 1, y, 2);
             fxCtx.fillStyle = idx === 0 ? accent2Color : accentColor;
-            fxCtx.fillRect(midX - 2, midY - 2, 4, 4);
+            fxCtx.fillRect(midX - 2, Math.round(y) - 2, 4, 4);
             fxCtx.restore();
           }
 
           prevAnchorX = sat.x + hDir * (sat.w * 0.5);
-          prevAnchorY = sat.y;
         });
 
-        // 计算第一层整体左右包络，使第二层搜索终端优雅对齐悬挂于整组顶栏正下方/正上方！
+        const fullRow1Span =
+          curW + actionSats.reduce((a, s) => a + s.w + H_GAP, 0);
         const leftMost =
-          hDir > 0
-            ? x - curW * 0.5
-            : actionSats[actionSats.length - 1].x - actionSats[actionSats.length - 1].w * 0.5;
-        const rightMost =
-          hDir > 0
-            ? actionSats[actionSats.length - 1].x + actionSats[actionSats.length - 1].w * 0.5
-            : x + curW * 0.5;
+          hDir > 0 ? x - curW * 0.5 : x + curW * 0.5 - fullRow1Span;
+        const rightMost = leftMost + fullRow1Span;
         const spanW = Math.max(460, Math.min(vw - 28, rightMost - leftMost));
-        cliSat.w += (spanW - cliSat.w) * 0.24;
+        cliSat.w = spanW;
         cliSat.h = 38;
         pendantCli.style.width = `${Math.round(cliSat.w)}px`;
 
@@ -1853,25 +1873,24 @@ const tagIndex = tags.map(([name, count]) => ({
           cliSat.w * 0.5 + 12,
           Math.min(vw - cliSat.w * 0.5 - 12, centerRow1),
         );
-        const cliTargetY =
-          y +
-          rowDir * (curH * 0.5 + 13 + cliSat.h * 0.5) +
-          (cliFocused ? 0 : Math.sin(t * 0.0022) * 1.1);
+        const cliFullY = y + rowDir * (curH * 0.5 + 13 + cliSat.h * 0.5);
+        const deckDropU = mechRatchet(dockAge, 210, 95);
 
-        cliSat.vx = (cliSat.vx + (cliTargetX - cliSat.x) * 0.2) * 0.75;
-        cliSat.vy = (cliSat.vy + (cliTargetY - cliSat.y) * 0.2) * 0.75;
-        cliSat.x += cliSat.vx;
-        cliSat.y += cliSat.vy;
-        cliSat.alpha += (1 - cliSat.alpha) * 0.22;
+        cliSat.x = cliTargetX;
+        cliSat.y = y + (cliFullY - y) * deckDropU;
+        cliSat.alpha = deckDropU;
 
-        cliSat.el.classList.add('is-deployed');
+        if (deckDropU > 0.02) {
+          cliSat.el.classList.add('is-deployed');
+        } else {
+          cliSat.el.classList.remove('is-deployed');
+        }
         cliSat.el.style.opacity = cliSat.alpha.toFixed(2);
         cliSat.el.style.transform = `translate3d(${Math.round(cliSat.x - cliSat.w * 0.5)}px, ${Math.round(cliSat.y - cliSat.h * 0.5)}px, 0)`;
 
-        // 绘制连接第一排与第二排宽幅搜索终端的双吊臂钢索挂钩！
         if (fxCtx && cliSat.alpha > 0.15) {
           fxCtx.save();
-          fxCtx.globalAlpha = cliSat.alpha * 0.92;
+          fxCtx.globalAlpha = cliSat.alpha * 0.94;
           const strutLeftX = Math.round(x - curW * 0.28);
           const strutRightX = Math.round(
             Math.min(cliSat.x + cliSat.w * 0.36, actionSats[1].x),
@@ -1889,19 +1908,18 @@ const tagIndex = tags.map(([name, count]) => ({
           fxCtx.restore();
         }
       } else {
-        // 移动端窄屏上下贴边：第二排整宽终端搜索栏，第三排紧凑功能挂牌
+        // 移动端窄屏上下贴边：机械分段展开第二排与第三排
         const wantW = Math.min(vw - 20, 440);
-        cliSat.w += (wantW - cliSat.w) * 0.25;
+        cliSat.w = wantW;
         cliSat.h = 36;
         pendantCli.style.width = `${Math.round(cliSat.w)}px`;
 
+        const deckU = mechRatchet(dockAge, 70, 80);
         const cliTY = y + rowDir * (curH * 0.5 + 10 + cliSat.h * 0.5);
-        cliSat.vx = (cliSat.vx + (vw * 0.5 - cliSat.x) * 0.22) * 0.75;
-        cliSat.vy = (cliSat.vy + (cliTY - cliSat.y) * 0.22) * 0.75;
-        cliSat.x += cliSat.vx;
-        cliSat.y += cliSat.vy;
-        cliSat.alpha += (1 - cliSat.alpha) * 0.22;
-        cliSat.el.classList.add('is-deployed');
+        cliSat.x = vw * 0.5;
+        cliSat.y = y + (cliTY - y) * deckU;
+        cliSat.alpha = deckU;
+        if (deckU > 0.02) cliSat.el.classList.add('is-deployed');
         cliSat.el.style.opacity = cliSat.alpha.toFixed(2);
         cliSat.el.style.transform = `translate3d(${Math.round(cliSat.x - cliSat.w * 0.5)}px, ${Math.round(cliSat.y - cliSat.h * 0.5)}px, 0)`;
 
@@ -1909,15 +1927,14 @@ const tagIndex = tags.map(([name, count]) => ({
         const subGap = 8;
         const row3W = actionSats.reduce((a, s) => a + s.w, 0) + subGap * 2;
         let curLeft = Math.max(8, (vw - row3W) * 0.5);
-        actionSats.forEach((sat) => {
+        actionSats.forEach((sat, idx) => {
+          const subU = mechRatchet(dockAge, 145 + idx * 45, 55);
           const tx = curLeft + sat.w * 0.5;
           curLeft += sat.w + subGap;
-          sat.vx = (sat.vx + (tx - sat.x) * 0.22) * 0.75;
-          sat.vy = (sat.vy + (row3Y - sat.y) * 0.22) * 0.75;
-          sat.x += sat.vx;
-          sat.y += sat.vy;
-          sat.alpha += (1 - sat.alpha) * 0.22;
-          sat.el.classList.add('is-deployed');
+          sat.x = tx;
+          sat.y = cliTY + (row3Y - cliTY) * subU;
+          sat.alpha = subU;
+          if (subU > 0.02) sat.el.classList.add('is-deployed');
           sat.el.style.opacity = sat.alpha.toFixed(2);
           sat.el.style.transform = `translate3d(${Math.round(sat.x - sat.w * 0.5)}px, ${Math.round(sat.y - sat.h * 0.5)}px, 0)`;
         });
@@ -2271,7 +2288,8 @@ const tagIndex = tags.map(([name, count]) => ({
         }
 
         const kissAlign = dockEdge ? nd.nx * dockWX + nd.ny * dockWY : -1;
-        const freeFactor = kissAlign > 0.4 ? 1 - smoothDockW * 0.82 : 1 - smoothDockW * 0.15;
+        // 吸附态下边框保持刚性机械锁定（仅在鼠标拨弦或孤子脉冲经过时震颤），悬浮态下保持失重呼吸
+        const freeFactor = kissAlign > 0.4 ? 1 - smoothDockW * 0.96 : 1 - smoothDockW * 0.88;
         const floatAmp = (nd.isLabel ? 0.9 : 2.2) * freeFactor;
         const waveN =
           Math.sin(t * 0.0036 + nd.phase) * floatAmp +
@@ -2662,10 +2680,13 @@ const tagIndex = tags.map(([name, count]) => ({
         updateRuler(null, 0, x, y, vw, vh);
         if (!grabbedFromDock) {
           const [ax, ay] = dockedAnchorPos(state, x, y, hw, hh, vw, vh);
-          rackVelX = (rackVelX + (ax - x) * 0.22) * 0.74;
-          rackVelY = (rackVelY + (ay - y) * 0.22) * 0.74;
-          x += rackVelX;
-          y += rackVelY;
+          // 吸附状态下采用无过冲液压步进归位，彻底消除来回弹跳
+          rackVelX = 0;
+          rackVelY = 0;
+          x += (ax - x) * 0.42;
+          y += (ay - y) * 0.42;
+          if (Math.abs(ax - x) < 0.5) x = ax;
+          if (Math.abs(ay - y) < 0.5) y = ay;
         }
       }
 
@@ -2695,11 +2716,11 @@ const tagIndex = tags.map(([name, count]) => ({
 
       if (pullingEdge) lastPullEdge = pullingEdge;
       smoothPullW += (pullStrength - smoothPullW) * 0.22;
-      smoothDockW += ((isDockedState ? 1 : 0) - smoothDockW) * 0.2;
+      smoothDockW += ((isDockedState ? 1 : 0) - smoothDockW) * 0.32;
 
       if (isDockedState) {
         rackEdge = state;
-        rackDeploy += (1 - rackDeploy) * 0.24;
+        rackDeploy = mechRatchet(Math.max(0, t - dockLockTime), 0, 75);
       } else if (pullingEdge && pullStrength > 0.2) {
         rackEdge = pullingEdge;
         rackDeploy += (pullStrength * 0.88 - rackDeploy) * 0.22;
@@ -2725,17 +2746,28 @@ const tagIndex = tags.map(([name, count]) => ({
       }
 
       const target = SHAPES[targetKey];
-      velW = (velW + (target.w - curW) * 0.18) * 0.72;
-      velH = (velH + (target.h - curH) * 0.18) * 0.72;
-      curW += velW;
-      curH += velH;
+      if (isDockedState) {
+        // 吸附展开时采用无过冲机械滑轨变形
+        velW = 0;
+        velH = 0;
+        curW += (target.w - curW) * 0.42;
+        curH += (target.h - curH) * 0.42;
+        if (Math.abs(target.w - curW) < 0.5) curW = target.w;
+        if (Math.abs(target.h - curH) < 0.5) curH = target.h;
+      } else {
+        // 太空悬浮与碰撞态保留 Q 弹弹簧阻尼变形
+        velW = (velW + (target.w - curW) * 0.18) * 0.72;
+        velH = (velH + (target.h - curH) * 0.18) * 0.72;
+        curW += velW;
+        curH += velH;
+      }
       nav.style.width = `${curW.toFixed(1)}px`;
       nav.style.height = `${curH.toFixed(1)}px`;
 
-      curInset.l += (target.inset.l - curInset.l) * 0.22;
-      curInset.r += (target.inset.r - curInset.r) * 0.22;
-      curInset.t += (target.inset.t - curInset.t) * 0.22;
-      curInset.b += (target.inset.b - curInset.b) * 0.22;
+      curInset.l += (target.inset.l - curInset.l) * 0.32;
+      curInset.r += (target.inset.r - curInset.r) * 0.32;
+      curInset.t += (target.inset.t - curInset.t) * 0.32;
+      curInset.b += (target.inset.b - curInset.b) * 0.32;
       innerFrost.style.left = `${curInset.l.toFixed(1)}px`;
       innerFrost.style.right = `${curInset.r.toFixed(1)}px`;
       innerFrost.style.top = `${curInset.t.toFixed(1)}px`;
@@ -2752,10 +2784,17 @@ const tagIndex = tags.map(([name, count]) => ({
 
       target.coords.forEach(([tx, ty], i) => {
         const sp = itemSpring[i];
-        sp.vx = (sp.vx + (tx - sp.x) * 0.2) * 0.74;
-        sp.vy = (sp.vy + (ty - sp.y) * 0.2) * 0.74;
-        sp.x += sp.vx;
-        sp.y += sp.vy;
+        if (isDockedState) {
+          sp.vx = 0;
+          sp.vy = 0;
+          sp.x += (tx - sp.x) * 0.42;
+          sp.y += (ty - sp.y) * 0.42;
+        } else {
+          sp.vx = (sp.vx + (tx - sp.x) * 0.2) * 0.74;
+          sp.vy = (sp.vy + (ty - sp.y) * 0.2) * 0.74;
+          sp.x += sp.vx;
+          sp.y += sp.vy;
+        }
         if (links[i]) {
           links[i].style.transform = `translate3d(calc(-50% + ${Math.round(sp.x)}px), calc(-50% + ${Math.round(sp.y)}px), 0)`;
         }

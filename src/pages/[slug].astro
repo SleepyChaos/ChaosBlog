@@ -113,7 +113,7 @@ const isAbout = page.slug === 'about';
     window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.04 } }));
     refreshDossier();
     if (boostBtn) {
-      boostBtn.textContent = '[✓ 已注入 +35m 推石动能]';
+      boostBtn.textContent = '[OK 已注入 +35m 推石动能]';
       setTimeout(() => {
         boostBtn.textContent = '[+PUSH 为石头注能 +35m]';
       }, 1600);

@@ -191,7 +191,7 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
       grantReadingBoost();
     }
     if (rewardBadgeEl) {
-      rewardBadgeEl.textContent = summitRewarded ? '[+35m 助推 ✓]' : '';
+      rewardBadgeEl.textContent = summitRewarded ? '[+35m 助推 OK]' : '';
     }
 
     let currentTitle = '山麓起点';
@@ -213,8 +213,8 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
 
     if (statusTextEl) {
       statusTextEl.textContent = atSummit
-        ? '✓ 已登顶完读'
-        : `⚑ ${currentTitle.slice(0, 12)}${currentTitle.length > 12 ? '…' : ''}`;
+        ? '[OK] 已登顶完读'
+        : `|> ${currentTitle.slice(0, 12)}${currentTitle.length > 12 ? '…' : ''}`;
     }
 
     renderMiniClimber(clamped, atSummit);

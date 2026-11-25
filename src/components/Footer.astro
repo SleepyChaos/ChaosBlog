@@ -26,14 +26,14 @@ const year = new Date().getFullYear();
           style="padding: 0.08rem 0.45rem; font-size: 0.72rem;"
           title="开启后，鼠标扫过悬浮导航 ASCII 边框可弹奏五声音阶竖琴泛音，切换世界与助推也有合成器音效"
         >
-          [♪ 拨弦音效: OFF]
+          [SFX 弦音: OFF]
         </button>
       </div>
 
       <div
         style="color: var(--text-muted); font-size: 0.72rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;"
       >
-        <span>⌨ 快捷键: <strong>/</strong> 终端 · <strong>j/k</strong> 选文 · <strong>t</strong> 跃迁世界 · <strong>p</strong> 助推</span>
+        <span>[KBD] <strong>/</strong> 终端 · <strong>j/k</strong> 选文 · <strong>t</strong> 跃迁世界 · <strong>p</strong> 助推</span>
       </div>
 
       <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
@@ -52,10 +52,10 @@ const year = new Date().getFullYear();
   const sfxBtn = document.getElementById('footer-sfx-btn');
 
   const WORLD_LABELS: Record<string, string> = {
-    void: '◉ 2001·太空漫游',
-    paper: 'Ψ 银河帝国·基地',
-    crt: '▓ 黑客帝国·母体',
-    amber: '◐ 沙丘·厄拉科斯',
+    void: '◉ 太空漫游 · TMA-1',
+    paper: 'Ψ 银河帝国 · 端点星',
+    crt: '▓ 黑客帝国 · 锡安',
+    amber: '◐ 沙丘 · 厄拉科斯',
   };
 
   const syncWorldPill = () => {
@@ -69,7 +69,7 @@ const year = new Date().getFullYear();
 
   const syncSfxLabel = (on: boolean) => {
     if (!sfxBtn) return;
-    sfxBtn.textContent = on ? '[♪ 拨弦音效: ON]' : '[♪ 拨弦音效: OFF]';
+    sfxBtn.textContent = on ? '[SFX 弦音: ON]' : '[SFX 弦音: OFF]';
     sfxBtn.classList.toggle('is-primary', on);
   };
 

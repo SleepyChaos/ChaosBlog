@@ -82,10 +82,10 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         let curRealm = document.documentElement.dataset.realm || 'void';
 
         const GLYPH_SETS: Record<string, string[]> = {
-          void: ['▮', '✦', '⋆', '·', '◉', '⟡', '1:4:9'],
+          void: ['▮', '*', '⋆', '·', '◉', '⟡', '1:4:9'],
           paper: ['∑', 'Ψ', '∂', '∆', '∞', '∴', '§'],
           crt: ['ﾊ', 'ﾐ', 'ﾋ', 'ｰ', 'ｳ', 'ｼ', '0', '1'],
-          amber: ['◈', '∷', '·', '◐', '≈', '⟡', '◦'],
+          amber: ['◈', '∷', '·', '◐', '~', '⟡', '◦'],
         };
 
         const syncPalette = () => {
@@ -201,7 +201,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
           const raw = pre.querySelector('code')?.textContent ?? pre.textContent ?? '';
           try {
             await navigator.clipboard.writeText(raw);
-            copyBtn.textContent = '[COPIED ✓]';
+            copyBtn.textContent = '[COPIED OK]';
             setTimeout(() => {
               copyBtn.textContent = '[COPY]';
             }, 1600);
