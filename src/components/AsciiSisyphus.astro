@@ -161,6 +161,7 @@ const { initialSummits = 1 } = Astro.props;
     let sprintToSummit = false;
     let boostBannerTimer = 0;
     let lastBoostGainMeters = 0;
+    let lastBoostSource = '主动助推';
 
     let boulderProg = displayFrac;
     let sisyphusProg = Math.max(0, displayFrac - 0.068);
@@ -235,26 +236,47 @@ const { initialSummits = 1 } = Astro.props;
       }
     };
 
-    const applyBoost = (amount: number, strikeCol?: number) => {
+    const applyBoost = (
+      amount: number,
+      strikeCol?: number,
+      source = '主动助推',
+      alreadyPersisted = false,
+    ) => {
       if (phase !== 'CLIMB') return;
-      const clamped = Math.max(0.004, Math.min(0.12, amount));
-      save.boostAccum += clamped;
+      const clamped = Math.max(0.001, Math.min(0.12, amount));
       const gainedM = clamped * PEAK_ALT;
-      save.boostMeters += gainedM;
+      if (alreadyPersisted) {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            save.boostAccum = Number(parsed.boostAccum || save.boostAccum);
+            save.boostMeters = Number(parsed.boostMeters || save.boostMeters);
+          }
+        } catch {}
+      } else {
+        save.boostAccum += clamped;
+        save.boostMeters += gainedM;
+        persistSave();
+      }
       lastBoostGainMeters = gainedM;
-      boostBannerTimer = 1.8;
+      lastBoostSource = source;
+      boostBannerTimer = 2.0;
       boostVelocity = Math.min(0.45, boostVelocity + clamped * 2.8);
-      persistSave();
 
       const bx = progToCol(boulderProg);
       const by = terrainY(bx);
       skyStrikeCol = strikeCol ?? Math.round(bx);
-      skyStrikeTimer = 0.58;
-      spawnSubParticles(bx - 2, by - 1, 14, -1, 9);
+      skyStrikeTimer = strikeCol !== undefined ? 0.58 : 0.35;
+      spawnSubParticles(bx - 2, by - 1, 12, -1, 9);
     };
 
     pushBtn?.addEventListener('click', () => {
-      applyBoost(0.028);
+      window.dispatchEvent(
+        new CustomEvent('sisyphus:boulder-boost', {
+          detail: { amount: 0.028, source: '主动助推' },
+        }),
+      );
     });
 
     summitBtn?.addEventListener('click', () => {
@@ -267,12 +289,23 @@ const { initialSummits = 1 } = Astro.props;
       const rect = stageEl.getBoundingClientRect();
       const ratioX = Math.max(0.05, Math.min(0.95, (e.clientX - rect.left) / Math.max(1, rect.width)));
       const clickedCol = Math.round(ratioX * (COLS - 1));
-      applyBoost(0.025, clickedCol);
+      window.dispatchEvent(
+        new CustomEvent('sisyphus:boulder-boost', {
+          detail: { amount: 0.025, source: '天象共鸣', strikeCol: clickedCol },
+        }),
+      );
     });
 
     window.addEventListener('sisyphus:boulder-boost', (ev: Event) => {
-      const detail = (ev as CustomEvent<{ amount?: number }>).detail;
-      applyBoost(detail?.amount ?? 0.018);
+      const detail = (
+        ev as CustomEvent<{ amount?: number; source?: string; strikeCol?: number }>
+      ).detail;
+      applyBoost(
+        detail?.amount ?? 0.018,
+        detail?.strikeCol,
+        detail?.source || '动能共鸣',
+        true,
+      );
     });
 
     window.addEventListener('sisyphus:trigger-summit', () => {
@@ -1030,7 +1063,7 @@ const { initialSummits = 1 } = Astro.props;
 
       putStr(0, 1, `[${phaseTag}] ${altNow}m`, 10);
       if (boostBannerTimer > 0) {
-        putStr(0, 19, `>> BOOST +${lastBoostGainMeters.toFixed(1)}m! <<`, 9);
+        putStr(0, 18, `>> +${lastBoostGainMeters.toFixed(1)}m [${lastBoostSource}] <<`, 9);
       }
 
       // ================= 7. 合并连续同色字符输出高对比多彩 HTML =================

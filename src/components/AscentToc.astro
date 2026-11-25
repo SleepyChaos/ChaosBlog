@@ -107,16 +107,22 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
     summitRewarded = true;
     try {
       sessionStorage.setItem(rewardKey, '1');
-      const raw = localStorage.getItem('sisyphus_8h_cycle_v2');
-      const cycleMs = 8 * 3600 * 1000;
-      const parsed = raw
-        ? JSON.parse(raw)
-        : { anchorEpoch: Math.floor(Date.now() / cycleMs), boostAccum: 0, boostMeters: 0 };
-      parsed.boostAccum = Number(parsed.boostAccum || 0) + 0.04;
-      parsed.boostMeters = Number(parsed.boostMeters || 0) + 35.4;
-      localStorage.setItem('sisyphus_8h_cycle_v2', JSON.stringify(parsed));
+      // 同步在文章垒石记录中点亮初登顶印记
+      const slug = document.querySelector<HTMLElement>('article[data-post-slug]')?.dataset.postSlug;
+      if (slug) {
+        const rawC = localStorage.getItem('sisyphus_cairns_v1');
+        const map = rawC ? JSON.parse(rawC) : {};
+        if (!map[slug]) {
+          map[slug] = 1;
+          localStorage.setItem('sisyphus_cairns_v1', JSON.stringify(map));
+        }
+      }
     } catch {}
-    window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.04 } }));
+    window.dispatchEvent(
+      new CustomEvent('sisyphus:boulder-boost', {
+        detail: { amount: 0.04, source: '完读登顶' },
+      }),
+    );
   };
 
   const renderMiniClimber = (progress: number, atSummit: boolean) => {

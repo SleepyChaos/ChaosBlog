@@ -1,46 +1,371 @@
 ---
-import { getAllPosts, getAllTags } from '../../lib/content';
+import { getAllPosts, getAllTags, formatDateShort, readingTime } from '../../lib/content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 const posts = await getAllPosts();
 const tags = getAllTags(posts);
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const tagNames = tags.map(([t]) => t);
+const edges: [number, number, number][] = [];
+for (let i = 0; i < tagNames.length; i++) {
+  for (let j = i + 1; j < tagNames.length; j++) {
+    const shared = posts.filter(
+      (p) => p.tags.includes(tagNames[i]) && p.tags.includes(tagNames[j]),
+    ).length;
+    if (shared > 0) {
+      edges.push([i, j, shared]);
+    }
+  }
+}
+
+const payload = {
+  tags: tags.map(([name, count]) => ({
+    name,
+    count,
+    url: `${base}/tags/${encodeURIComponent(name)}/`,
+  })),
+  edges,
+  posts: posts.map((p) => ({
+    title: p.title,
+    url: `${base}/posts/${p.slug}/`,
+    date: formatDateShort(p.pubDate),
+    read: readingTime(p.body),
+    tags: p.tags,
+    desc: p.description || '',
+  })),
+};
 ---
 
-<BaseLayout title="标签" description="所有文章标签索引">
-  <section class="bento-card">
-    <div>
-      <div class="bento-head">
-        <span class="bento-head-title">
-          <span class="term-ascii-icon">#*</span>
-          <span>TAG_MATRIX // 全部标签索引</span>
-        </span>
-        <span class="bento-head-meta">TOTAL {tags.length} TAGS</span>
+<BaseLayout title="标签星图" description="交互式知识星图拓扑与全部文章标签索引">
+  <div class="bento-grid">
+    <section class="bento-card col-12">
+      <div>
+        <div class="bento-head">
+          <span class="bento-head-title">
+            <span class="term-ascii-icon">#*</span>
+            <span>01 // ASTROLABE_TOPOLOGY · 知识星图拓扑 (160x56 亚像素连线)</span>
+          </span>
+          <span class="bento-head-meta" id="constellation-status">
+            点击下方星团或标签测绘共现脉络 · {tags.length} NODES / {edges.length} LINKS
+          </span>
+        </div>
+
+        <pre
+          class="ascii-slope-pre"
+          id="tag-constellation-stage"
+          style="margin-bottom: 0.9rem;"
+          title="点击星图节点高亮共现标签脉络并测绘航道 (+5m 推石动能)"
+          aria-label="Drawille 亚像素盲文连线的标签共现知识星图"></pre>
+
+        <div class="tag-matrix" id="constellation-tag-list">
+          {
+            tags.map(([tag, count], idx) => (
+              <a
+                class="tag-chip"
+                data-tag-idx={idx}
+                data-tag-name={tag}
+                style="padding: 0.3rem 0.7rem; font-size: 0.84rem;"
+                href={`${base}/tags/${encodeURIComponent(tag)}/`}
+              >
+                <span>#{tag}</span>
+                <span class="tag-count">[{count}]</span>
+              </a>
+            ))
+          }
+        </div>
       </div>
 
-      <p style="margin: 0 0 1rem; color: var(--text-muted); font-size: 0.92rem;">
-        按主题检索已发布的登山笔记与文章：
-      </p>
-
-      <div class="tag-matrix">
-        {
-          tags.map(([tag, count]) => (
-            <a
-              class="tag-chip"
-              style="padding: 0.35rem 0.75rem; font-size: 0.86rem;"
-              href={`${base}/tags/${encodeURIComponent(tag)}/`}
-            >
-              <span>#{tag}</span>
-              <span class="tag-count">[{count}]</span>
-            </a>
-          ))
-        }
+      <div class="bento-foot">
+        <a href={`${base}/`}>[← cd ~/home]</a>
+        <span>提示: 首次点击标签在星图中测绘共现连接，再次点击进入该标签专页</span>
       </div>
-    </div>
+    </section>
 
-    <div class="bento-foot">
-      <a href={`${base}/`}>[← cd ~/home]</a>
-      <span>POSTS_INDEXED: {posts.length}</span>
-    </div>
-  </section>
+    <section class="bento-card col-12">
+      <div>
+        <div class="bento-head">
+          <span class="bento-head-title">
+            <span class="term-ascii-icon">ls</span>
+            <span id="constellation-posts-title">02 // MATCHED_LOGS · 星团关联文章 ({posts.length})</span>
+          </span>
+          <a
+            id="constellation-jump-link"
+            class="term-btn"
+            href={`${base}/tags/`}
+            style="display: none;"
+          >
+            [↗ 进入标签归档专页]
+          </a>
+        </div>
+
+        <ul class="post-list" id="constellation-post-list">
+          {
+            posts.map((post, idx) => {
+              const branch = idx === posts.length - 1 ? '└─' : '├─';
+              return (
+                <li class="post-row" data-post-tags={post.tags.join('|')}>
+                  <div class="post-row-head">
+                    <div class="post-row-title-wrap">
+                      <span class="post-tree-branch">{branch}</span>
+                      <a class="post-row-title" href={`${base}/posts/${post.slug}/`}>
+                        {post.title}
+                      </a>
+                    </div>
+                    <div class="post-row-meta">
+                      <span>{readingTime(post.body)}</span>
+                      <span>·</span>
+                      <time datetime={post.pubDate.toISOString()}>
+                        {formatDateShort(post.pubDate)}
+                      </time>
+                    </div>
+                  </div>
+                  {post.description && <p class="post-row-desc">{post.description}</p>}
+                </li>
+              );
+            })
+          }
+        </ul>
+      </div>
+    </section>
+  </div>
 </BaseLayout>
+
+<script
+  type="application/json"
+  id="tag-constellation-payload"
+  set:html={JSON.stringify(payload).replace(/</g, '\\u003c')}
+/>
+
+<script>
+  const stageEl = document.getElementById('tag-constellation-stage');
+  const statusEl = document.getElementById('constellation-status');
+  const postsTitleEl = document.getElementById('constellation-posts-title');
+  const jumpLinkEl = document.getElementById('constellation-jump-link') as HTMLAnchorElement | null;
+  const tagChips = Array.from(
+    document.querySelectorAll<HTMLAnchorElement>('#constellation-tag-list .tag-chip'),
+  );
+  const postRows = Array.from(
+    document.querySelectorAll<HTMLElement>('#constellation-post-list .post-row'),
+  );
+
+  interface TagNode {
+    name: string;
+    count: number;
+    url: string;
+    cx: number;
+    cy: number;
+  }
+
+  let nodes: TagNode[] = [];
+  let edges: [number, number, number][] = [];
+
+  try {
+    const raw = document.getElementById('tag-constellation-payload')?.textContent;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      edges = parsed.edges || [];
+      const rawTags = (parsed.tags || []) as { name: string; count: number; url: string }[];
+      const total = Math.max(1, rawTags.length);
+      nodes = rawTags.map((t, i) => {
+        // 双环星盘螺旋排布，确保标签互不遮挡
+        const ring = i < 6 ? 0 : 1;
+        const idxInRing = ring === 0 ? i : i - 6;
+        const countInRing = ring === 0 ? Math.min(6, total) : Math.max(1, total - 6);
+        const angle = (idxInRing / countInRing) * Math.PI * 2 - Math.PI * 0.42;
+        const rx = ring === 0 ? 17 : 33;
+        const ry = ring === 0 ? 3.3 : 5.4;
+        return {
+          ...t,
+          cx: Math.round(41 + Math.cos(angle) * rx),
+          cy: Math.round(7 + Math.sin(angle) * ry),
+        };
+      });
+    }
+  } catch {}
+
+  if (stageEl && nodes.length > 0) {
+    const COLS = 82;
+    const ROWS = 14;
+    const BRAILLE_BITS = [
+      [0x01, 0x02, 0x04, 0x40],
+      [0x08, 0x10, 0x20, 0x80],
+    ];
+    const CLS_NAMES = ['', 'as-earth', 'as-aurora', 'as-rock', 'as-hero', 'as-fire'];
+
+    let activeIdx: number | null = 0;
+
+    const selectTag = (idx: number | null, triggerBoost = false) => {
+      activeIdx = idx;
+      const activeNode = idx !== null ? nodes[idx] : null;
+
+      // 找出与当前选中标签共现的邻居节点
+      const neighborSet = new Set<number>();
+      if (idx !== null) {
+        for (const [a, b] of edges) {
+          if (a === idx) neighborSet.add(b);
+          if (b === idx) neighborSet.add(a);
+        }
+      }
+
+      tagChips.forEach((chip, cIdx) => {
+        const isSelf = cIdx === idx;
+        const isNeighbor = neighborSet.has(cIdx);
+        chip.style.borderColor = isSelf
+          ? 'var(--accent)'
+          : isNeighbor
+            ? 'var(--accent-2)'
+            : '';
+        chip.style.background = isSelf ? 'var(--accent-soft)' : '';
+      });
+
+      let matchCount = 0;
+      postRows.forEach((row) => {
+        const rowTags = (row.dataset.postTags || '').split('|');
+        const show = !activeNode || rowTags.includes(activeNode.name);
+        row.style.display = show ? '' : 'none';
+        if (show) matchCount++;
+      });
+
+      if (statusEl) {
+        statusEl.textContent = activeNode
+          ? `FOCUS: #${activeNode.name} (${activeNode.count} 篇) · 共现关联星团: ${neighborSet.size} 个`
+          : `全部星团 (${nodes.length} NODES / ${edges.length} LINKS)`;
+      }
+      if (postsTitleEl) {
+        postsTitleEl.textContent = activeNode
+          ? `02 // MATCHED_LOGS · #${activeNode.name} (${matchCount})`
+          : `02 // MATCHED_LOGS · 全部文章 (${postRows.length})`;
+      }
+      if (jumpLinkEl) {
+        if (activeNode) {
+          jumpLinkEl.style.display = 'inline-flex';
+          jumpLinkEl.href = activeNode.url;
+          jumpLinkEl.textContent = `[↗ 打开 #${activeNode.name} 专页]`;
+        } else {
+          jumpLinkEl.style.display = 'none';
+        }
+      }
+
+      if (triggerBoost) {
+        window.dispatchEvent(
+          new CustomEvent('sisyphus:boulder-boost', {
+            detail: { amount: 0.0056, source: '星图测绘' },
+          }),
+        );
+      }
+    };
+
+    tagChips.forEach((chip, idx) => {
+      chip.addEventListener('click', (e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+        if (activeIdx !== idx) {
+          e.preventDefault();
+          selectTag(idx, true);
+        }
+      });
+      chip.addEventListener('pointerenter', () => {
+        selectTag(idx, false);
+      });
+    });
+
+    stageEl.addEventListener('click', (e) => {
+      const rect = stageEl.getBoundingClientRect();
+      const clickCol = ((e.clientX - rect.left) / Math.max(1, rect.width)) * COLS;
+      const clickRow = ((e.clientY - rect.top) / Math.max(1, rect.height)) * ROWS;
+      let bestIdx = 0;
+      let bestDist = 999;
+      nodes.forEach((n, i) => {
+        const d = Math.hypot(n.cx - clickCol, (n.cy - clickRow) * 1.8);
+        if (d < bestDist) {
+          bestDist = d;
+          bestIdx = i;
+        }
+      });
+      selectTag(bestIdx, true);
+    });
+
+    const renderStarChart = (t: number) => {
+      const chars = Array.from({ length: ROWS }, () => Array(COLS).fill(' '));
+      const cls = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      const bMask = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      const bCls = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
+
+      const setSub = (px: number, py: number, cId: number) => {
+        const xi = Math.round(px);
+        const yi = Math.round(py);
+        if (xi < 0 || xi >= COLS * 2 || yi < 0 || yi >= ROWS * 4) return;
+        const col = xi >> 1;
+        const row = yi >> 2;
+        bMask[row][col] |= BRAILLE_BITS[xi & 1][yi & 3];
+        if (cId > bCls[row][col]) bCls[row][col] = cId;
+      };
+
+      // 1. 绘制所有共现星轨连线 (160x56 亚像素盲文线段)
+      edges.forEach(([a, b]) => {
+        const na = nodes[a];
+        const nb = nodes[b];
+        if (!na || !nb) return;
+        const isHighlighted = activeIdx === a || activeIdx === b;
+        const x0 = na.cx * 2;
+        const y0 = na.cy * 4 + 2;
+        const x1 = nb.cx * 2;
+        const y1 = nb.cy * 4 + 2;
+        const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0)));
+        for (let s = 0; s <= steps; s += isHighlighted ? 1 : 2) {
+          const u = s / steps;
+          setSub(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, isHighlighted ? 2 : 1);
+        }
+      });
+
+      // 2. 选中星团的旋转亚像素脉冲环
+      if (activeIdx !== null && nodes[activeIdx]) {
+        const an = nodes[activeIdx];
+        const sec = t * 0.0025;
+        for (let k = 0; k < 14; k++) {
+          const ang = sec + (k / 14) * Math.PI * 2;
+          setSub(an.cx * 2 + Math.cos(ang) * 9, an.cy * 4 + 2 + Math.sin(ang) * 4.5, 3);
+        }
+      }
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (bMask[r][c] !== 0) {
+            chars[r][c] = String.fromCharCode(0x2800 | bMask[r][c]);
+            cls[r][c] = bCls[r][c];
+          }
+        }
+      }
+
+      // 3. 绘制星团标签节点名
+      nodes.forEach((n, idx) => {
+        const isSelf = idx === activeIdx;
+        const isLinked =
+          activeIdx !== null &&
+          edges.some(([a, b]) => (a === activeIdx && b === idx) || (b === activeIdx && a === idx));
+        const label = isSelf ? `[◉ #${n.name}]` : isLinked ? `*#${n.name}` : `·${n.name}`;
+        const colorId = isSelf ? 5 : isLinked ? 4 : 3;
+        const startC = Math.max(1, Math.min(COLS - label.length - 1, Math.round(n.cx - label.length * 0.5)));
+        const row = Math.max(1, Math.min(ROWS - 2, n.cy));
+        for (let i = 0; i < label.length; i++) {
+          chars[row][startC + i] = label[i];
+          cls[row][startC + i] = colorId;
+        }
+      });
+
+      const htmlLines = chars.map((row, r) =>
+        row
+          .map((ch, c) => {
+            const safe = ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch === '&' ? '&amp;' : ch;
+            return cls[r][c] ? `<span class="${CLS_NAMES[cls[r][c]]}">${safe}</span>` : safe;
+          })
+          .join(''),
+      );
+      stageEl.innerHTML = htmlLines.join('\n');
+      requestAnimationFrame(renderStarChart);
+    };
+
+    selectTag(0, false);
+    requestAnimationFrame(renderStarChart);
+  }
+</script>

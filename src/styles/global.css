@@ -1811,9 +1811,178 @@ main.page-main {
   border: 1px solid var(--border-strong);
 }
 
-/* ================= 页脚 ================= */
+/* ================= 页脚与视口地平线微缩推石轨（全站无感贯穿，不喧宾夺主） ================= */
+.ambient-horizon-ridge {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 18px;
+  z-index: 84;
+  pointer-events: none;
+  user-select: none;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.horizon-track-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--border-strong) 62%, transparent) 0px,
+    color-mix(in srgb, var(--border-strong) 62%, transparent) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+.horizon-fill-line {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 24%;
+  background: linear-gradient(90deg, transparent, var(--accent));
+  transition: width 0.35s ease;
+}
+
+.horizon-climber-node {
+  position: absolute;
+  bottom: 3px;
+  left: 24%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 5px;
+  background: color-mix(in srgb, var(--surface-strong) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 1px;
+  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+  transition: left 0.35s ease;
+}
+
+.horizon-climber-node .h-alt {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 9.5px;
+}
+
+.horizon-impulse-toast {
+  position: absolute;
+  bottom: 4px;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  color: var(--accent-2);
+  font-weight: 700;
+  font-size: 10px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.horizon-impulse-toast.is-active {
+  opacity: 1;
+  transform: translate(-50%, -1px);
+}
+
+/* 划选正文词句时浮现的极简终端批注浮签 */
+.selection-echo-hud {
+  position: fixed;
+  z-index: 105;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 7px;
+  background: var(--surface-strong);
+  -webkit-backdrop-filter: blur(18px) saturate(185%);
+  backdrop-filter: blur(18px) saturate(185%);
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  box-shadow: var(--shadow-float);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.selection-echo-hud.is-open {
+  display: inline-flex;
+}
+
+.selection-echo-tag {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.selection-echo-btn {
+  padding: 1px 5px;
+  background: var(--bg-code);
+  border: 1px solid var(--border-strong);
+  border-radius: 1px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.selection-echo-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 文章底部登顶界石堆（ASCII Cairn） */
+.article-cairn-card {
+  margin-top: 2.2rem;
+  padding: 0.9rem 1.1rem;
+  background: var(--surface-inner);
+  border: 1px dashed var(--border-strong);
+  border-radius: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.cairn-ascii-pile {
+  margin: 0;
+  padding: 0.3rem 0.65rem;
+  background: var(--stage-bg);
+  border: 1px solid var(--border);
+  border-radius: 1px;
+  font-family: Menlo, Monaco, Consolas, monospace;
+  font-size: 0.64rem;
+  line-height: 1.15;
+  color: var(--accent);
+  user-select: none;
+}
+
+.conquered-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.38rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-2) 45%, transparent);
+  border-radius: 1px;
+}
+
 .site-footer {
-  padding: 1.2rem 0 3rem;
+  padding: 1.2rem 0 3.2rem;
 }
 
 .site-footer-inner {

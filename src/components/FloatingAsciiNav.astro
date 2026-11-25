@@ -604,6 +604,34 @@ const tagIndex = tags.map(([name, count]) => ({
     ];
     let cliFocused = false;
     let cliHovered = false;
+    let liveBoulderFrac = 0.24;
+    let pluckHarvestCount = 0;
+    const cliHintPill = pendantCli.querySelector<HTMLElement>('.cli-hint-pill');
+
+    window.addEventListener('sisyphus:boulder-telemetry', (e: Event) => {
+      const d = (e as CustomEvent<{ frac?: number; alt?: number; flow?: number }>).detail;
+      if (typeof d?.frac === 'number') liveBoulderFrac = d.frac;
+      if (cliHintPill && typeof d?.alt === 'number') {
+        const fl = (d?.flow ?? 1) > 1.05 ? ` · ${(d?.flow ?? 1).toFixed(1)}x` : '';
+        cliHintPill.textContent = `[${d.alt.toFixed(0)}m${fl} · /]`;
+      }
+    });
+
+    window.addEventListener('sisyphus:cli-query', (e: Event) => {
+      const q = (e as CustomEvent<{ query?: string }>).detail?.query || '';
+      if (!q) return;
+      if (state === 'free' || state === 'dragging') {
+        const vw = window.innerWidth;
+        x = preferredTopAnchorX(vw);
+        lockDock('top', vw, window.innerHeight, performance.now());
+      }
+      cliInput.value = q;
+      selectedIdx = 0;
+      setTimeout(() => {
+        cliInput.focus();
+        renderLiveSearch();
+      }, 65);
+    });
 
     pendantCli.addEventListener('pointerenter', () => {
       cliHovered = true;
@@ -1537,7 +1565,18 @@ const tagIndex = tags.map(([name, count]) => ({
               if (pluckedIdx === -1) pluckedIdx = rIdx;
             }
           }
-          if (pluckedIdx !== -1) playPluckNote(pluckedIdx);
+          if (pluckedIdx !== -1) {
+            playPluckNote(pluckedIdx);
+            pluckHarvestCount++;
+            if (pluckHarvestCount >= 9) {
+              pluckHarvestCount = 0;
+              window.dispatchEvent(
+                new CustomEvent('sisyphus:boulder-boost', {
+                  detail: { amount: 0.0038, source: '弦波共振' },
+                }),
+              );
+            }
+          }
         }
       }
 
@@ -2170,7 +2209,13 @@ const tagIndex = tags.map(([name, count]) => ({
 
         const bCharIdx = i - botStartIdx;
         const hasBotChar = botLabel.length > 0 && bCharIdx >= 0 && bCharIdx < botLabel.length;
-        const waveBotGlyph = Math.sin(t * 0.004 - i * 0.8) > 0.78 ? spec.hWave : botBaseChar;
+        const altCursorCol = Math.max(1, Math.min(cols - 1, Math.round(liveBoulderFrac * (cols - 2)) + 1));
+        const isAltCursor = !hasBotChar && i === altCursorCol;
+        const waveBotGlyph = isAltCursor
+          ? '▲'
+          : Math.sin(t * 0.004 - i * 0.8) > 0.78
+            ? spec.hWave
+            : botBaseChar;
         nodes.push({
           bx: px,
           by: ry,
@@ -2182,7 +2227,7 @@ const tagIndex = tags.map(([name, count]) => ({
           glyph: hasBotChar ? botLabel[bCharIdx] : waveBotGlyph,
           phase: (cols - i) * 0.55 + 2.1,
           isCorner: false,
-          isLabel: hasBotChar,
+          isLabel: hasBotChar || isAltCursor,
         });
       }
 

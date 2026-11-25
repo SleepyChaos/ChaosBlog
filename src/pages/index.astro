@@ -204,6 +204,7 @@ const computePostTerrain = (body: string) => {
                   return (
                     <li
                       class="post-row"
+                      data-slug={post.slug}
                       data-tags={post.tags.join('|')}
                       data-url={`${base}/posts/${post.slug}/`}
                     >
@@ -213,6 +214,7 @@ const computePostTerrain = (body: string) => {
                           <a class="post-row-title" href={`${base}/posts/${post.slug}/`}>
                             {post.title}
                           </a>
+                          <span class="conquered-pill" data-cairn-badge={post.slug} style="display: none;"></span>
                         </div>
                         <div class="post-row-meta">
                           <span
@@ -381,6 +383,22 @@ const computePostTerrain = (body: string) => {
   });
 
   clearFilterBtn?.addEventListener('click', () => applyTagFilter(null));
+
+  // 读取用户在文章页立下的界石记录，在首页归档中点亮 [|> 已立碑] 印记
+  try {
+    const rawCairns = localStorage.getItem('sisyphus_cairns_v1');
+    if (rawCairns) {
+      const cairnMap = JSON.parse(rawCairns) as Record<string, number>;
+      document.querySelectorAll<HTMLElement>('[data-cairn-badge]').forEach((badge) => {
+        const s = badge.dataset.cairnBadge || '';
+        const cnt = Number(cairnMap[s] || 0);
+        if (cnt > 0) {
+          badge.style.display = 'inline-flex';
+          badge.textContent = cnt > 1 ? `|> 已立碑 x${cnt}` : '|> 已登顶';
+        }
+      });
+    }
+  } catch {}
 
   window.addEventListener('keydown', (e) => {
     if (

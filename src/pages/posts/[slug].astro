@@ -28,17 +28,22 @@ const { post, older, newer } = Astro.props as {
 };
 const { Content, headings } = await renderPost(post);
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const codeBlocks = (post.body.match(/```/g)?.length || 0) / 2;
+const peakAlt = Math.min(884, Math.max(160, Math.round(140 + post.body.length * 0.14 + codeBlocks * 28)));
 ---
 
 <BaseLayout title={post.title} description={post.description}>
   <div class="reader-layout">
-    <article class="article-card">
+    <article class="article-card" data-post-slug={post.slug} data-peak-alt={peakAlt}>
       <a class="back-link" href={`${base}/`}>[← cd ~/home]</a>
 
       <header class="post-header">
         <h1>{post.title}</h1>
         <div class="post-meta">
-          <span>DATE: <time datetime={post.pubDate.toISOString()}>{formatDateLong(post.pubDate)}</time></span>
+          <span>
+            DATE: <time datetime={post.pubDate.toISOString()}>{formatDateLong(post.pubDate)}</time>
+          </span>
           {
             post.updatedDate && (
               <>
@@ -49,6 +54,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           }
           <span>│</span>
           <span>{readingTime(post.body)}</span>
+          <span>│</span>
+          <span style="color: var(--accent); font-weight: 700;">PEAK: {peakAlt}m</span>
           {
             post.tags.map((tag) => (
               <a class="tag-chip" href={`${base}/tags/${encodeURIComponent(tag)}/`}>
@@ -62,6 +69,27 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       <div class="prose">
         <Content />
       </div>
+
+      <!-- 文末互动：登顶垒石界碑（ASCII Summit Cairn） -->
+      <section class="article-cairn-card" aria-label="文章登顶垒石界碑">
+        <div style="display: flex; align-items: center; gap: 0.85rem;">
+          <pre class="cairn-ascii-pile" id="article-cairn-pile" aria-hidden="true"></pre>
+          <div>
+            <div style="font-weight: 700; color: var(--text); margin-bottom: 0.2rem;">
+              SUMMIT_CAIRN // {peakAlt}m 登顶玛尼堆
+            </div>
+            <div id="article-cairn-desc" style="color: var(--text-muted); font-size: 0.74rem;">
+              在此山峰垒放一块界石，记录你的阅读足迹并为全站 8h 巨石注入 +18m 动能。
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+          <button type="button" class="term-btn is-primary" id="stack-cairn-btn">
+            [+STACK_STONE 垒放界石 (+18m)]
+          </button>
+        </div>
+      </section>
 
       <nav class="post-nav" aria-label="文章前后篇导航">
         {
@@ -90,3 +118,63 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <AscentToc headings={headings} />
   </div>
 </BaseLayout>
+
+<script>
+  const articleEl = document.querySelector<HTMLElement>('article[data-post-slug]');
+  const pileEl = document.getElementById('article-cairn-pile');
+  const descEl = document.getElementById('article-cairn-desc');
+  const stackBtn = document.getElementById('stack-cairn-btn');
+  const CAIRN_KEY = 'sisyphus_cairns_v1';
+
+  if (articleEl && pileEl) {
+    const slug = articleEl.dataset.postSlug || 'unknown';
+    const loadCairns = (): Record<string, number> => {
+      try {
+        const raw = localStorage.getItem(CAIRN_KEY);
+        return raw ? JSON.parse(raw) : {};
+      } catch {
+        return {};
+      }
+    };
+
+    const CAIRN_ART = [
+      ['    .    ', '   / \\   ', '  /   \\  ', ' ──┴─┴── '],
+      ['    .    ', '   / \\   ', '   ▄█▄   ', ' ──┴─┴── '],
+      ['    ▲    ', '   ▄█▄   ', '  ▄███▄  ', ' ──┴─┴── '],
+      ['   [|>]  ', '    ▲    ', '   ▄█▄   ', '  ▄███▄  '],
+      ['  * [|>] ', '   ▄▀▄   ', '  ▄███▄  ', ' ▄█████▄ '],
+    ];
+
+    const renderCairn = () => {
+      const map = loadCairns();
+      const count = Number(map[slug] || 0);
+      const artIdx = Math.min(CAIRN_ART.length - 1, count);
+      pileEl.textContent = CAIRN_ART[artIdx].join('\n');
+      if (descEl) {
+        descEl.textContent =
+          count > 0
+            ? `[OK] 已在此峰垒石 ${count} 块 · 首页归档已点亮该峰立碑印记`
+            : '在此山峰垒放一块界石，记录你的阅读足迹并为全站 8h 巨石注入 +18m 动能。';
+      }
+    };
+
+    renderCairn();
+
+    stackBtn?.addEventListener('click', () => {
+      const map = loadCairns();
+      map[slug] = Number(map[slug] || 0) + 1;
+      try {
+        localStorage.setItem(CAIRN_KEY, JSON.stringify(map));
+      } catch {}
+      renderCairn();
+      window.dispatchEvent(
+        new CustomEvent('sisyphus:boulder-boost', {
+          detail: { amount: 0.0204, source: '垒石立碑' },
+        }),
+      );
+      if (stackBtn) {
+        stackBtn.textContent = `[+1 界石已立 (#${map[slug]}) · +18m]`;
+      }
+    });
+  }
+</script>

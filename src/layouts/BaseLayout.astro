@@ -57,13 +57,32 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <div class="heavy-frost-veil" aria-hidden="true"></div>
     <canvas id="bg-pixel-canvas" aria-hidden="true"></canvas>
 
-    <!-- 全站悬浮导航与双层链式挂件终端（完全接管原静态顶栏） -->
+    <!-- 全站悬浮导航与双层链式挂件终端 -->
     <FloatingAsciiNav />
 
     <main class="container-wide page-main">
       <slot />
     </main>
     <Footer />
+
+    <!-- 全站视口底边地平线微缩推石轨（不阻挡任何点击，在每个界面静默映射 8h 巨石海拔与被动助推脉冲） -->
+    <div class="ambient-horizon-ridge" id="ambient-horizon-ridge" aria-hidden="true">
+      <div class="horizon-track-line"></div>
+      <div class="horizon-fill-line" id="horizon-fill-line"></div>
+      <div class="horizon-climber-node" id="horizon-climber-node">
+        <span id="horizon-climber-sprite">o_▪</span>
+        <span class="h-alt" id="horizon-climber-alt">210.0m</span>
+      </div>
+      <div class="horizon-impulse-toast" id="horizon-impulse-toast"></div>
+    </div>
+
+    <!-- 划选正文句子时浮现的极简终端共鸣与一键检索浮签 -->
+    <div class="selection-echo-hud" id="selection-echo-hud" role="toolbar" aria-label="划选词句终端操作">
+      <span class="selection-echo-tag" id="selection-echo-tag">[+8.5m 哲思共鸣]</span>
+      <button type="button" class="selection-echo-btn" id="selection-grep-btn">
+        [&gt;&gt; 终端检索]
+      </button>
+    </div>
 
     <!-- 文章配图灯箱 -->
     <div class="lightbox-modal" id="lightbox-modal" role="dialog" aria-label="图片放大预览">
@@ -72,7 +91,230 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     </div>
 
     <script>
-      // 1. 四主题背景 ASCII 漂浮字符艺术画布（不再只是单调像素点，而是对应四大世界的字符意象！）
+      // ================= 1. 全局被动推石动能引擎 + 视口底边微缩推石轨 =================
+      const CYCLE_MS = 8 * 60 * 60 * 1000;
+      const PEAK_ALT = 884.8;
+      const BOULDER_KEY = 'sisyphus_8h_cycle_v2';
+      const FLOW_KEY = 'sisyphus_flow_v1';
+
+      const horizonFill = document.getElementById('horizon-fill-line');
+      const horizonNode = document.getElementById('horizon-climber-node');
+      const horizonSprite = document.getElementById('horizon-climber-sprite');
+      const horizonAlt = document.getElementById('horizon-climber-alt');
+      const horizonToast = document.getElementById('horizon-impulse-toast');
+
+      let flowMult = 1.0;
+      let lastImpulseTag = '8H_CHRONO';
+      let lastImpulseMeters = 0;
+      let toastHideTimer = 0;
+      let strideFrame = 0;
+
+      try {
+        const savedFlow = Number(sessionStorage.getItem(FLOW_KEY) || '1');
+        if (Number.isFinite(savedFlow) && savedFlow >= 1) {
+          flowMult = Math.min(2.5, savedFlow);
+        }
+      } catch {}
+
+      const loadBoulderSave = () => {
+        const nowEpoch = Math.floor(Date.now() / CYCLE_MS);
+        let save = { anchorEpoch: nowEpoch, boostAccum: 0, boostMeters: 0 };
+        try {
+          const raw = localStorage.getItem(BOULDER_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (
+              typeof parsed.anchorEpoch === 'number' &&
+              typeof parsed.boostAccum === 'number'
+            ) {
+              save = {
+                anchorEpoch: parsed.anchorEpoch,
+                boostAccum: parsed.boostAccum,
+                boostMeters: Number(parsed.boostMeters || 0),
+              };
+            }
+          } else {
+            localStorage.setItem(BOULDER_KEY, JSON.stringify(save));
+          }
+        } catch {}
+        return save;
+      };
+
+      const getBoulderState = () => {
+        const save = loadBoulderSave();
+        const total = Math.max(0, Date.now() / CYCLE_MS - save.anchorEpoch + save.boostAccum);
+        const cycle = Math.floor(total);
+        const frac = total - cycle;
+        const alt = frac * PEAK_ALT;
+        return { save, total, cycle, frac, alt };
+      };
+
+      const updateHorizonBar = (toastText?: string) => {
+        const st = getBoulderState();
+        const pct = Math.max(3, Math.min(96, st.frac * 92 + 4));
+        if (horizonFill) horizonFill.style.width = `${pct.toFixed(1)}%`;
+        if (horizonNode) horizonNode.style.left = `${pct.toFixed(1)}%`;
+        if (horizonAlt) {
+          const flowStr = flowMult > 1.08 ? ` · ${flowMult.toFixed(1)}x` : '';
+          horizonAlt.textContent = `${st.alt.toFixed(1)}m${flowStr}`;
+        }
+        if (horizonSprite) {
+          const sprites = ['o_▪', 'o/▣', 'o_▪', 'o-▣'];
+          horizonSprite.textContent = sprites[strideFrame % sprites.length];
+        }
+        if (toastText && horizonToast) {
+          horizonToast.textContent = toastText;
+          horizonToast.style.left = `${Math.max(12, Math.min(88, pct + 9)).toFixed(1)}%`;
+          horizonToast.classList.add('is-active');
+          window.clearTimeout(toastHideTimer);
+          toastHideTimer = window.setTimeout(() => {
+            horizonToast.classList.remove('is-active');
+          }, 1450);
+        }
+
+        window.dispatchEvent(
+          new CustomEvent('sisyphus:boulder-telemetry', {
+            detail: {
+              frac: st.frac,
+              alt: st.alt,
+              cycle: st.cycle,
+              boostMeters: st.save.boostMeters,
+              flow: flowMult,
+              lastSource: lastImpulseTag,
+              lastGain: lastImpulseMeters,
+            },
+          }),
+        );
+      };
+
+      // 全局监听任何助推事件（无论在首页、文章页、标签页还是关于页触发，均统一持久化并回显！）
+      window.addEventListener('sisyphus:boulder-boost', (ev: Event) => {
+        const detail = (ev as CustomEvent<{ amount?: number; source?: string; persisted?: boolean }>)
+          .detail;
+        const rawAmt = Math.max(0.001, Math.min(0.12, detail?.amount ?? 0.012));
+        const source = detail?.source || '主动助推';
+        flowMult = Math.min(2.5, +(flowMult + 0.06).toFixed(2));
+        try {
+          sessionStorage.setItem(FLOW_KEY, String(flowMult));
+        } catch {}
+
+        const gainedM = rawAmt * PEAK_ALT;
+        lastImpulseTag = source;
+        lastImpulseMeters = gainedM;
+        strideFrame++;
+
+        // 若触发方尚未写入 localStorage，则在此处统一持久化
+        if (!detail?.persisted) {
+          const save = loadBoulderSave();
+          save.boostAccum += rawAmt;
+          save.boostMeters += gainedM;
+          try {
+            localStorage.setItem(BOULDER_KEY, JSON.stringify(save));
+          } catch {}
+        }
+
+        updateHorizonBar(`+${gainedM.toFixed(1)}m [${source}]`);
+      });
+
+      // 被动推石手段 A：沉浸式匀速阅读步频（过滤掉暴躁乱滚，只采集 35..520 px/s 的阅读滚动）
+      let lastScrollPos = window.scrollY;
+      let lastScrollAt = performance.now();
+      let readingScrollAccum = 0;
+
+      window.addEventListener(
+        'scroll',
+        () => {
+          const now = performance.now();
+          const dt = Math.max(8, now - lastScrollAt);
+          const dy = Math.abs(window.scrollY - lastScrollPos);
+          lastScrollPos = window.scrollY;
+          lastScrollAt = now;
+
+          const speedPxSec = (dy / dt) * 1000;
+          if (speedPxSec >= 35 && speedPxSec <= 580) {
+            readingScrollAccum += dy;
+            if (readingScrollAccum >= 360) {
+              readingScrollAccum = 0;
+              window.dispatchEvent(
+                new CustomEvent('sisyphus:boulder-boost', {
+                  detail: { amount: 0.0028 * Math.min(1.8, flowMult), source: '阅读步频' },
+                }),
+              );
+            }
+          }
+        },
+        { passive: true },
+      );
+
+      // 被动推石手段 B：划选正文词句思考（哲思共鸣 + 浮现一键终端检索签）
+      const selHud = document.getElementById('selection-echo-hud');
+      const selTag = document.getElementById('selection-echo-tag');
+      const selGrepBtn = document.getElementById('selection-grep-btn');
+      let currentSelectedSnippet = '';
+      let lastSelectionBoostAt = 0;
+
+      document.addEventListener('mouseup', () => {
+        setTimeout(() => {
+          const sel = window.getSelection();
+          const text = sel?.toString().trim() || '';
+          if (text.length >= 3 && text.length <= 72 && sel && sel.rangeCount > 0) {
+            const rect = sel.getRangeAt(0).getBoundingClientRect();
+            if (rect.width > 8 && rect.top > 40) {
+              currentSelectedSnippet = text;
+              const now = performance.now();
+              if (now - lastSelectionBoostAt > 3500) {
+                lastSelectionBoostAt = now;
+                window.dispatchEvent(
+                  new CustomEvent('sisyphus:boulder-boost', {
+                    detail: { amount: 0.0096, source: '哲思共鸣' },
+                  }),
+                );
+              }
+              if (selHud && selTag) {
+                const shortQ = text.length > 12 ? `${text.slice(0, 12)}…` : text;
+                selTag.textContent = `[+8.5m 哲思共鸣]`;
+                if (selGrepBtn) selGrepBtn.textContent = `[>> 检索 "${shortQ}"]`;
+                const left = Math.max(12, Math.min(window.innerWidth - 250, rect.left));
+                const top = Math.max(12, rect.top - 34);
+                selHud.style.left = `${Math.round(left)}px`;
+                selHud.style.top = `${Math.round(top)}px`;
+                selHud.classList.add('is-open');
+              }
+              return;
+            }
+          }
+          selHud?.classList.remove('is-open');
+        }, 20);
+      });
+
+      document.addEventListener('pointerdown', (e) => {
+        if (selHud && !selHud.contains(e.target as Node)) {
+          selHud.classList.remove('is-open');
+        }
+      });
+
+      selGrepBtn?.addEventListener('click', () => {
+        if (!currentSelectedSnippet) return;
+        selHud?.classList.remove('is-open');
+        window.dispatchEvent(
+          new CustomEvent('sisyphus:cli-query', { detail: { query: currentSelectedSnippet } }),
+        );
+        window.dispatchEvent(
+          new CustomEvent('sisyphus:boulder-boost', {
+            detail: { amount: 0.0074, source: '航道求索' },
+          }),
+        );
+      });
+
+      updateHorizonBar();
+      setInterval(() => {
+        if (flowMult > 1.0) {
+          flowMult = Math.max(1.0, +(flowMult - 0.02).toFixed(2));
+        }
+        updateHorizonBar();
+      }, 4000);
+
+      // ================= 2. 四主题背景 ASCII 漂浮字符画布（流速与风向耦合当前巨石海拔！） =================
       const bgCanvas = document.getElementById('bg-pixel-canvas') as HTMLCanvasElement | null;
       if (bgCanvas && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         const ctx = bgCanvas.getContext('2d');
@@ -80,6 +322,15 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         let accentColor = '#a5b4fc';
         let accent2Color = '#38bdf8';
         let curRealm = document.documentElement.dataset.realm || 'void';
+        let altitudeWindMult = 1.0;
+
+        window.addEventListener('sisyphus:boulder-telemetry', (e: Event) => {
+          const d = (e as CustomEvent<{ frac?: number; flow?: number }>).detail;
+          const f = d?.frac ?? 0.25;
+          const fl = d?.flow ?? 1.0;
+          // 海拔越高（越接近 884.8m 峰顶）且阅读心流越强，背景星风/代码雨/香料流越强劲
+          altitudeWindMult = (0.75 + f * 1.15) * (0.85 + fl * 0.22);
+        });
 
         const GLYPH_SETS: Record<string, string[]> = {
           void: ['▮', '*', '⋆', '·', '◉', '⟡', '1:4:9'],
@@ -129,8 +380,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
               ctx.font = `${p.size}px ui-monospace, SFMono-Regular, Menlo, monospace`;
 
               if (curRealm === 'crt') {
-                // 霓虹矩阵：数字与半角假名垂直矩阵雨下落
-                p.y += 0.72 + (p.seed % 4) * 0.3;
+                p.y += (0.72 + (p.seed % 4) * 0.3) * altitudeWindMult;
                 if (p.y > h + 14) {
                   p.y = -12;
                   p.x = Math.round((Math.random() * w) / 24) * 24;
@@ -139,27 +389,24 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
                 ctx.globalAlpha = p.alpha * 1.1;
                 ctx.fillText(glyph, p.x, p.y);
               } else if (curRealm === 'paper') {
-                // 浮世纸墨：落樱与水墨微尘随春风斜向飘落
-                p.x += 0.24 + Math.sin(t * 0.0011 + p.seed) * 0.22;
-                p.y += 0.22 + (p.seed % 3) * 0.1;
+                p.x += (0.24 + Math.sin(t * 0.0011 + p.seed) * 0.22) * altitudeWindMult;
+                p.y += (0.22 + (p.seed % 3) * 0.1) * altitudeWindMult;
                 if (p.x > w + 12) p.x = -10;
                 if (p.y > h + 12) p.y = -10;
                 ctx.fillStyle = p.seed % 3 === 0 ? accentColor : mutedColor;
                 ctx.globalAlpha = p.alpha * 1.05;
                 ctx.fillText(glyph, p.x, p.y);
               } else if (curRealm === 'amber') {
-                // 大漠星轨：流沙金砾与星轨符文斜掠升腾
-                p.x += 0.32 + Math.sin(t * 0.001 + p.seed) * 0.18;
-                p.y -= 0.2 + (p.seed % 3) * 0.1;
+                p.x += (0.34 + Math.sin(t * 0.001 + p.seed) * 0.18) * altitudeWindMult;
+                p.y -= (0.2 + (p.seed % 3) * 0.1) * altitudeWindMult;
                 if (p.x > w + 12) p.x = -10;
                 if (p.y < -12) p.y = h + 10;
                 ctx.fillStyle = p.seed % 3 === 0 ? accentColor : mutedColor;
                 ctx.globalAlpha = p.alpha;
                 ctx.fillText(glyph, p.x, p.y);
               } else {
-                // 星渊神殿：星芒缓升与微闪呼吸
-                p.x += Math.sin(t * 0.0007 + p.seed) * 0.16;
-                p.y -= 0.12 + (p.seed % 3) * 0.07;
+                p.x += Math.sin(t * 0.0007 + p.seed) * 0.18 * altitudeWindMult;
+                p.y -= (0.12 + (p.seed % 3) * 0.07) * altitudeWindMult;
                 if (p.x < -12) p.x = w + 10;
                 if (p.x > w + 12) p.x = -10;
                 if (p.y < -12) p.y = h + 10;
@@ -176,13 +423,15 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         requestAnimationFrame(tickDust);
       }
 
-      // 2. 终端代码块顶栏与一键复制增强
-      document.querySelectorAll('.prose pre').forEach((pre) => {
+      // ================= 3. 终端代码块顶栏增强 + 代码研读/复制被动推石奖励 =================
+      document.querySelectorAll('.prose pre').forEach((pre, blockIdx) => {
         if (pre.parentElement?.classList.contains('code-term-frame')) return;
         const lang =
           (pre as HTMLElement).dataset.language ||
           pre.querySelector('code')?.className.match(/language-(\w+)/)?.[1] ||
           'txt';
+        const rawCode = pre.querySelector('code')?.textContent ?? pre.textContent ?? '';
+        const lineCount = Math.max(1, rawCode.trim().split('\n').length);
 
         const wrapper = document.createElement('div');
         wrapper.className = 'code-term-frame';
@@ -191,23 +440,46 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         head.className = 'code-term-head';
 
         const label = document.createElement('span');
-        label.textContent = `┌─ [${lang.toUpperCase()}]`;
+        label.textContent = `┌─ [${lang.toUpperCase()} · ${lineCount}L]`;
 
         const copyBtn = document.createElement('button');
         copyBtn.type = 'button';
         copyBtn.className = 'code-copy-btn';
-        copyBtn.textContent = '[COPY]';
+        copyBtn.textContent = '[COPY +16m]';
         copyBtn.addEventListener('click', async () => {
-          const raw = pre.querySelector('code')?.textContent ?? pre.textContent ?? '';
           try {
-            await navigator.clipboard.writeText(raw);
-            copyBtn.textContent = '[COPIED OK]';
+            await navigator.clipboard.writeText(rawCode);
+            copyBtn.textContent = '[FORGED +16m OK]';
+            window.dispatchEvent(
+              new CustomEvent('sisyphus:boulder-boost', {
+                detail: { amount: 0.018, source: '火种传递' },
+              }),
+            );
             setTimeout(() => {
-              copyBtn.textContent = '[COPY]';
-            }, 1600);
+              copyBtn.textContent = '[COPY +16m]';
+            }, 1800);
           } catch {
             copyBtn.textContent = '[ERR]';
           }
+        });
+
+        // 悬停研读代码块超过 1.4 秒自动发放一次“代码研读”推石冲量
+        let studyTimer = 0;
+        let studied = false;
+        wrapper.addEventListener('pointerenter', () => {
+          if (studied) return;
+          studyTimer = window.setTimeout(() => {
+            studied = true;
+            label.textContent = `┌─ [${lang.toUpperCase()} · ${lineCount}L · 已研读 +5m]`;
+            window.dispatchEvent(
+              new CustomEvent('sisyphus:boulder-boost', {
+                detail: { amount: 0.0058, source: `研读#${blockIdx + 1}` },
+              }),
+            );
+          }, 1350);
+        });
+        wrapper.addEventListener('pointerleave', () => {
+          window.clearTimeout(studyTimer);
         });
 
         head.append(label, copyBtn);
@@ -215,7 +487,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         wrapper.append(head, pre);
       });
 
-      // 3. 图片点击放大预览（Lightbox）
+      // ================= 4. 图片点击放大预览（Lightbox） =================
       const modal = document.getElementById('lightbox-modal');
       const modalImg = document.getElementById('lightbox-img') as HTMLImageElement | null;
       if (modal && modalImg) {
