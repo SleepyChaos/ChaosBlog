@@ -15,11 +15,23 @@ const tags = getAllTags(posts);
 const byYear = groupPostsByYear(posts);
 const latestPost = posts[0] ?? null;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+// 根据每篇文章的字数与代码块密度计算“山峰海拔剖面图 (▂▄▆█)”与海拔高度
+const computePostTerrain = (body: string) => {
+  const len = body.length;
+  const codeBlocks = (body.match(/```/g)?.length || 0) / 2;
+  const alt = Math.min(884, Math.max(160, Math.round(140 + len * 0.14 + codeBlocks * 28)));
+  const bars = ['▂', '▃', '▄', '▅', '▆', '▇', '█'];
+  const ratio = Math.min(1, alt / 884);
+  const peakIdx = Math.min(bars.length - 1, Math.max(2, Math.round(ratio * (bars.length - 1))));
+  const profile = `${bars[Math.max(0, peakIdx - 2)]}${bars[Math.max(1, peakIdx - 1)]}${bars[peakIdx]}${bars[Math.max(0, peakIdx - 1)]}`;
+  return { alt, profile };
+};
 ---
 
 <BaseLayout>
   <div class="bento-grid">
-    <!-- [01] 西西弗斯 8 小时真实时间轮回高分 ASCII 舞台 -->
+    <!-- [01] 西西弗斯 8 小时真实时间轮回高分多彩科幻剧场 -->
     <AsciiSisyphus initialSummits={Math.max(1, posts.length)} />
 
     <!-- [02] 身份与浮动 HUD 物理控制台 -->
@@ -88,7 +100,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
             <a class="featured-post-box" href={`${base}/posts/${latestPost.slug}/`}>
               <span class="featured-badge">
-                [NEW_ENTRY · {readingTime(latestPost.body)}]
+                [NEW_ENTRY · {readingTime(latestPost.body)} · ⛰ {computePostTerrain(latestPost.body).profile} {computePostTerrain(latestPost.body).alt}m]
               </span>
               <h3>{latestPost.title}</h3>
               {latestPost.description && <p>{latestPost.description}</p>}
@@ -105,21 +117,25 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       )
     }
 
-    <!-- [04] 标签字符矩阵 -->
+    <!-- [04] 标签字符矩阵（支持点击原地秒级过滤下方归档 + 悬停高亮联动） -->
     <section class:list={['bento-card', latestPost ? 'col-5' : 'col-12']}>
       <div>
         <div class="bento-head">
           <span class="bento-head-title">
             <span class="term-ascii-icon">#*</span>
-            <span>04 // TAG_MATRIX · 标签索引</span>
+            <span>04 // TAG_MATRIX · 标签星座</span>
           </span>
-          <span class="bento-head-meta">TOTAL {tags.length}</span>
+          <span class="bento-head-meta">点击原地过滤 · TOTAL {tags.length}</span>
         </div>
 
-        <div class="tag-matrix">
+        <div class="tag-matrix" id="home-tag-matrix">
           {
-            tags.slice(0, 12).map(([tag, count]) => (
-              <a class="tag-chip" href={`${base}/tags/${encodeURIComponent(tag)}/`}>
+            tags.slice(0, 14).map(([tag, count]) => (
+              <a
+                class="tag-chip"
+                data-filter-tag={tag}
+                href={`${base}/tags/${encodeURIComponent(tag)}/`}
+              >
                 <span>#{tag}</span>
                 <span class="tag-count">[{count}]</span>
               </a>
@@ -134,26 +150,57 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       </div>
     </section>
 
-    <!-- [05] 全部文章时间轴日志 -->
+    <!-- [05] 全部文章时间轴日志（含海拔剖面图、原地标签过滤条与 j/k 键盘光标导航） -->
     <section class="bento-card col-12" id="summit-logs">
       <div>
         <div class="bento-head">
           <span class="bento-head-title">
             <span class="term-ascii-icon">ls</span>
-            <span>05 // SUMMIT_LOGS · 全部文章归档</span>
+            <span>05 // SUMMIT_LOGS · 攀登归档</span>
           </span>
-          <span class="bento-head-meta">./documents/posts/ ({posts.length})</span>
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <span
+              id="active-tag-filter-bar"
+              style="display: none; align-items: center; gap: 0.35rem; font-size: 0.74rem;"
+            >
+              <span id="active-tag-filter-label" style="color: var(--accent); font-weight: 700;"></span>
+              <button
+                type="button"
+                class="term-btn"
+                id="clear-tag-filter-btn"
+                style="padding: 0.06rem 0.38rem; font-size: 0.7rem;"
+              >
+                [× 全部]
+              </button>
+              <a
+                id="open-tag-page-link"
+                class="term-btn"
+                href={`${base}/tags/`}
+                style="padding: 0.06rem 0.38rem; font-size: 0.7rem;"
+              >
+                [↗ 专页]
+              </a>
+            </span>
+            <span class="bento-head-meta" id="summit-logs-count">
+              j/k 选文 · ./documents/posts/ ({posts.length})
+            </span>
+          </div>
         </div>
 
         {
           byYear.map(([year, yearPosts]) => (
-            <div>
+            <div class="year-group" data-year={year}>
               <h2 class="year-divider">[{year}]</h2>
               <ul class="post-list">
                 {yearPosts.map((post, idx) => {
                   const branch = idx === yearPosts.length - 1 ? '└─' : '├─';
+                  const terrain = computePostTerrain(post.body);
                   return (
-                    <li class="post-row">
+                    <li
+                      class="post-row"
+                      data-tags={post.tags.join('|')}
+                      data-url={`${base}/posts/${post.slug}/`}
+                    >
                       <div class="post-row-head">
                         <div class="post-row-title-wrap">
                           <span class="post-tree-branch">{branch}</span>
@@ -162,6 +209,13 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
                           </a>
                         </div>
                         <div class="post-row-meta">
+                          <span
+                            style="color: var(--accent); font-weight: 600;"
+                            title={`文章体量折算山峰海拔: ${terrain.alt}m`}
+                          >
+                            {terrain.profile} {terrain.alt}m
+                          </span>
+                          <span>·</span>
                           <span>{readingTime(post.body)}</span>
                           <span>·</span>
                           <time datetime={post.pubDate.toISOString()}>
@@ -175,6 +229,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
                           {post.tags.map((tag) => (
                             <a
                               class="mini-tag"
+                              data-filter-tag={tag}
                               href={`${base}/tags/${encodeURIComponent(tag)}/`}
                             >
                               [#{tag}]
@@ -192,7 +247,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       </div>
 
       <div class="bento-foot">
-        <span>SOURCE: documents/posts/*.md</span>
+        <span>SOURCE: documents/posts/*.md · 完读任意文章可获 +35m 推石助推</span>
         <a href={`${base}/rss.xml`}>[SUBSCRIBE_RSS]</a>
       </div>
     </section>
@@ -203,10 +258,134 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   document.getElementById('bento-kick-btn')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('sisyphus:hud-kick'));
     window.dispatchEvent(
-      new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.035 } })
+      new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.035 } }),
     );
   });
   document.getElementById('bento-realm-btn')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('sisyphus:cycle-realm'));
+  });
+
+  // ========= 原地交互式标签过滤 + 悬停联动 + j/k 终端键盘流选文 =========
+  const tagChips = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-filter-tag]'));
+  const postRows = Array.from(document.querySelectorAll<HTMLElement>('#summit-logs .post-row'));
+  const yearGroups = Array.from(document.querySelectorAll<HTMLElement>('#summit-logs .year-group'));
+  const filterBar = document.getElementById('active-tag-filter-bar');
+  const filterLabel = document.getElementById('active-tag-filter-label');
+  const clearFilterBtn = document.getElementById('clear-tag-filter-btn');
+  const openTagLink = document.getElementById('open-tag-page-link') as HTMLAnchorElement | null;
+  const countMeta = document.getElementById('summit-logs-count');
+
+  let activeTag: string | null = null;
+  let kbdIdx = -1;
+
+  const updateKbdFocus = (visibleRows: HTMLElement[]) => {
+    postRows.forEach((r) => {
+      r.style.outline = '';
+      r.style.borderColor = '';
+    });
+    if (kbdIdx >= 0 && kbdIdx < visibleRows.length) {
+      const row = visibleRows[kbdIdx];
+      row.style.borderColor = 'var(--accent)';
+      row.style.outline = '1px dashed var(--accent)';
+      row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  };
+
+  const applyTagFilter = (tag: string | null) => {
+    activeTag = tag;
+    kbdIdx = -1;
+    let visibleCount = 0;
+
+    postRows.forEach((row) => {
+      const rowTags = (row.dataset.tags || '').split('|').filter(Boolean);
+      const show = !tag || rowTags.includes(tag);
+      row.style.display = show ? '' : 'none';
+      if (show) visibleCount++;
+    });
+
+    yearGroups.forEach((grp) => {
+      const hasVisible = Array.from(grp.querySelectorAll<HTMLElement>('.post-row')).some(
+        (r) => r.style.display !== 'none',
+      );
+      grp.style.display = hasVisible ? '' : 'none';
+    });
+
+    tagChips.forEach((chip) => {
+      const isMatch = Boolean(tag && chip.dataset.filterTag === tag);
+      chip.style.borderColor = isMatch ? 'var(--accent)' : '';
+      chip.style.background = isMatch ? 'var(--accent-soft)' : '';
+    });
+
+    if (filterBar && filterLabel) {
+      if (tag) {
+        filterBar.style.display = 'inline-flex';
+        filterLabel.textContent = `$ filter --tag=#${tag} (${visibleCount})`;
+        const sampleChip = tagChips.find((c) => c.dataset.filterTag === tag);
+        if (openTagLink && sampleChip) openTagLink.href = sampleChip.href;
+      } else {
+        filterBar.style.display = 'none';
+      }
+    }
+
+    if (countMeta) {
+      countMeta.textContent = tag
+        ? `MATCHED: ${visibleCount}/${postRows.length}`
+        : `j/k 选文 · ./documents/posts/ (${postRows.length})`;
+    }
+  };
+
+  tagChips.forEach((chip) => {
+    chip.addEventListener('click', (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+      e.preventDefault();
+      const t = chip.dataset.filterTag || null;
+      applyTagFilter(activeTag === t ? null : t);
+      document.getElementById('summit-logs')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    chip.addEventListener('pointerenter', () => {
+      const t = chip.dataset.filterTag;
+      if (!t || activeTag) return;
+      postRows.forEach((row) => {
+        const has = (row.dataset.tags || '').split('|').includes(t);
+        row.style.borderColor = has ? 'var(--accent)' : '';
+      });
+    });
+
+    chip.addEventListener('pointerleave', () => {
+      if (activeTag) return;
+      postRows.forEach((row) => {
+        row.style.borderColor = '';
+      });
+    });
+  });
+
+  clearFilterBtn?.addEventListener('click', () => applyTagFilter(null));
+
+  window.addEventListener('keydown', (e) => {
+    if (
+      document.activeElement instanceof HTMLInputElement ||
+      document.activeElement instanceof HTMLTextAreaElement ||
+      e.metaKey ||
+      e.ctrlKey ||
+      e.altKey
+    ) {
+      return;
+    }
+    const visibleRows = postRows.filter((r) => r.style.display !== 'none');
+    if (visibleRows.length === 0) return;
+
+    if (e.key === 'j' || e.key === 'J') {
+      e.preventDefault();
+      kbdIdx = (kbdIdx + 1) % visibleRows.length;
+      updateKbdFocus(visibleRows);
+    } else if (e.key === 'k' || e.key === 'K') {
+      e.preventDefault();
+      kbdIdx = kbdIdx <= 0 ? visibleRows.length - 1 : kbdIdx - 1;
+      updateKbdFocus(visibleRows);
+    } else if (e.key === 'Enter' && kbdIdx >= 0 && kbdIdx < visibleRows.length) {
+      const url = visibleRows[kbdIdx].dataset.url;
+      if (url) window.location.href = url;
+    }
   });
 </script>

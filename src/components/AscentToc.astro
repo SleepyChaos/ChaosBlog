@@ -18,20 +18,31 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
     <div style="display: flex; align-items: center; justify-content: space-between;">
       <span style="display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 700;">
         <span class="term-ascii-icon">/▲</span>
-        <span>ASCENT_METER</span>
+        <span>ASCENT_TELEMETRY</span>
       </span>
-      <span id="ascent-pct" style="color: var(--text-muted);">000%</span>
+      <span id="ascent-pct" style="color: var(--accent); font-weight: 700;">000%</span>
     </div>
+
+    <!-- 随文章滚动 1:1 实时攀登的 28x6 迷你 ASCII 西西弗斯画布 -->
+    <pre
+      id="reader-mini-slope"
+      class="ascii-slope-pre"
+      style="margin: 0.55rem 0 0.45rem; padding: 0.35rem 0.45rem; font-size: 0.6rem; line-height: 1.15; cursor: default;"
+      aria-hidden="true"></pre>
 
     <div class="ascent-bar-row">
       <span id="ascent-bar">[▫▫▫▫▫▫▫▫▫▫]</span>
-      <button type="button" class="term-btn" id="scroll-top-btn" title="回到页面顶部">
+      <button type="button" class="term-btn" id="scroll-top-btn" title="回到文章顶部">
         [↑TOP]
       </button>
     </div>
 
-    <div id="ascent-status" style="color: var(--text-muted); font-size: 0.72rem;">
-      STATUS: CLIMBING...
+    <div
+      id="ascent-status"
+      style="color: var(--text-muted); font-size: 0.72rem; display: flex; justify-content: space-between; gap: 0.3rem;"
+    >
+      <span id="ascent-status-text">CAMP: 山麓起点</span>
+      <span id="ascent-reward-badge" style="color: var(--accent); font-weight: 700;"></span>
     </div>
   </div>
 
@@ -40,7 +51,7 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
       <div class="ascent-box">
         <div style="display: flex; align-items: center; gap: 0.4rem; font-weight: 700; padding-bottom: 0.45rem; border-bottom: 1px solid var(--border);">
           <span class="term-ascii-icon">≡</span>
-          <span>OUTLINE ({tocItems.length})</span>
+          <span>CHECKPOINTS ({tocItems.length})</span>
         </div>
         <ul class="toc-list" id="toc-list">
           {tocItems.map((h, i) => {
@@ -50,6 +61,7 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
                 <a
                   href={`#${h.slug}`}
                   data-slug={h.slug}
+                  data-title={h.text}
                   class:list={['toc-link', `depth-${h.depth}`]}
                 >
                   {h.depth === 2 ? branch : '   · '}
@@ -67,7 +79,9 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
 <script>
   const pctEl = document.getElementById('ascent-pct');
   const barEl = document.getElementById('ascent-bar');
-  const statusEl = document.getElementById('ascent-status');
+  const statusTextEl = document.getElementById('ascent-status-text');
+  const rewardBadgeEl = document.getElementById('ascent-reward-badge');
+  const miniSlopeEl = document.getElementById('reader-mini-slope');
   const topBtn = document.getElementById('scroll-top-btn');
   const tocLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('#toc-list .toc-link'));
 
@@ -82,31 +96,128 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
     })
     .filter((el): el is HTMLElement => Boolean(el));
 
+  let summitRewarded = false;
+  const rewardKey = `sisyphus_read_reward_${window.location.pathname}`;
+  try {
+    summitRewarded = sessionStorage.getItem(rewardKey) === '1';
+  } catch {}
+
+  const grantReadingBoost = () => {
+    if (summitRewarded) return;
+    summitRewarded = true;
+    try {
+      sessionStorage.setItem(rewardKey, '1');
+      const raw = localStorage.getItem('sisyphus_8h_cycle_v2');
+      const cycleMs = 8 * 3600 * 1000;
+      const parsed = raw
+        ? JSON.parse(raw)
+        : { anchorEpoch: Math.floor(Date.now() / cycleMs), boostAccum: 0, boostMeters: 0 };
+      parsed.boostAccum = Number(parsed.boostAccum || 0) + 0.04;
+      parsed.boostMeters = Number(parsed.boostMeters || 0) + 35.4;
+      localStorage.setItem('sisyphus_8h_cycle_v2', JSON.stringify(parsed));
+    } catch {}
+    window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.04 } }));
+  };
+
+  const renderMiniClimber = (progress: number, atSummit: boolean) => {
+    if (!miniSlopeEl) return;
+    const W = 28;
+    const H = 6;
+    const grid = Array.from({ length: H }, () => Array(W).fill(' '));
+    const cls = Array.from({ length: H }, () => Array(W).fill(''));
+
+    const sY = (c: number) => {
+      if (c <= 2) return 5;
+      if (c >= 23) return 1;
+      return Math.round(5 - ((c - 2) / 21) * 4);
+    };
+
+    for (let c = 0; c < W; c++) {
+      const r = sY(c);
+      if (r >= 0 && r < H) {
+        grid[r][c] = c >= 23 ? '═' : '/';
+        cls[r][c] = 'as-ridge';
+      }
+      for (let br = r + 1; br < H; br++) {
+        grid[br][c] = (br + c) % 2 === 0 ? '▒' : '░';
+        cls[br][c] = 'as-earth';
+      }
+    }
+
+    // 峰顶路标
+    grid[0][25] = '^';
+    cls[0][25] = 'as-fire';
+
+    const bCol = Math.max(4, Math.min(23, Math.round(4 + progress * 19)));
+    const bRow = Math.max(0, sY(bCol) - 1);
+    const rockFrames = ['@', 'O', '0', '*'];
+    grid[bRow][bCol] = rockFrames[bCol % rockFrames.length];
+    cls[bRow][bCol] = 'as-rock';
+
+    const sCol = Math.max(2, bCol - 2);
+    const sRow = Math.max(0, sY(sCol) - 1);
+    if (atSummit) {
+      grid[sRow][sCol] = '\\';
+      grid[sRow][sCol + 1] = 'o';
+      cls[sRow][sCol] = 'as-hero';
+      cls[sRow][sCol + 1] = 'as-hero';
+    } else {
+      grid[sRow][sCol] = 'o';
+      grid[sRow][sCol + 1] = '_';
+      cls[sRow][sCol] = 'as-hero';
+      cls[sRow][sCol + 1] = 'as-hero';
+    }
+
+    const lines = grid.map((row, r) =>
+      row
+        .map((ch, c) => (cls[r][c] ? `<span class="${cls[r][c]}">${ch}</span>` : ch))
+        .join(''),
+    );
+    miniSlopeEl.innerHTML = lines.join('\n');
+  };
+
   const updateAscent = () => {
     const docHeight = document.documentElement.scrollHeight - window.innerHeight;
     const raw = docHeight > 20 ? window.scrollY / docHeight : 1;
     const clamped = Math.max(0, Math.min(1, raw));
     const pct = Math.round(clamped * 100);
     const filled = Math.round(clamped * 10);
+    const atSummit = pct >= 95;
 
     if (pctEl) pctEl.textContent = `${String(pct).padStart(3, '0')}%`;
     if (barEl) barEl.textContent = `[${'▪'.repeat(filled)}${'▫'.repeat(10 - filled)}]`;
-    if (statusEl) {
-      statusEl.textContent =
-        pct >= 96 ? 'STATUS: ✓ SUMMIT REACHED' : `ALTITUDE: ${Math.round(clamped * 884)}m`;
+
+    if (atSummit) {
+      grantReadingBoost();
+    }
+    if (rewardBadgeEl) {
+      rewardBadgeEl.textContent = summitRewarded ? '[+35m 助推 ✓]' : '';
     }
 
+    let currentTitle = '山麓起点';
     if (headingEls.length > 0) {
       let currentSlug = headingEls[0].id;
       for (const h of headingEls) {
-        if (h.getBoundingClientRect().top <= 130) {
+        if (h.getBoundingClientRect().top <= 145) {
           currentSlug = h.id;
         }
       }
       tocLinks.forEach((link) => {
-        link.classList.toggle('is-current', link.dataset.slug === currentSlug);
+        const match = link.dataset.slug === currentSlug;
+        link.classList.toggle('is-current', match);
+        if (match && link.dataset.title) {
+          currentTitle = link.dataset.title;
+        }
       });
     }
+
+    if (statusTextEl) {
+      statusTextEl.textContent = atSummit
+        ? '✓ 已登顶完读'
+        : `⚑ ${currentTitle.slice(0, 12)}${currentTitle.length > 12 ? '…' : ''}`;
+    }
+
+    renderMiniClimber(clamped, atSummit);
   };
 
   updateAscent();

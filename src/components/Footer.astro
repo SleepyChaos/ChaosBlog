@@ -1,5 +1,5 @@
 ---
-import { SITE_AUTHOR, SITE_SUB_AUTHOR, GITHUB_URL, CAMUS_QUOTE } from '../consts';
+import { SITE_AUTHOR, SITE_SUB_AUTHOR, GITHUB_URL } from '../consts';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const year = new Date().getFullYear();
@@ -8,16 +8,81 @@ const year = new Date().getFullYear();
 <footer class="site-footer">
   <div class="container-wide">
     <div class="site-footer-inner">
-      <span>
-        [EOF] © {year} {SITE_AUTHOR} ({SITE_SUB_AUTHOR}) · "{CAMUS_QUOTE}"
-      </span>
-      <span>
+      <div style="display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;">
+        <span
+          id="footer-mode-pill"
+          style="padding: 0.1rem 0.45rem; background: var(--accent); color: var(--accent-fg); font-weight: 700; border-radius: 1px;"
+        >
+          NORMAL
+        </span>
+        <span id="footer-world-pill" style="color: var(--accent); font-weight: 700;">
+          ◉ 2001·太空漫游
+        </span>
+        <span>│</span>
+        <button
+          type="button"
+          class="term-btn"
+          id="footer-sfx-btn"
+          style="padding: 0.08rem 0.45rem; font-size: 0.72rem;"
+          title="开启后，鼠标扫过悬浮导航 ASCII 边框可弹奏五声音阶竖琴泛音，切换世界与助推也有合成器音效"
+        >
+          [♪ 拨弦音效: OFF]
+        </button>
+      </div>
+
+      <div
+        style="color: var(--text-muted); font-size: 0.72rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;"
+      >
+        <span>⌨ 快捷键: <strong>/</strong> 终端 · <strong>j/k</strong> 选文 · <strong>t</strong> 跃迁世界 · <strong>p</strong> 助推</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+        <span>© {year} {SITE_AUTHOR} ({SITE_SUB_AUTHOR})</span>
+        <span>·</span>
         <a href={`${base}/rss.xml`}>[RSS]</a>
-        ·
+        <span>·</span>
         <a href={GITHUB_URL} target="_blank" rel="noopener">[GitHub]</a>
-        ·
-        <a href="https://astro.build" target="_blank" rel="noopener">[Astro]</a>
-      </span>
+      </div>
     </div>
   </div>
 </footer>
+
+<script>
+  const worldPill = document.getElementById('footer-world-pill');
+  const sfxBtn = document.getElementById('footer-sfx-btn');
+
+  const WORLD_LABELS: Record<string, string> = {
+    void: '◉ 2001·太空漫游',
+    paper: 'Ψ 银河帝国·基地',
+    crt: '▓ 黑客帝国·母体',
+    amber: '◐ 沙丘·厄拉科斯',
+  };
+
+  const syncWorldPill = () => {
+    const r = document.documentElement.dataset.realm || 'void';
+    if (worldPill) {
+      worldPill.textContent = WORLD_LABELS[r] || WORLD_LABELS.void;
+    }
+  };
+  syncWorldPill();
+  window.addEventListener('sisyphus:realmchange', syncWorldPill);
+
+  const syncSfxLabel = (on: boolean) => {
+    if (!sfxBtn) return;
+    sfxBtn.textContent = on ? '[♪ 拨弦音效: ON]' : '[♪ 拨弦音效: OFF]';
+    sfxBtn.classList.toggle('is-primary', on);
+  };
+
+  try {
+    syncSfxLabel(localStorage.getItem('sisyphus_sfx') === '1');
+  } catch {}
+
+  sfxBtn?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('sisyphus:toggle-sfx'));
+  });
+
+  window.addEventListener('sisyphus:sfxchange', (e: Event) => {
+    const on = Boolean((e as CustomEvent<{ enabled?: boolean }>).detail?.enabled);
+    syncSfxLabel(on);
+  });
+</script>
