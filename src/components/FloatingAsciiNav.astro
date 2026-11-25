@@ -1,4 +1,7 @@
 ---
+import { getAllPosts, formatDateShort } from '../lib/content';
+import { GITHUB_URL } from '../consts';
+
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const pathname = Astro.url.pathname;
 const relPath = pathname.startsWith(base) ? pathname.slice(base.length) || '/' : pathname;
@@ -14,6 +17,21 @@ const navItems = [
   { label: '#标签', href: `${base}/tags/`, active: isTags },
   { label: '?关于', href: `${base}/about/`, active: isAbout },
 ];
+
+// 构建期生成轻量全站检索索引（支持标题、标签、摘要与正文关键词秒级 grep）
+const posts = await getAllPosts();
+const searchIndex = posts.map((p) => ({
+  title: p.title,
+  url: `${base}/posts/${p.slug}/`,
+  date: formatDateShort(p.pubDate),
+  tags: p.tags,
+  desc: p.description || '',
+  body: p.body
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[#>*`\[\]()_~|-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .slice(0, 600),
+}));
 ---
 
 <canvas id="fx-pixel-canvas" aria-hidden="true"></canvas>
@@ -23,9 +41,9 @@ const navItems = [
   id="ascii-float-nav"
   class="ascii-float-nav"
   aria-label="浮动 ASCII 终端导航"
-  style="width: 144px; height: 68px; visibility: hidden;"
+  style="width: 150px; height: 72px; visibility: hidden;"
 >
-  <!-- 内部缩小一圈的雾面毛玻璃芯（带次级弹簧滞后，形成三层物理视差） -->
+  <!-- 内部高透模糊毛玻璃芯（带次级弹簧滞后） -->
   <div
     id="ascii-inner-frost"
     class="ascii-inner-frost"
@@ -33,9 +51,10 @@ const navItems = [
   >
   </div>
 
-  <!-- 外圈耦合弹簧质量惯性 ASCII 边界 + 侧边武器架机械挂钩画布 -->
+  <!-- 外圈耦合弹簧质量惯性 ASCII 边界 + 武器架机械挂钩画布 -->
   <canvas id="ascii-border-canvas" class="ascii-border-canvas" aria-hidden="true"></canvas>
 
+  <!-- 4 个核心路由按钮（悬浮态保留这 4 个且内部每个字符随失重浮动，吸附后字符定格！） -->
   {
     navItems.map((item, idx) => (
       <a
@@ -44,44 +63,156 @@ const navItems = [
         data-idx={idx}
         class:list={['ascii-nav-item', { 'is-active': item.active }]}
       >
-        {item.label}
+        {[...item.label].map((ch, cIdx) => (
+          <span class="ascii-char-span" data-bidx={idx} data-cidx={cIdx}>
+            {ch}
+          </span>
+        ))}
       </a>
     ))
   }
+
+  <!-- 吸附固定后展开的扩展终端控制台：输入检索终端 + 弹射 + 换色 + 明暗 + GitHub -->
+  <div id="hud-dock-extras" class="hud-dock-extras" aria-hidden="true">
+    <label class="hud-search-shell" id="hud-search-shell" aria-label="终端搜索文章">
+      <span class="hud-search-prompt">&gt;_</span>
+      <input
+        id="hud-search-input"
+        class="hud-search-input"
+        type="text"
+        placeholder="grep 搜索文章/标签..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </label>
+
+    <button
+      type="button"
+      id="hud-btn-eject"
+      class="hud-util-btn is-eject"
+      title="脱离挂架高速弹射"
+    >
+      [⚡弹射]
+    </button>
+    <button
+      type="button"
+      id="hud-btn-palette"
+      class="hud-util-btn"
+      title="切换全站终端强调色（靛紫 / 磷光绿 / 琥珀橙 / 冰川青）"
+    >
+      [◈换色]
+    </button>
+    <button
+      type="button"
+      id="hud-btn-theme"
+      class="hud-util-btn"
+      title="切换明暗背景主题"
+    >
+      [◐明暗]
+    </button>
+    <a
+      href={GITHUB_URL}
+      target="_blank"
+      rel="noopener"
+      draggable="false"
+      id="hud-btn-github"
+      class="hud-util-btn"
+      title="访问 Sisyphus 的 GitHub 主页"
+    >
+      [@GH↗]
+    </a>
+  </div>
 </nav>
 
+<!-- 终端检索实时下拉结果框 -->
+<div id="hud-search-dropdown" class="hud-search-dropdown" role="listbox" aria-label="文章搜索结果">
+</div>
+
+<script
+  type="application/json"
+  id="hud-search-index-data"
+  set:html={JSON.stringify(searchIndex).replace(/</g, '\\u003c')}
+/>
+
 <script>
-  const STORAGE_KEY = 'sisyphus_ascii_hud_v4';
-  // 留出 76px 画布边距，容纳大幅拖拽惯性甩摆、气动尾流及侧边武器架悬臂挂钩
+  const STORAGE_KEY = 'sisyphus_ascii_hud_v5';
+  const PALETTES = ['indigo', 'emerald', 'amber', 'cyan'] as const;
   const BORDER_PAD = 76;
+
+  interface PostIndexItem {
+    title: string;
+    url: string;
+    date: string;
+    tags: string[];
+    desc: string;
+    body: string;
+  }
 
   const nav = document.getElementById('ascii-float-nav') as HTMLElement | null;
   const innerFrost = document.getElementById('ascii-inner-frost') as HTMLElement | null;
   const borderCanvas = document.getElementById('ascii-border-canvas') as HTMLCanvasElement | null;
   const ruler = document.getElementById('pixel-dock-ruler') as HTMLElement | null;
   const fxCanvas = document.getElementById('fx-pixel-canvas') as HTMLCanvasElement | null;
+  const dockExtras = document.getElementById('hud-dock-extras') as HTMLElement | null;
+  const searchShell = document.getElementById('hud-search-shell') as HTMLElement | null;
+  const searchInput = document.getElementById('hud-search-input') as HTMLInputElement | null;
+  const searchDropdown = document.getElementById('hud-search-dropdown') as HTMLElement | null;
+  const btnEject = document.getElementById('hud-btn-eject') as HTMLButtonElement | null;
+  const btnPalette = document.getElementById('hud-btn-palette') as HTMLButtonElement | null;
+  const btnTheme = document.getElementById('hud-btn-theme') as HTMLButtonElement | null;
+  const btnGithub = document.getElementById('hud-btn-github') as HTMLAnchorElement | null;
   const links = Array.from(
     document.querySelectorAll<HTMLAnchorElement>('#ascii-float-nav .ascii-nav-item'),
   );
+  const charSpans = Array.from(
+    document.querySelectorAll<HTMLSpanElement>('#ascii-float-nav .ascii-char-span'),
+  ).map((el) => ({
+    el,
+    bIdx: Number(el.dataset.bidx || '0'),
+    cIdx: Number(el.dataset.cidx || '0'),
+  }));
 
-  if (nav && innerFrost && borderCanvas && ruler && fxCanvas) {
+  let postsData: PostIndexItem[] = [];
+  try {
+    const rawJson = document.getElementById('hud-search-index-data')?.textContent;
+    if (rawJson) postsData = JSON.parse(rawJson);
+  } catch {
+    postsData = [];
+  }
+
+  if (
+    nav &&
+    innerFrost &&
+    borderCanvas &&
+    ruler &&
+    fxCanvas &&
+    dockExtras &&
+    searchShell &&
+    searchInput &&
+    searchDropdown &&
+    btnEject &&
+    btnPalette &&
+    btnTheme &&
+    btnGithub
+  ) {
     const fxCtx = fxCanvas.getContext('2d');
     const bCtx = borderCanvas.getContext('2d');
 
     let accentColor = '#818cf8';
-    let mutedColor = '#888fa3';
-    let textColor = '#e5e7f0';
+    let mutedColor = '#8e96ab';
     let borderColor = '#394059';
     let monoFont = '600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
     const syncThemePalette = () => {
       const cs = getComputedStyle(document.documentElement);
       accentColor = cs.getPropertyValue('--accent').trim() || '#818cf8';
-      mutedColor = cs.getPropertyValue('--text-muted').trim() || '#888fa3';
-      textColor = cs.getPropertyValue('--text').trim() || '#e5e7f0';
+      mutedColor = cs.getPropertyValue('--text-muted').trim() || '#8e96ab';
       borderColor = cs.getPropertyValue('--border-strong').trim() || '#394059';
       const family = cs.getPropertyValue('--font-mono').trim() || 'monospace';
       monoFont = `600 11px ${family}`;
+
+      const isDark = document.documentElement.dataset.theme === 'dark';
+      btnTheme.textContent = isDark ? '[☀亮色]' : '[☾暗色]';
     };
     syncThemePalette();
     window.addEventListener('sisyphus:themechange', syncThemePalette);
@@ -137,46 +268,105 @@ const navItems = [
       }
     };
 
-    const SHAPES = {
-      block: {
-        w: 144,
-        h: 68,
-        inset: { l: 11, r: 11, t: 11, b: 11 },
-        coords: [
-          [-28, -8],
-          [28, -8],
-          [-28, 9],
-          [28, 9],
-        ],
-      },
-      bar: {
-        w: 268,
-        h: 34,
-        inset: { l: 20, r: 20, t: 6, b: 6 },
-        coords: [
-          [-74, 0],
-          [-25, 0],
-          [25, 0],
-          [74, 0],
-        ],
-      },
-      rail: {
-        w: 82,
-        h: 120,
-        inset: { l: 11, r: 11, t: 11, b: 11 },
-        coords: [
-          [0, -33],
-          [0, -11],
-          [0, 11],
-          [0, 33],
-        ],
-      },
-    } as const;
+    // 根据视口宽度动态计算三种形态的目标尺寸与各子控件坐标（悬浮态精简 4 按钮，吸附态展开完整搜索控制台！）
+    interface LayoutConfig {
+      w: number;
+      h: number;
+      inset: { l: number; r: number; t: number; b: number };
+      navCoords: [number, number][];
+      searchPos: { x: number; y: number; w: number };
+      utilCoords: [number, number][]; // [eject, palette, theme, github]
+    }
 
-    // 武器架悬臂挂钩离墙间隙（让侧边栏与顶底栏真正“挂”在支架钩上，而非糊在墙上！）
+    const getShapeLayout = (key: 'block' | 'bar' | 'rail', vw: number): LayoutConfig => {
+      if (key === 'block') {
+        return {
+          w: 150,
+          h: 72,
+          inset: { l: 11, r: 11, t: 11, b: 11 },
+          navCoords: [
+            [-30, -9],
+            [30, -9],
+            [-30, 10],
+            [30, 10],
+          ],
+          searchPos: { x: 0, y: 0, w: 90 },
+          utilCoords: [
+            [0, 0],
+            [0, 0],
+            [0, 0],
+            [0, 0],
+          ],
+        };
+      }
+
+      if (key === 'bar') {
+        // 窄屏紧凑双行控制台 vs 桌面端宽体单行终端栏
+        if (vw < 720) {
+          const w = Math.max(308, Math.min(vw - 16, 420));
+          return {
+            w,
+            h: 68,
+            inset: { l: 12, r: 12, t: 6, b: 6 },
+            navCoords: [
+              [-112, -13],
+              [-52, -13],
+              [6, -13],
+              [60, -13],
+            ],
+            searchPos: { x: -66, y: 13, w: 142 },
+            utilCoords: [
+              [118, -13],
+              [34, 13],
+              [84, 13],
+              [130, 13],
+            ],
+          };
+        }
+        return {
+          w: Math.min(vw - 28, 686),
+          h: 44,
+          inset: { l: 16, r: 16, t: 6, b: 6 },
+          navCoords: [
+            [-282, 0],
+            [-224, 0],
+            [-168, 0],
+            [-116, 0],
+          ],
+          searchPos: { x: 4, y: 0, w: 184 },
+          utilCoords: [
+            [132, 0],
+            [188, 0],
+            [244, 0],
+            [296, 0],
+          ],
+        };
+      }
+
+      // rail: 挂在左右侧边武器架上的竖向战术终端面板
+      return {
+        w: 188,
+        h: 226,
+        inset: { l: 11, r: 11, t: 11, b: 11 },
+        navCoords: [
+          [-38, -74],
+          [38, -74],
+          [-38, -45],
+          [38, -45],
+        ],
+        searchPos: { x: 0, y: -4, w: 152 },
+        utilCoords: [
+          [-38, 38],
+          [38, 38],
+          [-38, 68],
+          [38, 68],
+        ],
+      };
+    };
+
     const SIDE_RACK_GAP = 28;
     const BAR_RACK_GAP = 14;
-    const UNHOOK_PULL_DIST = 30; // 从挂钩上拽下来所需的挣脱拉伸距离
+    const UNHOOK_PULL_DIST = 30;
 
     const CAPTURE_SPEED = 3.8;
     const MAGNET_ZONE = 62;
@@ -196,17 +386,16 @@ const navItems = [
     let prevY = 160;
     let vx = -0.82;
     let vy = 0.56;
-    // 挂架上的微弹簧位置速度（挂入卡槽时的重力下沉与拨动晃动）
     let rackVelX = 0;
     let rackVelY = 0;
     let magnetImmunityUntil = 0;
 
-    // ========= 核心升级 1：28 节点耦合弹簧-质量惯性周界环（真实牛顿惯性甩动 + 弹性过冲 + 邻点横波传导） =========
-    const RING_COUNT = 28; // 每条边 7 个物理质点 (0..6 上, 7..13 右, 14..20 下, 21..27 左)
+    // 28 节点耦合弹簧-质量惯性周界环
+    const RING_COUNT = 28;
     interface RingMass {
-      ux: number; // 归一化周界位置 (-1..1)
+      ux: number;
       uy: number;
-      mass: number; // 边中段质量更大（晃动时产生真实悬链线弓形甩腹），角点更轻快
+      mass: number;
       dx: number;
       dy: number;
       vx: number;
@@ -214,7 +403,7 @@ const navItems = [
     }
     const ring: RingMass[] = Array.from({ length: RING_COUNT }, (_, idx) => {
       const side = Math.floor(idx / 7);
-      const frac = (idx % 7) / 7; // 0..6/7
+      const frac = (idx % 7) / 7;
       let ux = 0;
       let uy = 0;
       if (side === 0) {
@@ -230,7 +419,6 @@ const navItems = [
         ux = -1;
         uy = 1 - frac * 2;
       }
-      // 边中心质点质量 1.38，角点 0.86 -> 拖动晃动时四条边会产生明显的弧形甩尾与果冻回弹！
       const midness = Math.sin(frac * Math.PI);
       return {
         ux,
@@ -243,13 +431,11 @@ const navItems = [
       };
     });
 
-    // 内部毛玻璃核的次级惯性弹簧（比外圈 ASCII 稍硬，形成 按钮 -> 毛玻璃芯 -> 外框 三层物理视差）
     let coreDX = 0;
     let coreDY = 0;
     let coreVX = 0;
     let coreVY = 0;
 
-    // 采样周界任意归一化角度处的惯性偏移 (perimIdx: 0..RING_COUNT)
     const sampleRingDisp = (s: number): [number, number] => {
       const wrapped = ((s % RING_COUNT) + RING_COUNT) % RING_COUNT;
       const i0 = Math.floor(wrapped);
@@ -261,7 +447,6 @@ const navItems = [
       ];
     };
 
-    // 给整圈质点注入径向/方向性脉冲（用于撞墙冲击、挂钩脱扣回弹等）
     const impulseRing = (ix: number, iy: number, radialPush = 0) => {
       for (const m of ring) {
         m.vx += ix * m.mass + m.ux * radialPush;
@@ -281,16 +466,19 @@ const navItems = [
     let smoothPullW = 0;
     let lastPullEdge: EdgeSide | null = null;
     let smoothDockW = 0;
-    // 武器架挂钩展开进度 (0..1) 与当前归属墙面
     let rackDeploy = 0;
     let rackEdge: EdgeSide | null = null;
 
-    let curW: number = SHAPES.block.w;
-    let curH: number = SHAPES.block.h;
+    const initShape = getShapeLayout('block', 1200);
+    let curW = initShape.w;
+    let curH = initShape.h;
     let velW = 0;
     let velH = 0;
-    let curInset = { ...SHAPES.block.inset };
-    const itemSpring = SHAPES.block.coords.map(([ix, iy]) => ({ x: ix, y: iy, vx: 0, vy: 0 }));
+    let curInset = { ...initShape.inset };
+    const itemSpring = initShape.navCoords.map(([ix, iy]) => ({ x: ix, y: iy, vx: 0, vy: 0 }));
+    const searchSpring = { x: 0, y: 0, w: 120 };
+    const utilEls: HTMLElement[] = [btnEject, btnPalette, btnTheme, btnGithub];
+    const utilSpring = initShape.utilCoords.map(([ux, uy]) => ({ x: ux, y: uy }));
 
     const saveState = () => {
       if (!initialized || window.innerWidth < 160 || window.innerHeight < 140) return;
@@ -312,6 +500,206 @@ const navItems = [
     };
     window.addEventListener('pagehide', saveState);
 
+    // ========= 终端搜索逻辑（支持全文匹配、上下方向键选文章、回车跳转） =========
+    let dropdownOpen = false;
+    let matchedPosts: PostIndexItem[] = [];
+    let selectedIdx = 0;
+
+    const closeSearchDropdown = () => {
+      dropdownOpen = false;
+      searchDropdown.classList.remove('is-open');
+    };
+
+    const positionDropdown = () => {
+      if (!dropdownOpen) return;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const dropW = Math.min(vw * 0.9, 360);
+      searchDropdown.style.width = `${dropW}px`;
+
+      if (state === 'top') {
+        const left = Math.max(8, Math.min(vw - dropW - 8, x - dropW * 0.5));
+        searchDropdown.style.left = `${Math.round(left)}px`;
+        searchDropdown.style.top = `${Math.round(y + curH * 0.5 + 8)}px`;
+        searchDropdown.style.bottom = 'auto';
+      } else if (state === 'bottom') {
+        const left = Math.max(8, Math.min(vw - dropW - 8, x - dropW * 0.5));
+        searchDropdown.style.left = `${Math.round(left)}px`;
+        searchDropdown.style.top = 'auto';
+        searchDropdown.style.bottom = `${Math.round(vh - (y - curH * 0.5) + 8)}px`;
+      } else if (state === 'left') {
+        searchDropdown.style.left = `${Math.round(x + curW * 0.5 + 10)}px`;
+        searchDropdown.style.top = `${Math.max(12, Math.min(vh - 270, Math.round(y - 80)))}px`;
+        searchDropdown.style.bottom = 'auto';
+      } else if (state === 'right') {
+        searchDropdown.style.left = `${Math.max(8, Math.round(x - curW * 0.5 - dropW - 10))}px`;
+        searchDropdown.style.top = `${Math.max(12, Math.min(vh - 270, Math.round(y - 80)))}px`;
+        searchDropdown.style.bottom = 'auto';
+      }
+    };
+
+    const renderSearchResults = () => {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) {
+        matchedPosts = postsData.slice(0, 6);
+      } else {
+        const tokens = q.split(/\s+/).filter(Boolean);
+        matchedPosts = postsData
+          .map((item) => {
+            const titleL = item.title.toLowerCase();
+            const tagsL = item.tags.join(' ').toLowerCase();
+            const descL = item.desc.toLowerCase();
+            const bodyL = item.body.toLowerCase();
+            let score = 0;
+            for (const tk of tokens) {
+              let hit = 0;
+              if (titleL.includes(tk)) hit += 10;
+              if (tagsL.includes(tk)) hit += 7;
+              if (descL.includes(tk)) hit += 4;
+              if (bodyL.includes(tk)) hit += 2;
+              if (hit === 0) return { item, score: 0 };
+              score += hit;
+            }
+            return { item, score };
+          })
+          .filter((r) => r.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 8)
+          .map((r) => r.item);
+      }
+
+      if (selectedIdx >= matchedPosts.length) selectedIdx = 0;
+      const headText = q
+        ? `GREP "${q}" :: ${matchedPosts.length} MATCHES`
+        : `RECENT_POSTS :: ↑↓ 选择 / Enter 跳转`;
+
+      if (matchedPosts.length === 0) {
+        searchDropdown.innerHTML = `<div class="hud-search-head"><span>${headText}</span><span>[ESC]</span></div><div style="padding: 8px 6px; color: var(--text-muted);">0 matches found.</div>`;
+      } else {
+        const rows = matchedPosts
+          .map((p, idx) => {
+            const tagStr = p.tags.slice(0, 3).map((t) => `#${t}`).join(' ');
+            return `<a href="${p.url}" class="hud-search-item${idx === selectedIdx ? ' is-selected' : ''}" data-ridx="${idx}">
+              <div class="hud-search-item-title">
+                <span>${idx === matchedPosts.length - 1 ? '└─' : '├─'} ${p.title}</span>
+                <span style="color: var(--text-muted); font-weight: 400; flex-shrink: 0;">${p.date}</span>
+              </div>
+              <div class="hud-search-item-sub">${tagStr ? `[${tagStr}] ` : ''}${p.desc}</div>
+            </a>`;
+          })
+          .join('');
+        searchDropdown.innerHTML = `<div class="hud-search-head"><span>${headText}</span><span>[ESC]</span></div>${rows}`;
+      }
+
+      dropdownOpen = true;
+      searchDropdown.classList.add('is-open');
+      positionDropdown();
+    };
+
+    // 阻止搜索框与功能按钮冒泡触发拖拽
+    [searchShell, searchInput, btnEject, btnPalette, btnTheme, btnGithub].forEach((el) => {
+      el.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+      });
+    });
+
+    searchInput.addEventListener('focus', () => {
+      renderSearchResults();
+    });
+    searchInput.addEventListener('input', () => {
+      selectedIdx = 0;
+      renderSearchResults();
+    });
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (matchedPosts.length > 0) {
+          selectedIdx = (selectedIdx + 1) % matchedPosts.length;
+          renderSearchResults();
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (matchedPosts.length > 0) {
+          selectedIdx = (selectedIdx - 1 + matchedPosts.length) % matchedPosts.length;
+          renderSearchResults();
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (matchedPosts[selectedIdx]) {
+          saveState();
+          window.location.href = matchedPosts[selectedIdx].url;
+        }
+      } else if (e.key === 'Escape') {
+        searchInput.blur();
+        closeSearchDropdown();
+      }
+    });
+
+    document.addEventListener('pointerdown', (e) => {
+      const target = e.target as Node | null;
+      if (
+        dropdownOpen &&
+        target &&
+        !searchShell.contains(target) &&
+        !searchDropdown.contains(target)
+      ) {
+        closeSearchDropdown();
+      }
+    });
+
+    // 集成功能按钮 1：弹射脱离挂架
+    const launchBallistic = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      if (vw < 160) return;
+      closeSearchDropdown();
+      searchInput.blur();
+      if (state !== 'free' && state !== 'dragging') {
+        const [wx, wy] = wallVector(state);
+        spawnBurst(x, y, -wx, -wy, 12, 1.3);
+      }
+      state = 'free';
+      ambientOrbit = false;
+      if (x < 90 || x > vw - 90) x = vw * 0.5;
+      if (y < 70 || y > vh - 70) y = vh * 0.45;
+      const ang = (Math.random() * 0.5 + 0.22) * Math.PI * (Math.random() < 0.5 ? 1 : -1);
+      const power = 18 + Math.random() * 6;
+      vx = Math.cos(ang) * power;
+      vy = Math.sin(ang) * power;
+      impulseRing(-vx * 0.65, -vy * 0.65, 3.0);
+      magnetImmunityUntil = performance.now() + 260;
+      saveState();
+    };
+
+    btnEject.addEventListener('click', launchBallistic);
+
+    // 集成功能按钮 2：循环切换终端强调色配色方案
+    btnPalette.addEventListener('click', () => {
+      const root = document.documentElement;
+      const cur = (root.dataset.palette || 'indigo') as (typeof PALETTES)[number];
+      const next = PALETTES[(PALETTES.indexOf(cur) + 1) % PALETTES.length];
+      if (next === 'indigo') {
+        delete root.dataset.palette;
+      } else {
+        root.dataset.palette = next;
+      }
+      localStorage.setItem('accent_palette', next);
+      syncThemePalette();
+      spawnBurst(x, y, 0, -1, 8, 0.9);
+      window.dispatchEvent(new CustomEvent('sisyphus:themechange', { detail: { palette: next } }));
+    });
+
+    // 集成功能按钮 3：切换明暗背景主题
+    btnTheme.addEventListener('click', () => {
+      const root = document.documentElement;
+      const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+      root.dataset.theme = next;
+      localStorage.setItem('theme', next);
+      syncThemePalette();
+      window.dispatchEvent(new CustomEvent('sisyphus:themechange', { detail: { theme: next } }));
+    });
+
+    // ========= 边界画布与物理工具 =========
     let lastCanvasW = 0;
     let lastCanvasH = 0;
     const syncBorderCanvasSize = (w: number, h: number) => {
@@ -395,7 +783,7 @@ const navItems = [
       ruler.style.opacity = Math.min(0.95, 0.3 + strength * 0.7).toFixed(2);
       if (edge === 'top' || edge === 'bottom') {
         ruler.classList.remove('is-vert');
-        const span = Math.round((120 + strength * 100) / 6) * 6;
+        const span = Math.round((160 + strength * 180) / 6) * 6;
         const left = Math.max(8, Math.min(vw - span - 8, Math.round((cx - span * 0.5) / 2) * 2));
         ruler.style.width = `${span}px`;
         ruler.style.height = '3px';
@@ -403,7 +791,7 @@ const navItems = [
         ruler.style.top = edge === 'top' ? '1px' : `${vh - 4}px`;
       } else {
         ruler.classList.add('is-vert');
-        const vSpan = Math.round((64 + strength * 52) / 6) * 6;
+        const vSpan = Math.round((90 + strength * 90) / 6) * 6;
         const top = Math.max(8, Math.min(vh - vSpan - 8, Math.round((cy - vSpan * 0.5) / 2) * 2));
         ruler.style.width = '3px';
         ruler.style.height = `${vSpan}px`;
@@ -417,7 +805,6 @@ const navItems = [
       impactNY = ny;
       impactW = Math.min(1, Math.max(0.5, speed / 13));
       impactStart = now;
-      // 撞墙瞬间给惯性环注入强烈的反冲震荡脉冲！
       impulseRing(nx * Math.min(9, speed * 0.55), ny * Math.min(9, speed * 0.55), 3.2);
     };
 
@@ -430,57 +817,45 @@ const navItems = [
       rackEdge = edge;
       lastPullEdge = edge;
 
+      const targetBar = getShapeLayout('bar', vw);
+      const targetRail = getShapeLayout('rail', vw);
+
       if (edge === 'top' || edge === 'bottom') {
-        velW += 7.5;
+        velW += 9;
         velH -= 3.5;
-        x = Math.max(SHAPES.bar.w * 0.5 + 12, Math.min(vw - SHAPES.bar.w * 0.5 - 12, x));
-        // 挂入顶/底吊钩时的微冲击振动
+        x = Math.max(targetBar.w * 0.5 + 12, Math.min(vw - targetBar.w * 0.5 - 12, x));
         rackVelY = edge === 'top' ? 2.6 : -2.6;
         impulseRing(0, edge === 'top' ? 3.5 : -3.5, 1.8);
-        spawnBurst(x - 76, edge === 'top' ? 6 : vh - 6, 0, edge === 'top' ? 1 : -1, 5, 0.8);
-        spawnBurst(x + 76, edge === 'top' ? 6 : vh - 6, 0, edge === 'top' ? 1 : -1, 5, 0.8);
+        spawnBurst(x - 120, edge === 'top' ? 6 : vh - 6, 0, edge === 'top' ? 1 : -1, 5, 0.8);
+        spawnBurst(x + 120, edge === 'top' ? 6 : vh - 6, 0, edge === 'top' ? 1 : -1, 5, 0.8);
       } else {
-        velW -= 3.5;
-        velH += 7.5;
-        y = Math.max(SHAPES.rail.h * 0.5 + 16, Math.min(vh - SHAPES.rail.h * 0.5 - 16, y));
-        // 挂上侧边武器架时产生“咔哒”重力下沉落锁回弹感！
+        velW += 4;
+        velH += 8;
+        y = Math.max(targetRail.h * 0.5 + 16, Math.min(vh - targetRail.h * 0.5 - 16, y));
         rackVelY = 3.8;
         rackVelX = edge === 'left' ? 2.2 : -2.2;
         impulseRing(edge === 'left' ? 3.2 : -3.2, 4.2, 1.6);
         const wallX = edge === 'left' ? 6 : vw - 6;
         const dirX = edge === 'left' ? 1 : -1;
-        spawnBurst(wallX, y - 34, dirX, 0, 6, 0.85);
-        spawnBurst(wallX, y + 34, dirX, 0, 6, 0.85);
+        spawnBurst(wallX, y - 55, dirX, 0, 6, 0.85);
+        spawnBurst(wallX, y + 55, dirX, 0, 6, 0.85);
       }
       void now;
       saveState();
       window.dispatchEvent(new CustomEvent('sisyphus:hud-state', { detail: { state: edge } }));
     };
 
-    window.addEventListener('sisyphus:hud-kick', () => {
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      if (vw < 160) return;
-      state = 'free';
-      ambientOrbit = false;
-      if (x < 80 || x > vw - 80) x = vw * 0.5;
-      if (y < 60 || y > vh - 60) y = vh * 0.45;
-      const ang = (Math.random() * 0.5 + 0.22) * Math.PI * (Math.random() < 0.5 ? 1 : -1);
-      const power = 18 + Math.random() * 6;
-      vx = Math.cos(ang) * power;
-      vy = Math.sin(ang) * power;
-      impulseRing(-vx * 0.65, -vy * 0.65, 2.5);
-      magnetImmunityUntil = performance.now() + 220;
-    });
+    window.addEventListener('sisyphus:hud-kick', launchBallistic);
 
     window.addEventListener('sisyphus:hud-toggle-dock', () => {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       if (vw < 160) return;
       const now = performance.now();
+      closeSearchDropdown();
       if (state === 'free') {
-        y = Math.max(140, Math.min(vh - 140, y));
-        lockDock('left', vw, vh, now);
+        x = vw * 0.5;
+        lockDock('top', vw, vh, now);
       } else {
         state = 'free';
         ambientOrbit = true;
@@ -495,7 +870,7 @@ const navItems = [
       }
     });
 
-    // 指针拖拽、偏心抓握力矩与挂钩阻尼挣脱逻辑
+    // 指针拖拽与挂钩阻尼挣脱
     let pointerId: number | null = null;
     let startPX = 0;
     let startPY = 0;
@@ -534,6 +909,8 @@ const navItems = [
       if (!moved && Math.hypot(e.clientX - startPX, e.clientY - startPY) > 4) {
         moved = true;
         ambientOrbit = false;
+        closeSearchDropdown();
+        searchInput.blur();
         nav.setPointerCapture(e.pointerId);
         if (!grabbedFromDock) {
           state = 'dragging';
@@ -557,7 +934,6 @@ const navItems = [
       const rawTargetX = e.clientX - grabOffsetX;
       const rawTargetY = e.clientY - grabOffsetY;
 
-      // 若正挂在武器架钩上：未拉过 UNHOOK_PULL_DIST (30px) 时挂钩弹簧拉住终端，超过瞬间“咔哒”脱钩弹开！
       if (grabbedFromDock) {
         const pullDX = rawTargetX - dockBaseX;
         const pullDY = rawTargetY - dockBaseY;
@@ -571,7 +947,6 @@ const navItems = [
                 : -pullDY;
 
         if (outwardPull < UNHOOK_PULL_DIST) {
-          // 挂在钩子上受阻尼拉伸（可沿导轨滑动，向外拉有机械弹簧张力！）
           if (grabbedFromDock === 'left' || grabbedFromDock === 'right') {
             x = dockBaseX + pullDX * 0.42;
             y = Math.max(hh + 16, Math.min(vh - hh - 16, rawTargetY));
@@ -583,7 +958,6 @@ const navItems = [
           }
           return;
         } else {
-          // 挣脱武器架卡扣！迸发脱扣像素火花 + 弹性后坐力甩动周界框线！
           const [wx, wy] = wallVector(grabbedFromDock);
           const pinX =
             grabbedFromDock === 'left'
@@ -626,7 +1000,6 @@ const navItems = [
       const now = performance.now();
       suppressClickUntil = now + 180;
 
-      // 如果还没拽脱武器架就松手：回弹落锁回挂钩上并震颤一下！
       if (grabbedFromDock) {
         rackVelX = (dockBaseX - x) * 0.45;
         rackVelY = 2.4;
@@ -694,7 +1067,6 @@ const navItems = [
       }
     };
 
-    // ========= 核心升级 2：绘制武器架 / 战术机械挂钩连接件（连接页面边界与悬浮终端框线） =========
     const drawPixelLine = (
       ctx: CanvasRenderingContext2D,
       x0: number,
@@ -731,17 +1103,14 @@ const navItems = [
 
       if (edge === 'left' || edge === 'right') {
         const isLeft = edge === 'left';
-        const sign = isLeft ? 1 : -1; // 从墙指向终端的方向 (+1 向右, -1 向左)
-        // 页面真实边界在当前局部画布中的 X 坐标
+        const sign = isLeft ? 1 : -1;
         const wallX = isLeft ? ox - x : ox + (vw - x);
-        // 挂钩伸出前端位置（随 deploy 0->1 从墙边滑出并扣住终端侧边框）
         const [midLDX] = sampleRingDisp(isLeft ? 24.5 : 10.5);
         const targetLugX = ox + (isLeft ? -rx : rx) + midLDX * 0.5;
         const span = Math.abs(targetLugX - wallX);
         const reachX = wallX + sign * span * deploy;
         const isStretched = span > SIDE_RACK_GAP + 7;
 
-        // 1) 贴合页面边界的战术皮卡汀尼导轨底座 (Wall Slotted Track)
         const trackTop = oy - ry - 8;
         const trackBot = oy + ry + 8;
         bCtx.fillStyle = borderColor;
@@ -749,21 +1118,18 @@ const navItems = [
         const spineX = isLeft ? Math.round(wallX) : Math.round(wallX - 3);
         bCtx.fillRect(spineX, Math.round(trackTop), 3, Math.round(trackBot - trackTop));
 
-        // 导轨齿槽刻度
         bCtx.fillStyle = mutedColor;
         for (let ty = trackTop + 6; ty <= trackBot - 6; ty += 8) {
           const toothX = isLeft ? spineX + 3 : spineX - 3;
           bCtx.fillRect(toothX, Math.round(ty), 3, 2);
         }
 
-        // 导轨上下端锚固铆钉
         bCtx.fillStyle = accentColor;
         const flangeX = isLeft ? spineX : spineX - 2;
         bCtx.fillRect(flangeX, Math.round(trackTop - 2), 5, 4);
         bCtx.fillRect(flangeX, Math.round(trackBot - 2), 5, 4);
 
-        // 2) 上下双层承重武器挂架悬臂 (Upper & Lower Cantilever Weapon-Rack Hooks)
-        const armOffsets = [-ry * 0.54, ry * 0.54];
+        const armOffsets = [-ry * 0.56, ry * 0.56];
         armOffsets.forEach((offY, armIdx) => {
           const sampleIdx = isLeft ? (armIdx === 0 ? 26 : 23) : armIdx === 0 ? 8.5 : 12;
           const [, lugDY] = sampleRingDisp(sampleIdx);
@@ -772,30 +1138,24 @@ const navItems = [
           const jointX = Math.round(wallX + (reachX - wallX) * 0.62);
           const jointY = Math.round(wallArmY + (lugY - wallArmY) * 0.62);
 
-          // a. 45° 三角斜撑桁架杆（从墙轨下方支撑到悬臂中段，典型重型武器挂架结构！）
           bCtx.fillStyle = mutedColor;
-          bCtx.globalAlpha = 0.72 * deploy;
-          drawPixelLine(bCtx, wallX + sign * 3, wallArmY + 14, jointX, jointY + 2, 2);
+          bCtx.globalAlpha = 0.75 * deploy;
+          drawPixelLine(bCtx, wallX + sign * 3, wallArmY + 15, jointX, jointY + 2, 2);
 
-          // b. 主水平液压/弹簧承重横梁（被向外拉拽时显现弹簧虚线张力节，正常挂靠时为实心钢梁）
           bCtx.fillStyle = accentColor;
-          bCtx.globalAlpha = 0.92 * deploy;
+          bCtx.globalAlpha = 0.94 * deploy;
           drawPixelLine(bCtx, wallX + sign * 2, wallArmY, reachX - sign * 4, lugY, isStretched ? 5 : 2);
 
-          // c. 墙面法兰底座字符与前端 U 型武器托钩卡爪 (J-Hook Cradle + Lock Pin)
           bCtx.fillStyle = accentColor;
           bCtx.globalAlpha = deploy;
           bCtx.fillText(isLeft ? '╠' : '╣', Math.round(wallX + sign * 5), wallArmY);
 
-          // 前端向上弯折托住终端挂耳的 U 型钩爪 + 锁销像素点
           const hookX = Math.round(reachX - sign * 2);
           bCtx.fillText(isLeft ? '╚' : '╝', hookX - sign * 3, lugY + 4);
           bCtx.fillText(isLeft ? '╡' : '╞', hookX, lugY);
-          // 高亮锁止销钉
           bCtx.fillRect(hookX - 1, lugY - 5, 3, 3);
         });
       } else {
-        // 顶部 / 底部双吊架挂钩 (Overhead / Underslung Gantry Clamps)
         const isTop = edge === 'top';
         const sign = isTop ? 1 : -1;
         const wallY = isTop ? oy - y : oy + (vh - y);
@@ -805,7 +1165,6 @@ const navItems = [
         const reachY = wallY + sign * span * deploy;
         const isStretched = span > BAR_RACK_GAP + 6;
 
-        // 贴边横轨
         const trackL = ox - rx * 0.78;
         const trackR = ox + rx * 0.78;
         bCtx.fillStyle = borderColor;
@@ -813,28 +1172,25 @@ const navItems = [
         const spineY = isTop ? Math.round(wallY) : Math.round(wallY - 3);
         bCtx.fillRect(Math.round(trackL), spineY, Math.round(trackR - trackL), 3);
 
-        // 左右对称双吊钩 + 三角斜撑角码
-        const hangerOffsets = [-rx * 0.56, rx * 0.56];
+        const hangerOffsets = [-rx * 0.58, rx * 0.58];
         hangerOffsets.forEach((offX, hIdx) => {
           const [lugDX] = sampleRingDisp(isTop ? (hIdx === 0 ? 1.5 : 5.5) : hIdx === 0 ? 19.5 : 15.5);
           const wallHX = Math.round(ox + offX);
           const lugX = Math.round(ox + offX + lugDX * 0.5);
 
-          // 斜撑角码
           bCtx.fillStyle = mutedColor;
-          bCtx.globalAlpha = 0.7 * deploy;
+          bCtx.globalAlpha = 0.72 * deploy;
           drawPixelLine(
             bCtx,
-            wallHX + (hIdx === 0 ? -12 : 12),
+            wallHX + (hIdx === 0 ? -14 : 14),
             wallY + sign * 2,
             lugX,
             wallY + (reachY - wallY) * 0.68,
             2,
           );
 
-          // 垂直吊杆
           bCtx.fillStyle = accentColor;
-          bCtx.globalAlpha = 0.92 * deploy;
+          bCtx.globalAlpha = 0.94 * deploy;
           drawPixelLine(bCtx, wallHX, wallY + sign * 2, lugX, reachY - sign * 2, isStretched ? 4 : 2);
           bCtx.fillText(isTop ? '╦' : '╩', wallHX, Math.round(wallY + sign * 4));
           bCtx.fillText(isTop ? '╩' : '╦', lugX, Math.round(reachY - sign * 1));
@@ -844,7 +1200,6 @@ const navItems = [
       bCtx.restore();
     };
 
-    // ========= 核心升级 3：耦合惯性质量环驱动的动态浮动 ASCII 周界渲染 =========
     interface PerimNode {
       bx: number;
       by: number;
@@ -852,7 +1207,7 @@ const navItems = [
       ny: number;
       tx: number;
       ty: number;
-      ringPos: number; // 对应 0..28 惯性质量环的插值坐标
+      ringPos: number;
       glyph: string;
       phase: number;
       isCorner: boolean;
@@ -881,7 +1236,6 @@ const navItems = [
       const rx = w * 0.5 - 5;
       const ry = h * 0.5 - 5;
 
-      // 先绘制底层武器架机械连接挂钩
       if (rackEdge && rackDeploy > 0.03) {
         drawWeaponRackMounts(ox, oy, rx, ry, vw, vh, rackEdge, rackDeploy);
       }
@@ -890,7 +1244,7 @@ const navItems = [
       bCtx.textAlign = 'center';
       bCtx.textBaseline = 'middle';
 
-      const cols = Math.max(6, Math.round((rx * 2) / 7.0));
+      const cols = Math.max(6, Math.round((rx * 2) / 7.2));
       const rows = Math.max(2, Math.round((ry * 2) / 11.5));
 
       const topLabel =
@@ -901,7 +1255,7 @@ const navItems = [
             : smoothPullW > 0.3
               ? `::HOOK`
               : dockEdge
-                ? `[RACK]`
+                ? `[CONSOLE::DOCKED]`
                 : `::0G`;
       const botLabel = dockEdge ? '' : `${Math.round(x)},${Math.round(y)}`;
 
@@ -910,7 +1264,6 @@ const navItems = [
 
       const nodes: PerimNode[] = [];
 
-      // 4 个角点映射到 ring 索引 0, 7, 14, 21
       const corners: [number, number, number, number, number, string, string][] = [
         [-rx, -ry, -0.707, -0.707, 0, '┌', '╔'],
         [rx, -ry, 0.707, -0.707, 7, '┐', '╗'],
@@ -934,7 +1287,6 @@ const navItems = [
         });
       });
 
-      // 上边 (ring 0..7) 与 下边 (ring 21..14)
       for (let i = 1; i < cols; i++) {
         const u = i / cols;
         const px = -rx + u * (rx * 2);
@@ -976,7 +1328,6 @@ const navItems = [
         });
       }
 
-      // 左边 (ring 28->21) 与 右边 (ring 7->14)
       for (let j = 1; j < rows; j++) {
         const v = j / rows;
         const py = -ry + v * (ry * 2);
@@ -1018,10 +1369,9 @@ const navItems = [
       const impactAge = t - impactStart;
       const shockFront = 1 - (impactAge / 240) * 2.2;
 
-      // 0G 游离卫星微尘字符（同样叠加惯性环偏移，晃动时一起甩动！）
-      const satAlpha = (1 - smoothDockW) * (1 - sprintW * 0.7) * 0.45;
+      const satAlpha = (1 - smoothDockW) * (1 - sprintW * 0.7) * 0.5;
       if (satAlpha > 0.04) {
-        bCtx.fillStyle = mutedColor;
+        bCtx.fillStyle = accentColor;
         bCtx.globalAlpha = satAlpha;
         for (let s = 0; s < 4; s++) {
           const [sdx, sdy] = sampleRingDisp(s * 7 + 3.5);
@@ -1034,19 +1384,14 @@ const navItems = [
 
       for (let k = 0; k < nodes.length; k++) {
         const nd = nodes[k];
-        // 1. 读取该点在耦合弹簧-质量惯性环上的真实物理滞后与过冲位移！
         const [inerDX, inerDY] = sampleRingDisp(nd.ringPos);
         const labelDamp = nd.isLabel ? 0.62 : 1.0;
         let dx = inerDX * labelDamp;
         let dy = inerDY * labelDamp;
-
         let glyph = nd.glyph;
-        let useAccent = true;
 
-        // 当惯性形变剧烈时（大幅度拖动猛晃！），被拉扯一侧的字符自动呈现张力波纹 `~` / `═` / `¦`
         const localStrain = Math.hypot(inerDX, inerDY);
         if (localStrain > 6.5 && !nd.isLabel && !nd.isCorner) {
-          useAccent = localStrain > 11 ? true : useAccent;
           if (Math.abs(nd.ny) > 0.5) {
             glyph = localStrain > 12 ? '~' : '═';
           } else {
@@ -1054,9 +1399,8 @@ const navItems = [
           }
         }
 
-        // 2. 常态 0G 呼吸波
         const kissAlign = dockEdge ? nd.nx * dockWX + nd.ny * dockWY : -1;
-        const freeFactor = kissAlign > 0.4 ? 1 - smoothDockW * 0.78 : 1 - smoothDockW * 0.2;
+        const freeFactor = kissAlign > 0.4 ? 1 - smoothDockW * 0.85 : 1 - smoothDockW * 0.35;
         const floatAmp = (nd.isLabel ? 1.0 : 2.3) * freeFactor;
         const waveN =
           Math.sin(t * 0.0034 + nd.phase) * floatAmp +
@@ -1065,7 +1409,6 @@ const navItems = [
         dx += nd.nx * waveN + nd.tx * waveT;
         dy += nd.ny * waveN + nd.ty * waveT;
 
-        // 3. 贴边前磁吸牵引迎接触角
         if (smoothPullW > 0.04 && pullEdge) {
           const pullAlign = nd.nx * pullWX + nd.ny * pullWY;
           if (pullAlign > 0.35) {
@@ -1075,18 +1418,15 @@ const navItems = [
               (5.5 + Math.sin(t * 0.018 + nd.phase * 1.4) * 2.0);
             dx += pullWX * reach;
             dy += pullWY * reach;
-            useAccent = true;
           }
         }
 
-        // 4. 高速度冲刺气动变形与背风尾流残影
         if (sprintW > 0.04) {
           const motionAlign = nd.nx * dirUX + nd.ny * dirUY;
           if (motionAlign > 0.2) {
             const bowCompress = motionAlign * sprintW * 3.0;
             dx -= nd.nx * bowCompress;
             dy -= nd.ny * bowCompress;
-            useAccent = true;
             if (!nd.isLabel && !nd.isCorner && motionAlign > 0.65 && k % 2 === 0) {
               glyph =
                 Math.abs(dirUX) > Math.abs(dirUY)
@@ -1122,14 +1462,12 @@ const navItems = [
           }
         }
 
-        // 5. 撞墙反弹冲击波
         if (impactW > 0.03) {
           const hitAlign = -(nd.nx * impactNX + nd.ny * impactNY);
           if (hitAlign > 0.35) {
             const crush = hitAlign * impactW * 5.2;
             dx -= nd.nx * crush;
             dy -= nd.ny * crush;
-            useAccent = true;
             if (!nd.isLabel) {
               glyph = impactW > 0.55 ? '█' : '▓';
             }
@@ -1140,15 +1478,13 @@ const navItems = [
             dy += nd.ny * bulge;
           }
 
-          if (Math.abs(hitAlign - shockFront) < 0.34) {
-            useAccent = true;
-            if (!nd.isLabel && hitAlign <= 0.35) {
-              glyph = '+';
-            }
+          if (Math.abs(hitAlign - shockFront) < 0.34 && !nd.isLabel && hitAlign <= 0.35) {
+            glyph = '+';
           }
         }
 
-        bCtx.fillStyle = useAccent ? accentColor : mutedColor;
+        // 四边统一强调色（默认靛紫，支持 [◈换色] 一键联动变色）
+        bCtx.fillStyle = accentColor;
         bCtx.globalAlpha = nd.isLabel ? 0.96 : 0.92;
         bCtx.fillText(glyph, Math.round(ox + nd.bx + dx), Math.round(oy + nd.by + dy));
       }
@@ -1156,17 +1492,13 @@ const navItems = [
       bCtx.globalAlpha = 1;
     };
 
-    // 推进耦合弹簧-质量惯性环物理步（每帧根据真实位移差注入牛顿惯性与角力矩！）
     const stepInertialRing = (stepDX: number, stepDY: number, isDocked: boolean) => {
-      // 偏心拖拽产生的转动甩摆角冲量（抓着一头晃动时，另一头甩动幅度更大！）
       const torque =
         pointerId !== null
           ? Math.max(-0.22, Math.min(0.22, (grabOffsetX * stepDY - grabOffsetY * stepDX) * 0.0022))
           : 0;
 
-      // 1) 注入牛顿第一定律惯性滞后（核心动了 stepD，外框因质量留在原地 -> 局部偏移 -stepD）
       for (const m of ring) {
-        // 已挂在武器架的那一侧受挂钩约束略硬，自由侧保持灵动弹性
         let mountStiff = 1.0;
         if (isDocked && rackEdge) {
           const [wx, wy] = wallVector(rackEdge);
@@ -1174,12 +1506,10 @@ const navItems = [
         }
         m.dx -= stepDX * 0.76 * m.mass * mountStiff;
         m.dy -= stepDY * 0.76 * m.mass * mountStiff;
-        // 叠加角动量切向甩摆
         m.dx += -m.uy * torque * 24 * m.mass;
         m.dy += m.ux * torque * 24 * m.mass;
       }
 
-      // 2) 相邻质点张力拉普拉斯耦合（让局部受力沿整圈框线传递真实机械横波！）
       const coupleFX = new Float32Array(RING_COUNT);
       const coupleFY = new Float32Array(RING_COUNT);
       for (let i = 0; i < RING_COUNT; i++) {
@@ -1190,7 +1520,6 @@ const navItems = [
         coupleFY[i] = (prev.dy + next.dy - 2 * cur.dy) * 0.17;
       }
 
-      // 3) 胡克定律欠阻尼弹簧积分（k=0.17, damp=0.82 -> 停手瞬间清晰过冲回弹晃动 3~4 次！）
       const kSpring = 0.17;
       const damping = 0.82;
       const maxDisp = 26;
@@ -1212,7 +1541,6 @@ const navItems = [
         }
       }
 
-      // 4) 内部毛玻璃芯次级刚性弹簧（形成三层错位晃动感）
       coreDX -= stepDX * 0.34;
       coreDY -= stepDY * 0.34;
       coreVX = (coreVX - coreDX * 0.26) * 0.76;
@@ -1233,8 +1561,9 @@ const navItems = [
         initialized = true;
         state = vw < 640 ? 'top' : 'free';
         ambientOrbit = state === 'free';
+        const initBar = getShapeLayout('bar', vw);
         x = vw < 640 ? vw * 0.5 : vw * 0.72;
-        y = vw < 640 ? SHAPES.bar.h * 0.5 + BAR_RACK_GAP : Math.max(150, Math.min(260, vh * 0.3));
+        y = vw < 640 ? initBar.h * 0.5 + BAR_RACK_GAP : Math.max(150, Math.min(260, vh * 0.3));
 
         try {
           const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -1249,8 +1578,8 @@ const navItems = [
             ) {
               state = saved.state || state;
               ambientOrbit = Boolean(saved.ambientOrbit);
-              x = Math.max(76, Math.min(vw - 76, saved.xNorm * vw));
-              y = Math.max(20, Math.min(vh - 20, saved.yNorm * vh));
+              x = Math.max(80, Math.min(vw - 80, saved.xNorm * vw));
+              y = Math.max(24, Math.min(vh - 24, saved.yNorm * vh));
               vx = Number.isFinite(saved.vx) ? saved.vx : vx;
               vy = Number.isFinite(saved.vy) ? saved.vy : vy;
             }
@@ -1265,13 +1594,22 @@ const navItems = [
             : state === 'left' || state === 'right'
               ? 'rail'
               : 'block';
-        curW = SHAPES[k].w;
-        curH = SHAPES[k].h;
-        curInset = { ...SHAPES[k].inset };
-        SHAPES[k].coords.forEach(([ix, iy], idx) => {
+        const initCfg = getShapeLayout(k, vw);
+        curW = initCfg.w;
+        curH = initCfg.h;
+        curInset = { ...initCfg.inset };
+        initCfg.navCoords.forEach(([ix, iy], idx) => {
           itemSpring[idx].x = ix;
           itemSpring[idx].y = iy;
         });
+        searchSpring.x = initCfg.searchPos.x;
+        searchSpring.y = initCfg.searchPos.y;
+        searchSpring.w = initCfg.searchPos.w;
+        initCfg.utilCoords.forEach(([ux, uy], idx) => {
+          utilSpring[idx].x = ux;
+          utilSpring[idx].y = uy;
+        });
+
         if (state !== 'free') {
           rackEdge = state as EdgeSide;
           rackDeploy = 1;
@@ -1322,33 +1660,30 @@ const navItems = [
           pullStrength = 1 - Math.max(0, nw.dist) / MAGNET_ZONE;
           const accel = 0.16 + pullStrength * 0.44;
           const standOff = nw.edge === 'left' || nw.edge === 'right' ? SIDE_RACK_GAP : BAR_RACK_GAP;
+          const barHalf = getShapeLayout('bar', vw).w * 0.5 + 12;
+          const railHalf = getShapeLayout('rail', vw).h * 0.5 + 16;
 
           if (nw.edge === 'top') {
             vy -= accel;
             vx *= 0.9;
-            const safeHalf = SHAPES.bar.w * 0.5 + 12;
-            if (x < safeHalf) x += (safeHalf - x) * 0.2;
-            if (x > vw - safeHalf) x += (vw - safeHalf - x) * 0.2;
+            if (x < barHalf) x += (barHalf - x) * 0.2;
+            if (x > vw - barHalf) x += (vw - barHalf - x) * 0.2;
           } else if (nw.edge === 'bottom') {
             vy += accel;
             vx *= 0.9;
-            const safeHalf = SHAPES.bar.w * 0.5 + 12;
-            if (x < safeHalf) x += (safeHalf - x) * 0.2;
-            if (x > vw - safeHalf) x += (vw - safeHalf - x) * 0.2;
+            if (x < barHalf) x += (barHalf - x) * 0.2;
+            if (x > vw - barHalf) x += (vw - barHalf - x) * 0.2;
           } else if (nw.edge === 'left') {
             vx -= accel;
             vy *= 0.9;
-            const safeHalf = SHAPES.rail.h * 0.5 + 16;
-            if (y < safeHalf) y += (safeHalf - y) * 0.2;
-            if (y > vh - safeHalf) y += (vh - safeHalf - y) * 0.2;
+            if (y < railHalf) y += (railHalf - y) * 0.2;
+            if (y > vh - railHalf) y += (vh - railHalf - y) * 0.2;
           } else if (nw.edge === 'right') {
             vx += accel;
             vy *= 0.9;
-            const safeHalf = SHAPES.rail.h * 0.5 + 16;
-            if (y < safeHalf) y += (safeHalf - y) * 0.2;
-            if (y > vh - safeHalf) y += (vh - safeHalf - y) * 0.2;
+            if (y < railHalf) y += (railHalf - y) * 0.2;
+            if (y > vh - railHalf) y += (vh - railHalf - y) * 0.2;
           }
-          // 抵达武器架挂钩位置即挂入落锁！
           if (nw.dist <= standOff + 2) lockDock(nw.edge, vw, vh, t);
         } else {
           if (ambientOrbit) {
@@ -1445,7 +1780,6 @@ const navItems = [
         }
       } else {
         updateRuler(null, 0, x, y, vw, vh);
-        // 挂在武器架钩上的弹簧平衡（未按住拖拽时：带重力下沉回弹感稳稳挂在悬臂钩上！）
         if (!grabbedFromDock) {
           const [ax, ay] = dockedAnchorPos(state, x, y, hw, hh, vw, vh);
           rackVelX = (rackVelX + (ax - x) * 0.22) * 0.74;
@@ -1458,7 +1792,6 @@ const navItems = [
       const isDockedState =
         state === 'top' || state === 'bottom' || state === 'left' || state === 'right';
 
-      // 计算本帧真实位移差并驱动 28 节点惯性弹簧质量环（拖动晃动时的核心物理来源！）
       const stepDX = x - prevX;
       const stepDY = y - prevY;
       prevX = x;
@@ -1474,7 +1807,6 @@ const navItems = [
         dirUY /= dNorm;
       }
 
-      // 自由飞行才触发气动长拖尾；手动拖拽晃动主要展示真实的弹簧质量惯性甩摆！
       const targetSprint =
         state === 'dragging' ? 0 : Math.max(0, Math.min(1, (curSpeed - 2.2) / 8.5));
       sprintW += (targetSprint - sprintW) * 0.2;
@@ -1485,7 +1817,6 @@ const navItems = [
       smoothPullW += (pullStrength - smoothPullW) * 0.22;
       smoothDockW += ((isDockedState ? 1 : 0) - smoothDockW) * 0.2;
 
-      // 武器架伸出/收回过渡：靠近边缘预磁吸时提前伸出迎接，挂定后 100% 锁定，挣脱后缩回墙内
       if (isDockedState) {
         rackEdge = state;
         rackDeploy += (1 - rackDeploy) * 0.24;
@@ -1503,7 +1834,7 @@ const navItems = [
       let targetKey: 'block' | 'bar' | 'rail' = 'block';
       const activeEdge: EdgeSide | null = isDockedState
         ? state
-        : pullStrength > 0.35
+        : pullStrength > 0.45
           ? pullingEdge
           : null;
 
@@ -1513,7 +1844,7 @@ const navItems = [
         targetKey = 'rail';
       }
 
-      const target = SHAPES[targetKey];
+      const target = getShapeLayout(targetKey, vw);
       velW = (velW + (target.w - curW) * 0.18) * 0.72;
       velH = (velH + (target.h - curH) * 0.18) * 0.72;
       curW += velW;
@@ -1530,7 +1861,6 @@ const navItems = [
       innerFrost.style.top = `${curInset.t.toFixed(1)}px`;
       innerFrost.style.bottom = `${curInset.b.toFixed(1)}px`;
 
-      // 内部毛玻璃芯同时呈现次级惯性平移与弹性挤压
       const impactOsc = Math.cos((t - impactStart) * 0.04) * impactW * 0.08;
       const impactSquashX = Math.abs(impactNX) > 0.5 ? -impactOsc : impactOsc;
       const impactSquashY = Math.abs(impactNY) > 0.5 ? -impactOsc : impactOsc;
@@ -1540,7 +1870,8 @@ const navItems = [
       const sy = 1 - sprintStretchX + impactSquashY - breath;
       innerFrost.style.transform = `translate3d(${coreDX.toFixed(1)}px, ${coreDY.toFixed(1)}px, 0) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
 
-      target.coords.forEach(([tx, ty], i) => {
+      // 1) 更新 4 个核心导航按钮位置
+      target.navCoords.forEach(([tx, ty], i) => {
         const sp = itemSpring[i];
         sp.vx = (sp.vx + (tx - sp.x) * 0.2) * 0.74;
         sp.vy = (sp.vy + (ty - sp.y) * 0.2) * 0.74;
@@ -1550,6 +1881,45 @@ const navItems = [
           links[i].style.transform = `translate3d(calc(-50% + ${Math.round(sp.x)}px), calc(-50% + ${Math.round(sp.y)}px), 0)`;
         }
       });
+
+      // 2) 按钮内的文字逐字符失重微浮动（悬浮态灵动飘浮，吸附态自动平滑定格归零！）
+      const charFloatAmp = Math.max(0, 1 - smoothDockW * 1.15);
+      if (charFloatAmp > 0.02) {
+        for (const cs of charSpans) {
+          const phase = t * 0.0042 + cs.bIdx * 1.65 + cs.cIdx * 0.92;
+          const cx =
+            (Math.cos(phase * 0.78) * 0.95 + Math.max(-2.5, Math.min(2.5, coreDX * 0.28))) *
+            charFloatAmp;
+          const cy =
+            (Math.sin(phase) * 2.15 + Math.max(-2.5, Math.min(2.5, coreDY * 0.28))) *
+            charFloatAmp;
+          cs.el.style.transform = `translate3d(${cx.toFixed(2)}px, ${cy.toFixed(2)}px, 0)`;
+        }
+      } else {
+        for (const cs of charSpans) {
+          if (cs.el.style.transform) cs.el.style.transform = '';
+        }
+      }
+
+      // 3) 吸附态扩展控制台（终端搜索框 + 弹射/换色/明暗/GitHub）平滑显隐与排版插值
+      const showExtras = isDockedState && smoothDockW > 0.55;
+      dockExtras.classList.toggle('is-visible', showExtras);
+      dockExtras.style.visibility = showExtras ? 'visible' : 'hidden';
+      dockExtras.setAttribute('aria-hidden', showExtras ? 'false' : 'true');
+
+      searchSpring.x += (target.searchPos.x - searchSpring.x) * 0.24;
+      searchSpring.y += (target.searchPos.y - searchSpring.y) * 0.24;
+      searchSpring.w += (target.searchPos.w - searchSpring.w) * 0.24;
+      searchShell.style.width = `${Math.round(searchSpring.w)}px`;
+      searchShell.style.transform = `translate3d(calc(-50% + ${Math.round(searchSpring.x)}px), calc(-50% + ${Math.round(searchSpring.y)}px), 0)`;
+
+      target.utilCoords.forEach(([ux, uy], idx) => {
+        utilSpring[idx].x += (ux - utilSpring[idx].x) * 0.24;
+        utilSpring[idx].y += (uy - utilSpring[idx].y) * 0.24;
+        utilEls[idx].style.transform = `translate3d(calc(-50% + ${Math.round(utilSpring[idx].x)}px), calc(-50% + ${Math.round(utilSpring[idx].y)}px), 0)`;
+      });
+
+      if (dropdownOpen) positionDropdown();
 
       drawDynamicAsciiBorder(
         t,

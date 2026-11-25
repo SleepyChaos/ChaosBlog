@@ -1,22 +1,25 @@
-/* ================= 主题设计变量（像素 × 重度雾面毛玻璃 × ASCII 终端） ================= */
+/* ================= 主题设计变量（高透毛玻璃模糊 × 像素粒子 × ASCII 终端） ================= */
 :root {
-  --bg: #f1f3f8;
-  --bg-veil: rgba(241, 243, 248, 0.86);
-  --surface: rgba(255, 255, 255, 0.89);
-  --surface-strong: rgba(255, 255, 255, 0.94);
-  --surface-inner: rgba(246, 247, 251, 0.86);
-  --bg-code: #e8ebf2;
-  --text: #151821;
-  --text-muted: #616779;
-  --border: #d4d8e4;
-  --border-strong: #b1b8ca;
+  --bg: #edf0f7;
+  --bg-veil: rgba(237, 240, 247, 0.18);
+  --surface: rgba(255, 255, 255, 0.52);
+  --surface-strong: rgba(255, 255, 255, 0.62);
+  --surface-inner: rgba(255, 255, 255, 0.44);
+  --surface-hud: rgba(255, 255, 255, 0.46);
+  --glass-rim: rgba(255, 255, 255, 0.75);
+  --bg-code: rgba(230, 234, 244, 0.68);
+  --text: #141720;
+  --text-muted: #5a6175;
+  --border: rgba(148, 158, 184, 0.36);
+  --border-strong: rgba(112, 124, 156, 0.58);
   --accent: #4338ca;
   --accent-fg: #ffffff;
-  --accent-soft: rgba(67, 56, 202, 0.09);
-  --orb-1: rgba(67, 56, 202, 0.13);
-  --orb-2: rgba(14, 165, 233, 0.11);
-  --shadow-card: 0 8px 24px -12px rgba(15, 23, 42, 0.10);
-  --shadow-float: 0 10px 24px -8px rgba(15, 23, 42, 0.22);
+  --accent-soft: rgba(67, 56, 202, 0.12);
+  --orb-1: rgba(79, 70, 229, 0.26);
+  --orb-2: rgba(14, 165, 233, 0.22);
+  --orb-3: rgba(168, 85, 247, 0.18);
+  --shadow-card: 0 10px 30px -12px rgba(15, 23, 42, 0.12), inset 0 1px 0 var(--glass-rim);
+  --shadow-float: 0 12px 32px -8px rgba(15, 23, 42, 0.22), inset 0 1px 0 var(--glass-rim);
   --font-mono: ui-monospace, SFMono-Regular, 'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas,
     'Liberation Mono', monospace;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'PingFang SC',
@@ -25,24 +28,67 @@
 }
 
 :root[data-theme='dark'] {
-  --bg: #090a0f;
-  --bg-veil: rgba(9, 10, 15, 0.86);
-  --surface: rgba(16, 18, 26, 0.89);
-  --surface-strong: rgba(18, 20, 30, 0.94);
-  --surface-inner: rgba(13, 15, 23, 0.87);
-  --bg-code: #11131d;
-  --text: #e5e7f0;
-  --text-muted: #888fa3;
-  --border: #242838;
-  --border-strong: #394059;
+  --bg: #07080d;
+  --bg-veil: rgba(7, 8, 13, 0.20);
+  --surface: rgba(16, 19, 30, 0.48);
+  --surface-strong: rgba(18, 22, 35, 0.58);
+  --surface-inner: rgba(12, 15, 26, 0.42);
+  --surface-hud: rgba(14, 17, 29, 0.44);
+  --glass-rim: rgba(255, 255, 255, 0.14);
+  --bg-code: rgba(12, 14, 23, 0.68);
+  --text: #e6e9f2;
+  --text-muted: #8e96ab;
+  --border: rgba(130, 142, 178, 0.22);
+  --border-strong: rgba(148, 163, 205, 0.40);
   --accent: #818cf8;
-  --accent-fg: #090a0f;
-  --accent-soft: rgba(129, 140, 248, 0.13);
-  --orb-1: rgba(129, 140, 248, 0.12);
-  --orb-2: rgba(56, 189, 248, 0.09);
-  --shadow-card: 0 10px 28px -12px rgba(0, 0, 0, 0.42);
-  --shadow-float: 0 12px 28px -8px rgba(0, 0, 0, 0.55);
+  --accent-fg: #07080d;
+  --accent-soft: rgba(129, 140, 248, 0.15);
+  --orb-1: rgba(129, 140, 248, 0.27);
+  --orb-2: rgba(34, 211, 238, 0.20);
+  --orb-3: rgba(192, 132, 252, 0.18);
+  --shadow-card: 0 12px 32px -12px rgba(0, 0, 0, 0.48), inset 0 1px 0 var(--glass-rim);
+  --shadow-float: 0 14px 34px -8px rgba(0, 0, 0, 0.62), inset 0 1px 0 var(--glass-rim);
   color-scheme: dark;
+}
+
+/* 可切换终端磷光配色方案（Indigo 默认 / Emerald 磷光绿 / Amber 琥珀橙 / Cyan 冰川青） */
+:root[data-palette='emerald'] {
+  --accent: #059669;
+  --accent-soft: rgba(5, 150, 105, 0.12);
+  --orb-1: rgba(16, 185, 129, 0.24);
+  --orb-2: rgba(20, 184, 166, 0.20);
+}
+:root[data-theme='dark'][data-palette='emerald'] {
+  --accent: #34d399;
+  --accent-soft: rgba(52, 211, 153, 0.15);
+  --orb-1: rgba(52, 211, 153, 0.24);
+  --orb-2: rgba(45, 212, 191, 0.18);
+}
+
+:root[data-palette='amber'] {
+  --accent: #d97706;
+  --accent-soft: rgba(217, 119, 6, 0.12);
+  --orb-1: rgba(245, 158, 11, 0.24);
+  --orb-2: rgba(249, 115, 22, 0.18);
+}
+:root[data-theme='dark'][data-palette='amber'] {
+  --accent: #fbbf24;
+  --accent-soft: rgba(251, 191, 36, 0.15);
+  --orb-1: rgba(251, 191, 36, 0.23);
+  --orb-2: rgba(251, 146, 60, 0.17);
+}
+
+:root[data-palette='cyan'] {
+  --accent: #0284c7;
+  --accent-soft: rgba(2, 132, 199, 0.12);
+  --orb-1: rgba(14, 165, 233, 0.25);
+  --orb-2: rgba(99, 102, 241, 0.20);
+}
+:root[data-theme='dark'][data-palette='cyan'] {
+  --accent: #22d3ee;
+  --accent-soft: rgba(34, 211, 238, 0.15);
+  --orb-1: rgba(34, 211, 238, 0.25);
+  --orb-2: rgba(129, 140, 248, 0.19);
 }
 
 /* ================= 全局基础 ================= */
@@ -79,7 +125,7 @@ a:hover {
   text-underline-offset: 3px;
 }
 
-/* ================= 背景层：柔和底色 + 重度雾面毛玻璃遮罩 + 微像素网格 ================= */
+/* ================= 背景层：立体景深光池 + 坐标网格（让上层毛玻璃真正显现透明与模糊折射） ================= */
 .ambient-bg {
   position: fixed;
   inset: 0;
@@ -92,22 +138,57 @@ a:hover {
 .ambient-blob {
   position: absolute;
   border-radius: 999px;
+  filter: blur(68px);
+  animation: orb-drift 18s ease-in-out infinite alternate;
 }
 
 .ambient-blob.blob-a {
-  top: -12%;
-  left: 10%;
-  width: 38rem;
-  height: 28rem;
+  top: -8%;
+  left: 6%;
+  width: 40rem;
+  height: 30rem;
   background: var(--orb-1);
 }
 
 .ambient-blob.blob-b {
-  bottom: -14%;
-  right: 8%;
-  width: 40rem;
-  height: 30rem;
+  bottom: -10%;
+  right: 6%;
+  width: 42rem;
+  height: 32rem;
   background: var(--orb-2);
+  animation-delay: -6s;
+}
+
+.ambient-blob.blob-c {
+  top: 38%;
+  left: 44%;
+  width: 30rem;
+  height: 24rem;
+  background: var(--orb-3);
+  animation-delay: -11s;
+}
+
+@keyframes orb-drift {
+  0% {
+    transform: translate3d(-18px, -12px, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(24px, 18px, 0) scale(1.08);
+  }
+}
+
+/* 清晰底层坐标网格：卡片外锐利清晰，透过毛玻璃卡片时被 backdrop-filter 模糊柔化，直观呈现玻璃质感 */
+.ambient-grid-marks {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--border) 62%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--border) 62%, transparent) 1px, transparent 1px),
+    radial-gradient(color-mix(in srgb, var(--border-strong) 55%, transparent) 1px, transparent 1px);
+  background-size:
+    64px 64px,
+    64px 64px,
+    16px 16px;
 }
 
 .heavy-frost-veil {
@@ -116,13 +197,6 @@ a:hover {
   z-index: -2;
   pointer-events: none;
   background-color: var(--bg-veil);
-  -webkit-backdrop-filter: blur(36px) saturate(115%);
-  backdrop-filter: blur(36px) saturate(115%);
-  background-image: radial-gradient(
-    color-mix(in srgb, var(--border) 55%, transparent) 1px,
-    transparent 1px
-  );
-  background-size: 16px 16px;
 }
 
 #bg-pixel-canvas {
@@ -144,7 +218,7 @@ a:hover {
 }
 
 .top-term-strip {
-  padding-top: 3.35rem;
+  padding-top: 4.3rem;
   padding-bottom: 0.75rem;
 }
 
@@ -156,9 +230,10 @@ a:hover {
   gap: 0.75rem;
   padding: 0.55rem 0.85rem;
   background: var(--surface);
-  -webkit-backdrop-filter: blur(22px) saturate(120%);
-  backdrop-filter: blur(22px) saturate(120%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
   border-radius: 2px;
   font-family: var(--font-mono);
   font-size: 0.8rem;
@@ -291,8 +366,8 @@ main.page-main {
 
 .bento-card {
   background: var(--surface);
-  -webkit-backdrop-filter: blur(24px) saturate(120%);
-  backdrop-filter: blur(24px) saturate(120%);
+  -webkit-backdrop-filter: blur(18px) saturate(175%);
+  backdrop-filter: blur(18px) saturate(175%);
   border: 1px solid var(--border);
   border-radius: 2px;
   box-shadow: var(--shadow-card);
@@ -300,7 +375,7 @@ main.page-main {
   flex-direction: column;
   justify-content: space-between;
   padding: 1rem 1.15rem;
-  transition: border-color 0.15s steps(2);
+  transition: border-color 0.15s steps(2), background-color 0.2s ease;
   min-width: 0;
 }
 
@@ -648,13 +723,13 @@ main.page-main {
   cursor: grabbing;
 }
 
-/* 缩小一圈的内部雾面毛玻璃芯：严格缩进在外圈动态浮动 ASCII 框线之内！ */
+/* 缩小一圈的内部高透雾面毛玻璃芯：清晰透出并模糊底层文字与卡片轮廓 */
 .ascii-inner-frost {
   position: absolute;
-  background: var(--surface-inner);
-  -webkit-backdrop-filter: blur(18px) saturate(125%);
-  backdrop-filter: blur(18px) saturate(125%);
-  border: 1px solid color-mix(in srgb, var(--border-strong) 65%, transparent);
+  background: var(--surface-hud);
+  -webkit-backdrop-filter: blur(15px) saturate(180%);
+  backdrop-filter: blur(15px) saturate(180%);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 78%, transparent);
   border-radius: 1px;
   box-shadow: var(--shadow-float);
   pointer-events: none;
@@ -688,13 +763,179 @@ main.page-main {
 }
 
 .ascii-nav-item:hover {
-  background: color-mix(in srgb, var(--text) 12%, transparent);
+  background: color-mix(in srgb, var(--text) 14%, transparent);
   text-decoration: none;
 }
 
 .ascii-nav-item.is-active {
   background: var(--accent);
   color: var(--accent-fg);
+}
+
+/* 按钮内逐字微浮动单元（悬浮态失重呼吸，吸附态自动归零定格） */
+.ascii-char-span {
+  display: inline-block;
+  will-change: transform;
+}
+
+/* 吸附固定后展开的终端扩展控制台（搜索终端 + 弹射 + 换色 + 明暗 + GitHub） */
+.hud-dock-extras {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.hud-dock-extras.is-visible {
+  opacity: 1;
+}
+
+.hud-search-shell {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+  border: 1px solid var(--border-strong);
+  border-radius: 1px;
+  pointer-events: auto;
+  cursor: text;
+  will-change: transform, width;
+}
+
+.hud-search-shell:focus-within {
+  border-color: var(--accent);
+}
+
+.hud-search-prompt {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.hud-search-input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 1px 0;
+}
+
+.hud-search-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.hud-util-btn {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  white-space: nowrap;
+  padding: 2px 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.15;
+  color: var(--text);
+  background: color-mix(in srgb, var(--bg) 52%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 1px;
+  cursor: pointer;
+  pointer-events: auto;
+  text-decoration: none;
+  transition: border-color 0.1s steps(2), color 0.1s steps(2), background-color 0.1s steps(2);
+  will-change: transform;
+}
+
+.hud-util-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.hud-util-btn.is-eject {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 65%, transparent);
+}
+
+.hud-util-btn.is-eject:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* 终端搜索实时匹配下拉结果面板 */
+.hud-search-dropdown {
+  position: fixed;
+  z-index: 95;
+  display: none;
+  width: min(90vw, 360px);
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--surface-strong);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  box-shadow: var(--shadow-float);
+  padding: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.hud-search-dropdown.is-open {
+  display: block;
+}
+
+.hud-search-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 4px 5px;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed var(--border-strong);
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.hud-search-item {
+  display: block;
+  padding: 5px 6px;
+  border-radius: 1px;
+  color: var(--text);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+}
+
+.hud-search-item:hover,
+.hud-search-item.is-selected {
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.hud-search-item-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.hud-search-item-sub {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ================= 文章阅读页与登山海拔仪 TOC ================= */

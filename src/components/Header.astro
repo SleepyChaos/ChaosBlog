@@ -69,6 +69,7 @@ const displayCmd =
     }
   }
   refreshThemeLabel();
+  window.addEventListener('sisyphus:themechange', refreshThemeLabel);
 
   themeBtn?.addEventListener('click', () => {
     const root = document.documentElement;

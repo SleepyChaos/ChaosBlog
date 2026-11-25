@@ -37,13 +37,19 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         localStorage.getItem('theme') ??
         (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
       document.documentElement.dataset.theme = savedTheme;
+      const savedPalette = localStorage.getItem('accent_palette');
+      if (savedPalette) {
+        document.documentElement.dataset.palette = savedPalette;
+      }
     </script>
   </head>
   <body>
-    <!-- 柔和底色 + 重度雾面毛玻璃遮罩 + 像素微尘画布 -->
+    <!-- 立体景深底色光池 + 终端坐标矩阵（供上层半透明毛玻璃卡片与悬浮窗产生清晰的模糊折射层次） -->
     <div class="ambient-bg" aria-hidden="true">
       <div class="ambient-blob blob-a"></div>
       <div class="ambient-blob blob-b"></div>
+      <div class="ambient-blob blob-c"></div>
+      <div class="ambient-grid-marks"></div>
     </div>
     <div class="heavy-frost-veil" aria-hidden="true"></div>
     <canvas id="bg-pixel-canvas" aria-hidden="true"></canvas>
