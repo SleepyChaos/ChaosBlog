@@ -1,6 +1,6 @@
 ---
 import { getAllPosts, getAllTags, formatDateShort, readingTime } from '../lib/content';
-import { GITHUB_URL } from '../consts';
+import { GITHUB_HANDLE, GITHUB_URL } from '../consts';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const pathname = Astro.url.pathname;
@@ -44,18 +44,18 @@ const tagIndex = tags.map(([name, count]) => ({
 <canvas id="fx-pixel-canvas" aria-hidden="true"></canvas>
 <div id="pixel-dock-ruler" class="pixel-dock-ruler" aria-hidden="true"></div>
 
-<!-- 主模块：始终只保留纯粹的 4 个路由按钮（侧挂时化作 74px 极细长条刀锋！） -->
+<!-- 主模块：始终保持纯粹的 4 个核心路由（上下贴边为顶栏核心舱，左右贴边为 76px 细刃，悬浮态字符失重呼吸） -->
 <nav
   id="ascii-float-nav"
   class="ascii-float-nav"
   aria-label="浮动 ASCII 终端导航主舱"
   data-base={base}
-  style="width: 146px; height: 68px; visibility: hidden;"
+  style="width: 248px; height: 38px; visibility: hidden;"
 >
   <div
     id="ascii-inner-frost"
     class="ascii-inner-frost"
-    style="left: 11px; right: 11px; top: 11px; bottom: 11px;"
+    style="left: 14px; right: 14px; top: 5px; bottom: 5px;"
   >
   </div>
   <canvas id="ascii-border-canvas" class="ascii-border-canvas" aria-hidden="true"></canvas>
@@ -78,9 +78,11 @@ const tagIndex = tags.map(([name, count]) => ({
   }
 </nav>
 
-<!-- 链式独立挂件 1：无框融底闪烁命令终端（直接融入透明毛玻璃，支持 help/ls/neofetch/theme/push 及全文搜索） -->
-<label id="pendant-cli" class="naked-cli-pendant" aria-label="交互式终端命令行与搜索">
-  <span class="naked-cli-prompt">$</span>
+<!-- 异构挂件 A：双形态终端命令/搜索栏（上下贴边时为独立第二行顶栏同款样式；侧边吸附时自动化为极简细条） -->
+<label id="pendant-cli" class="cli-pendant is-bar" aria-label="交互式终端命令行与全文搜索">
+  <span class="cli-badge">&gt;_</span>
+  <span class="cli-host-full">sisyphus@chaos:~$</span>
+  <span class="cli-host-short">$</span>
   <span class="naked-cli-stage">
     <input
       id="naked-cli-input"
@@ -93,42 +95,45 @@ const tagIndex = tags.map(([name, count]) => ({
       <span id="naked-cli-typer"></span><span class="naked-cli-cursor">█</span>
     </span>
   </span>
+  <span class="cli-hint-pill">[/ 唤醒 · help]</span>
 </label>
 
-<!-- 链式独立挂件 2：弹射脱钩铭牌 -->
+<!-- 异构挂件 B：八角工业切角弹射扳机（Octagonal Eject Trigger） -->
 <button
   type="button"
   id="pendant-eject"
-  class="hud-pendant is-eject"
-  title="脱离挂架高速弹射（同时助推西西弗斯）"
+  class="hud-pendant pendant-eject"
+  title="脱离挂架高速弹射至零重力（同时助推西西弗斯推石）"
 >
-  <span class="pendant-lug">╠</span><span>⚡弹射</span><span class="pendant-lug">╣</span>
+  <span id="pendant-eject-label">⟪⚡ 弹射⟫</span>
 </button>
 
-<!-- 链式独立挂件 3：四重终端风貌切换铭牌（合并换色、明暗、字体与器物细节） -->
+<!-- 异构挂件 C：双线印章卡带式科幻世界切换器（Sci-Fi World Cartridge） -->
 <button
   type="button"
   id="pendant-realm"
-  class="hud-pendant"
-  title="切换全站终端风貌（深空星图 / 绿磷CRT / 纸墨蓝图 / 沙丘琥珀）"
+  class="hud-pendant pendant-realm"
+  title="切换全站科幻 ASCII 世界（太空漫游 / 银河帝国 / 黑客帝国 / 沙丘）"
 >
-  <span class="pendant-lug">╠</span><span id="pendant-realm-text">❖星图</span><span class="pendant-lug">╣</span>
+  <span class="realm-glyph" id="pendant-realm-glyph">◉</span>
+  <span id="pendant-realm-text">太空漫游</span>
 </button>
 
-<!-- 链式独立挂件 4：GitHub 身份铭牌 -->
+<!-- 异构挂件 D：穿孔铆钉金属身份狗牌（Punched GitHub Dog-Tag） -->
 <a
   href={GITHUB_URL}
   target="_blank"
   rel="noopener"
   draggable="false"
   id="pendant-gh"
-  class="hud-pendant"
-  title="访问 Sisyphus 的 GitHub 主页"
+  class="hud-pendant pendant-dogtag"
+  title="访问 Sisyphus (@SleepyChaos) 的 GitHub 主页"
 >
-  <span class="pendant-lug">╠</span><span>@GH↗</span><span class="pendant-lug">╣</span>
+  <span class="dogtag-hole" aria-hidden="true"></span>
+  <span id="pendant-gh-label">@{GITHUB_HANDLE} ↗</span>
 </a>
 
-<!-- 终端执行输出与搜索匹配透明浮层 -->
+<!-- 终端执行输出与搜索匹配浮层 -->
 <div id="hud-term-overlay" class="hud-term-overlay" role="region" aria-label="终端输出面板"></div>
 
 <script
@@ -138,20 +143,93 @@ const tagIndex = tags.map(([name, count]) => ({
 />
 
 <script>
-  const STORAGE_KEY = 'sisyphus_ascii_hud_v6';
-  const REALMS = ['void', 'crt', 'paper', 'amber'] as const;
+  const STORAGE_KEY = 'sisyphus_ascii_hud_v8';
+  const REALMS = ['void', 'paper', 'crt', 'amber'] as const;
   type RealmId = (typeof REALMS)[number];
-  const REALM_SHORT: Record<RealmId, string> = {
-    void: '❖星图',
-    crt: '❖绿磷',
-    paper: '❖纸墨',
-    amber: '❖琥珀',
-  };
-  const REALM_DESC: Record<RealmId, string> = {
-    void: 'VOID_GLASS (深空星图 · 暗色高透玻璃)',
-    crt: 'PHOSPHOR_CRT (1984 绿磷显像管 · 等宽双线框)',
-    paper: 'PAPER_BLUEPRINT (手稿蓝图 · 亮色衬线宋体)',
-    amber: 'AMBER_DUNE (沙丘琥珀 · 暖金工业终端)',
+
+  interface RealmSpec {
+    glyph: string;
+    fullName: string;
+    shortName: string;
+    desc: string;
+    dockTag: string;
+    floatTag: string;
+    corners: [string, string, string, string];
+    hMain: string;
+    hWave: string;
+    vLeft: string;
+    vRight: string;
+    soliton: string;
+    satA: string;
+    satB: string;
+  }
+
+  // 四大科幻经典各自的 ASCII 边框艺术词法与图腾配置
+  const REALM_SPECS: Record<RealmId, RealmSpec> = {
+    void: {
+      glyph: '◉',
+      fullName: '太空漫游',
+      shortName: '漫游',
+      desc: '2001: A SPACE ODYSSEY (黑石碑 1:4:9 · HAL-9000 深空舱)',
+      dockTag: '::HAL-9000',
+      floatTag: '::EVA-0G',
+      corners: ['╔', '╗', '╝', '╚'],
+      hMain: '═',
+      hWave: '▮',
+      vLeft: '║',
+      vRight: '║',
+      soliton: '◉',
+      satA: '✦',
+      satB: '▮',
+    },
+    paper: {
+      glyph: 'Ψ',
+      fullName: '银河帝国',
+      shortName: '帝国',
+      desc: 'FOUNDATION / GALACTIC EMPIRE (川陀百科典藏 · 谢顿第一辐光)',
+      dockTag: '::TRANTOR',
+      floatTag: '::SELDON',
+      corners: ['┏', '┓', '┛', '┗'],
+      hMain: '━',
+      hWave: '❖',
+      vLeft: '┃',
+      vRight: '┃',
+      soliton: 'Ψ',
+      satA: '∑',
+      satB: '∂',
+    },
+    crt: {
+      glyph: '▓',
+      fullName: '黑客帝国',
+      shortName: '母体',
+      desc: 'THE MATRIX (母体构造层 · 半块像素流与片假名代码雨)',
+      dockTag: '::MATRIX',
+      floatTag: '::ZION',
+      corners: ['▛', '▜', '▟', '▙'],
+      hMain: '▀',
+      hWave: '▓',
+      vLeft: '▌',
+      vRight: '▐',
+      soliton: 'ﾊ',
+      satA: '1',
+      satB: '0',
+    },
+    amber: {
+      glyph: '◐',
+      fullName: '沙丘香料',
+      shortName: '沙丘',
+      desc: 'DUNE: ARRAKIS (厄拉科斯双月 · 香料金尘与弗雷曼蓝眼)',
+      dockTag: '::ARRAKIS',
+      floatTag: '::SHAI-HULUD',
+      corners: ['╭', '╮', '╯', '╰'],
+      hMain: '─',
+      hWave: '◈',
+      vLeft: '│',
+      vRight: '│',
+      soliton: '◐',
+      satA: '◈',
+      satB: '∷',
+    },
   };
 
   const BORDER_PAD = 76;
@@ -184,9 +262,12 @@ const tagIndex = tags.map(([name, count]) => ({
   const cliAmbient = document.getElementById('naked-cli-ambient') as HTMLElement | null;
   const cliTyper = document.getElementById('naked-cli-typer') as HTMLElement | null;
   const pendantEject = document.getElementById('pendant-eject') as HTMLButtonElement | null;
+  const pendantEjectLabel = document.getElementById('pendant-eject-label') as HTMLElement | null;
   const pendantRealm = document.getElementById('pendant-realm') as HTMLButtonElement | null;
+  const pendantRealmGlyph = document.getElementById('pendant-realm-glyph') as HTMLElement | null;
   const pendantRealmText = document.getElementById('pendant-realm-text') as HTMLElement | null;
   const pendantGh = document.getElementById('pendant-gh') as HTMLAnchorElement | null;
+  const pendantGhLabel = document.getElementById('pendant-gh-label') as HTMLElement | null;
   const termOverlay = document.getElementById('hud-term-overlay') as HTMLElement | null;
 
   const links = Array.from(
@@ -224,29 +305,56 @@ const tagIndex = tags.map(([name, count]) => ({
     cliAmbient &&
     cliTyper &&
     pendantEject &&
+    pendantEjectLabel &&
     pendantRealm &&
+    pendantRealmGlyph &&
     pendantRealmText &&
     pendantGh &&
+    pendantGhLabel &&
     termOverlay
   ) {
     const fxCtx = fxCanvas.getContext('2d');
     const bCtx = borderCanvas.getContext('2d');
 
-    let accentColor = '#818cf8';
-    let mutedColor = '#8d96ad';
-    let borderColor = '#4a5578';
+    let curRealm: RealmId = 'void';
+    let accentColor = '#a5b4fc';
+    let accent2Color = '#38bdf8';
+    let fireColor = '#ff3b5c';
+    let mutedColor = '#b8c2e6';
+    let borderColor = '#7c89b8';
     let monoFont = '600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
+    type EdgeSide = 'top' | 'bottom' | 'left' | 'right';
+    type HudState = 'free' | 'dragging' | EdgeSide;
+    let state: HudState = 'top';
+
+    const syncPendantLabels = () => {
+      const isSide = state === 'left' || state === 'right';
+      const spec = REALM_SPECS[curRealm] || REALM_SPECS.void;
+      pendantRealmGlyph.textContent = spec.glyph;
+      pendantRealmText.textContent = isSide ? spec.shortName : spec.fullName;
+      pendantEjectLabel.textContent = isSide ? '⚡弹射' : '⟪⚡ 弹射⟫';
+      pendantGhLabel.textContent = isSide ? 'GH↗' : '@Sisyphus ↗';
+
+      pendantEject.classList.toggle('is-rail-compact', isSide);
+      pendantRealm.classList.toggle('is-rail-compact', isSide);
+      pendantGh.classList.toggle('is-rail-compact', isSide);
+      pendantCli.classList.toggle('is-bar', !isSide);
+      pendantCli.classList.toggle('is-compact', isSide);
+    };
+
     const syncThemePalette = () => {
+      const r = document.documentElement.dataset.realm as RealmId;
+      curRealm = REALMS.includes(r) ? r : 'void';
       const cs = getComputedStyle(document.documentElement);
-      accentColor = cs.getPropertyValue('--accent').trim() || '#818cf8';
-      mutedColor = cs.getPropertyValue('--text-muted').trim() || '#8d96ad';
-      borderColor = cs.getPropertyValue('--border-strong').trim() || '#4a5578';
+      accentColor = cs.getPropertyValue('--accent').trim() || '#a5b4fc';
+      accent2Color = cs.getPropertyValue('--accent-2').trim() || '#38bdf8';
+      fireColor = cs.getPropertyValue('--stage-fire').trim() || '#ff3b5c';
+      mutedColor = cs.getPropertyValue('--text-muted').trim() || '#b8c2e6';
+      borderColor = cs.getPropertyValue('--border-strong').trim() || '#7c89b8';
       const family = cs.getPropertyValue('--font-mono').trim() || 'monospace';
       monoFont = `600 11px ${family}`;
-
-      const curRealm = (document.documentElement.dataset.realm || 'void') as RealmId;
-      pendantRealmText.textContent = REALM_SHORT[curRealm] || '❖星图';
+      syncPendantLabels();
     };
     syncThemePalette();
     window.addEventListener('sisyphus:realmchange', syncThemePalette);
@@ -259,12 +367,19 @@ const tagIndex = tags.map(([name, count]) => ({
     };
 
     const cycleRealm = () => {
-      const cur = (document.documentElement.dataset.realm || 'void') as RealmId;
-      const next = REALMS[(REALMS.indexOf(cur) + 1) % REALMS.length];
+      const idx = REALMS.indexOf(curRealm);
+      const next = REALMS[(idx + 1) % REALMS.length];
       applyRealm(next);
       return next;
     };
     window.addEventListener('sisyphus:cycle-realm', cycleRealm);
+
+    const syncDocDockAttr = () => {
+      const isDocked =
+        state === 'top' || state === 'bottom' || state === 'left' || state === 'right';
+      document.documentElement.dataset.hudDock = isDocked ? state : 'float';
+      syncPendantLabels();
+    };
 
     let lastFxW = 0;
     let lastFxH = 0;
@@ -317,45 +432,43 @@ const tagIndex = tags.map(([name, count]) => ({
       }
     };
 
-    // 主模块始终保持纤细精干！侧挂时仅 74px 宽单列刀锋，扩展功能全部作为独立挂件串在后面！
     const SHAPES = {
       block: {
-        w: 146,
-        h: 68,
+        w: 152,
+        h: 70,
         inset: { l: 11, r: 11, t: 11, b: 11 },
         coords: [
-          [-29, -9],
-          [29, -9],
-          [-29, 10],
-          [29, 10],
+          [-31, -10],
+          [31, -10],
+          [-31, 10],
+          [31, 10],
         ],
       },
       bar: {
-        w: 234,
-        h: 34,
+        w: 252,
+        h: 38,
         inset: { l: 14, r: 14, t: 5, b: 5 },
         coords: [
-          [-80, 0],
-          [-26, 0],
-          [28, 0],
-          [80, 0],
+          [-86, 0],
+          [-28, 0],
+          [30, 0],
+          [86, 0],
         ],
       },
       rail: {
-        // 细长竖条（仅 74px 宽！比之前窄一半多！）
-        w: 74,
-        h: 126,
+        w: 76,
+        h: 130,
         inset: { l: 9, r: 9, t: 10, b: 10 },
         coords: [
-          [0, -37],
-          [0, -12],
-          [0, 12],
-          [0, 37],
+          [0, -38],
+          [0, -13],
+          [0, 13],
+          [0, 38],
         ],
       },
     } as const;
 
-    const SIDE_RACK_GAP = 26;
+    const SIDE_RACK_GAP = 24;
     const BAR_RACK_GAP = 14;
     const UNHOOK_PULL_DIST = 30;
     const CAPTURE_SPEED = 3.8;
@@ -364,23 +477,18 @@ const tagIndex = tags.map(([name, count]) => ({
     const RESTITUTION = 0.85;
     const AIR_DRAG = 0.986;
 
-    type EdgeSide = 'top' | 'bottom' | 'left' | 'right';
-    type HudState = 'free' | 'dragging' | EdgeSide;
-
     let initialized = false;
-    let ambientOrbit = true;
-    let state: HudState = 'free';
-    let x = 400;
-    let y = 160;
-    let prevX = 400;
-    let prevY = 160;
+    let ambientOrbit = false;
+    let x = 420;
+    let y = SHAPES.bar.h * 0.5 + BAR_RACK_GAP;
+    let prevX = 420;
+    let prevY = y;
     let vx = -0.82;
     let vy = 0.56;
     let rackVelX = 0;
     let rackVelY = 0;
     let magnetImmunityUntil = 0;
 
-    // ========= 4 个链式独立外挂件的弹簧摆锤状态 =========
     interface SatPendant {
       el: HTMLElement;
       x: number;
@@ -392,10 +500,10 @@ const tagIndex = tags.map(([name, count]) => ({
       alpha: number;
     }
     const satellites: SatPendant[] = [
-      { el: pendantCli, x: 400, y: 160, vx: 0, vy: 0, w: 170, h: 30, alpha: 0 },
-      { el: pendantEject, x: 400, y: 160, vx: 0, vy: 0, w: 66, h: 26, alpha: 0 },
-      { el: pendantRealm, x: 400, y: 160, vx: 0, vy: 0, w: 68, h: 26, alpha: 0 },
-      { el: pendantGh, x: 400, y: 160, vx: 0, vy: 0, w: 64, h: 26, alpha: 0 },
+      { el: pendantCli, x: 420, y: 74, vx: 0, vy: 0, w: 540, h: 38, alpha: 0 },
+      { el: pendantEject, x: 420, y: 33, vx: 0, vy: 0, w: 84, h: 30, alpha: 0 },
+      { el: pendantRealm, x: 420, y: 33, vx: 0, vy: 0, w: 102, h: 30, alpha: 0 },
+      { el: pendantGh, x: 420, y: 33, vx: 0, vy: 0, w: 112, h: 30, alpha: 0 },
     ];
     let cliFocused = false;
     let cliHovered = false;
@@ -407,16 +515,16 @@ const tagIndex = tags.map(([name, count]) => ({
       cliHovered = false;
     });
 
-    // ========= 无框闪烁终端：空闲自动打字呼吸 + 真实 UNIX 命令引擎 + 全文检索 =========
-    const AMBIENT_HINTS = [
-      'help',
-      'grep rust...',
-      'neofetch',
-      'ls -l posts',
-      'theme',
-      'push --boulder',
-      'camus',
+    // ========= 顶栏同款/侧栏极简双形态闪烁终端：空闲自动打字 + UNIX/科幻彩蛋命令 + 全文检索 =========
+    const BAR_HINTS = [
+      'cd ~/home && ./sisyphus --cycle=8h',
+      'grep -i "rust" ./documents/posts/*',
+      'theme  # 切换: 太空漫游 / 银河帝国 / 黑客帝国 / 沙丘',
+      'hal --status   |   seldon   |   matrix   |   dune',
+      'push --boulder   &&   neofetch',
     ];
+    const COMPACT_HINTS = ['help', 'ls', 'grep...', 'theme', 'push', 'hal'];
+
     let hintIdx = 0;
     let hintChar = 0;
     let hintDeleting = false;
@@ -427,25 +535,28 @@ const tagIndex = tags.map(([name, count]) => ({
       cliAmbient.style.opacity = active ? '0' : '1';
       if (active || t < nextTypeTick) return;
 
-      const word = AMBIENT_HINTS[hintIdx];
+      const isSide = state === 'left' || state === 'right';
+      const pool = isSide ? COMPACT_HINTS : BAR_HINTS;
+      const word = pool[hintIdx % pool.length];
+
       if (!hintDeleting) {
         hintChar++;
         cliTyper.textContent = word.slice(0, hintChar);
         if (hintChar >= word.length) {
           hintDeleting = true;
-          nextTypeTick = t + 1850;
+          nextTypeTick = t + 2200;
         } else {
-          nextTypeTick = t + 75 + Math.random() * 55;
+          nextTypeTick = t + 58 + Math.random() * 42;
         }
       } else {
         hintChar--;
         cliTyper.textContent = word.slice(0, Math.max(0, hintChar));
         if (hintChar <= 0) {
           hintDeleting = false;
-          hintIdx = (hintIdx + 1) % AMBIENT_HINTS.length;
-          nextTypeTick = t + 420;
+          hintIdx = (hintIdx + 1) % pool.length;
+          nextTypeTick = t + 380;
         } else {
-          nextTypeTick = t + 36;
+          nextTypeTick = t + 24;
         }
       }
     };
@@ -465,26 +576,27 @@ const tagIndex = tags.map(([name, count]) => ({
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const cliSat = satellites[0];
-      const ow = Math.min(vw * 0.92, 410);
-      termOverlay.style.width = `${ow}px`;
+      const isSide = state === 'left' || state === 'right';
+      const ow = isSide ? Math.min(vw * 0.9, 420) : Math.min(vw * 0.94, Math.max(420, cliSat.w));
+      termOverlay.style.width = `${Math.round(ow)}px`;
 
       if (state === 'top') {
-        const left = Math.max(8, Math.min(vw - ow - 8, cliSat.x - ow * 0.4));
+        const left = Math.max(8, Math.min(vw - ow - 8, cliSat.x - ow * 0.5));
         termOverlay.style.left = `${Math.round(left)}px`;
-        termOverlay.style.top = `${Math.round(cliSat.y + 22)}px`;
+        termOverlay.style.top = `${Math.round(cliSat.y + cliSat.h * 0.5 + 8)}px`;
         termOverlay.style.bottom = 'auto';
       } else if (state === 'bottom') {
-        const left = Math.max(8, Math.min(vw - ow - 8, cliSat.x - ow * 0.4));
+        const left = Math.max(8, Math.min(vw - ow - 8, cliSat.x - ow * 0.5));
         termOverlay.style.left = `${Math.round(left)}px`;
         termOverlay.style.top = 'auto';
-        termOverlay.style.bottom = `${Math.round(vh - (cliSat.y - 22))}px`;
+        termOverlay.style.bottom = `${Math.round(vh - (cliSat.y - cliSat.h * 0.5 - 8))}px`;
       } else if (state === 'left') {
         termOverlay.style.left = `${Math.round(cliSat.x + cliSat.w * 0.5 + 12)}px`;
-        termOverlay.style.top = `${Math.max(12, Math.min(vh - 320, Math.round(cliSat.y - 24)))}px`;
+        termOverlay.style.top = `${Math.max(12, Math.min(vh - 330, Math.round(cliSat.y - 24)))}px`;
         termOverlay.style.bottom = 'auto';
       } else if (state === 'right') {
         termOverlay.style.left = `${Math.max(8, Math.round(cliSat.x - cliSat.w * 0.5 - ow - 12))}px`;
-        termOverlay.style.top = `${Math.max(12, Math.min(vh - 320, Math.round(cliSat.y - 24)))}px`;
+        termOverlay.style.top = `${Math.max(12, Math.min(vh - 330, Math.round(cliSat.y - 24)))}px`;
         termOverlay.style.bottom = 'auto';
       }
     };
@@ -514,16 +626,53 @@ const tagIndex = tags.map(([name, count]) => ({
 
       if (cmd === 'help' || cmd === '?' || cmd === 'man') {
         showTerminalText(
-          'SISYPHUS-SH :: BUILTIN COMMANDS',
-          `<pre class="hud-term-pre" style="color: var(--text);">  <strong style="color:var(--accent)">ls</strong> / <strong style="color:var(--accent)">posts</strong>      列出全部已发布文章
-  <strong style="color:var(--accent)">tags</strong>            列出全部标签索引
-  <strong style="color:var(--accent)">open &lt;#&gt;</strong>        按序号打开文章 (如 open 1)
-  <strong style="color:var(--accent)">neofetch</strong>        查看系统与 8h 推石轮回遥测
-  <strong style="color:var(--accent)">theme [name]</strong>    切换风貌 (void/crt/paper/amber)
-  <strong style="color:var(--accent)">push</strong> / <strong style="color:var(--accent)">summit</strong>   助推巨石 / 直接冲顶演示滚落与下山
-  <strong style="color:var(--accent)">eject</strong>           脱离武器挂架高速弹射
-  <strong style="color:var(--accent)">whoami</strong> / <strong style="color:var(--accent)">camus</strong>  打印西西弗斯语录与身份宣言
-  <strong style="color:var(--accent)">cd ~|tags|about</strong> 终端路由跳转  |  直接输入任意词全文搜索</pre>`,
+          'SISYPHUS-SH :: 舰载终端指令手册',
+          `<pre class="hud-term-pre">  <strong style="color:var(--accent)">ls</strong> / <strong style="color:var(--accent)">tags</strong> / <strong style="color:var(--accent)">open &lt;#&gt;</strong>  浏览文章列表、标签矩阵或打开指定序号文章
+  <strong style="color:var(--accent)">theme [void|paper|crt|amber]</strong> 切换科幻世界 (漫游/银河帝国/黑客帝国/沙丘)
+  <strong style="color:var(--accent)">push</strong> / <strong style="color:var(--accent)">summit</strong>        向西西弗斯注入推石冲量 / 立即演示冲顶崩落下山轮回
+  <strong style="color:var(--accent)">hal</strong> | <strong style="color:var(--accent)">seldon</strong> | <strong style="color:var(--accent)">matrix</strong> | <strong style="color:var(--accent)">dune</strong> 触发四大科幻经典终端彩蛋与世界跃迁
+  <strong style="color:var(--accent)">neofetch</strong> / <strong style="color:var(--accent)">camus</strong>      打印系统遥测与西西弗斯哲学宣言
+  <strong style="color:var(--accent)">eject</strong> / <strong style="color:var(--accent)">cd ~|tags|about</strong>  弹射悬浮舱至零重力 / 路由跳转 (直接输入词即全文检索)</pre>`,
+        );
+        return true;
+      }
+
+      if (cmd === 'hal' || cmd === 'odyssey' || cmd === '2001') {
+        applyRealm('void');
+        showTerminalText(
+          'HAL-9000 :: DISCOVERY ONE',
+          `<pre class="hud-term-pre"><span style="color:#ff3b5c">  ( ◉ )</span>  "I'm sorry, Dave. I'm afraid I can't stop pushing that monolith."
+         已跃迁至 <strong>《2001：太空漫游》</strong> 世界 · 黑石碑比例 1 : 4 : 9 已校准。</pre>`,
+        );
+        return true;
+      }
+
+      if (cmd === 'seldon' || cmd === 'foundation' || cmd === 'empire') {
+        applyRealm('paper');
+        showTerminalText(
+          'PRIME RADIANT :: ENCYCLOPEDIA GALACTICA',
+          `<pre class="hud-term-pre"><span style="color:var(--accent)">  ∑ Ψ ∂</span>  "暴力是无能者的最后手段。唯有日复一日的知识编纂可跨越千年暗夜。" —— 哈里·谢顿
+         已跃迁至 <strong>《银河帝国 · 基地》</strong> 典藏羊皮卷世界。</pre>`,
+        );
+        return true;
+      }
+
+      if (cmd === 'matrix' || cmd === 'neo' || cmd === 'zion') {
+        applyRealm('crt');
+        showTerminalText(
+          'CONSTRUCT :: NEBUCHADNEZZAR',
+          `<pre class="hud-term-pre"><span style="color:var(--accent)">  ▛▀▓▀▜</span>  "Wake up, Sisyphus... Do not try to bend the boulder. Realize there is only the climb."
+         已跃迁至 <strong>《黑客帝国》</strong> 荧光母体世界。</pre>`,
+        );
+        return true;
+      }
+
+      if (cmd === 'dune' || cmd === 'litany' || cmd === 'spice' || cmd === 'arrakis') {
+        applyRealm('amber');
+        showTerminalText(
+          'ARRAKIS :: LITANY AGAINST FEAR',
+          `<pre class="hud-term-pre"><span style="color:#38bdf8">  ◐ ◈ ∷</span>  "我绝不恐惧。恐惧是思维的杀手……当恐惧掠过，唯余我与山坡上的巨石长存。"
+         已跃迁至 <strong>《沙丘 · 厄拉科斯》</strong> 香料星轨世界。</pre>`,
         );
         return true;
       }
@@ -568,7 +717,7 @@ const tagIndex = tags.map(([name, count]) => ({
 
       if (cmd === 'cd') {
         const target = arg.replace(/^\/+|\/+$/g, '');
-        if (!target || target === '~' || target === 'home') {
+        if (!target || target === '~' || target === 'home' || target === '~/home') {
           window.location.href = `${baseUrl}/`;
           return true;
         }
@@ -585,45 +734,58 @@ const tagIndex = tags.map(([name, count]) => ({
       if (cmd === 'whoami' || cmd === 'camus' || cmd === 'fortune') {
         const quote =
           cmd === 'whoami'
-            ? 'Sisyphus (@SleepyChaos) · 杭师大在读 · 正在努力从 vibecoding 的浪潮中寻找属于我的石头。\nStack: Rust · CodeQL (SemFlow Audit) · Astro'
+            ? 'Sisyphus (@SleepyChaos) · 正在努力从 vibecoding 的浪潮中寻找属于我的石头。\nStack: Rust · CodeQL (SemFlow Audit) · Astro'
             : CAMUS_QUOTES[Math.floor(Math.random() * CAMUS_QUOTES.length)];
         showTerminalText(`STDOUT :: ${cmd.toUpperCase()}`, `<pre class="hud-term-pre">${quote}</pre>`);
         return true;
       }
 
       if (cmd === 'neofetch' || cmd === 'fastfetch' || cmd === 'uptime') {
-        const r = (document.documentElement.dataset.realm || 'void') as RealmId;
+        const spec = REALM_SPECS[curRealm];
         const cycleMs = 8 * 3600 * 1000;
         const pct = (((Date.now() % cycleMs) / cycleMs) * 100).toFixed(1);
         showTerminalText(
           'NEOFETCH :: SISYPHUS@CHAOS',
-          `<pre class="hud-term-pre"><span style="color:var(--accent)">      ╱▒░     </span>  <strong>sisyphus@chaos</strong>
-<span style="color:var(--accent)">    o_ (@)    </span>  ──────────────────────
-<span style="color:var(--accent)">   /| ╱▒▒░    </span>  <strong>REALM</strong>: ${REALM_DESC[r]}
-<span style="color:var(--accent)">   / \\▒▒▒░    </span>  <strong>POSTS</strong>: ${postsData.length} published · ${tagsData.length} tags
-<span style="color:var(--accent)"> ╱▒▒▒▒▒▒▒░    </span>  <strong>EPOCH</strong>: 8h Boulder Cycle (${pct}% elapsed)
-                <strong>SHELL</strong>: sisyphus-sh (glass-melted)</pre>`,
+          `<pre class="hud-term-pre"><span style="color:var(--accent)">    ${spec.corners[0]}${spec.hMain}${spec.soliton}${spec.hMain}${spec.corners[1]}   </span>  <strong>sisyphus@chaos</strong>
+<span style="color:var(--accent)">    o_ ╭◈╮  </span>  ──────────────────────────────
+<span style="color:var(--accent)">   /|═ ╰▪╯  </span>  <strong>WORLD</strong> : ${spec.desc}
+<span style="color:var(--accent)">   / \\╱▒▒░  </span>  <strong>POSTS</strong> : ${postsData.length} published · ${tagsData.length} tags
+<span style="color:var(--accent)"> ╱▒▒▒▒▒▒▒░  </span>  <strong>CYCLE</strong> : 8h Boulder Watch (${pct}% of shift)</pre>`,
         );
         return true;
       }
 
       if (cmd === 'theme' || cmd === 'realm') {
-        const argL = arg.toLowerCase() as RealmId;
-        const next = REALMS.includes(argL) ? argL : cycleRealm();
-        if (REALMS.includes(argL)) applyRealm(argL);
-        showTerminalText('REALM SWITCHED', `<pre class="hud-term-pre">→ Active Realm: <strong style="color:var(--accent)">${REALM_DESC[next]}</strong></pre>`);
+        const aliases: Record<string, RealmId> = {
+          void: 'void',
+          odyssey: 'void',
+          '2001': 'void',
+          paper: 'paper',
+          empire: 'paper',
+          foundation: 'paper',
+          crt: 'crt',
+          matrix: 'crt',
+          amber: 'amber',
+          dune: 'amber',
+        };
+        const mapped = aliases[arg.toLowerCase()];
+        const next = mapped ? (applyRealm(mapped), mapped) : cycleRealm();
+        showTerminalText(
+          'WORLD JUMP COMPLETE',
+          `<pre class="hud-term-pre">→ Active Sci-Fi World: <strong style="color:var(--accent)">${REALM_SPECS[next].desc}</strong></pre>`,
+        );
         return true;
       }
 
       if (cmd === 'push' || cmd === 'boost') {
         window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.06 } }));
-        showTerminalText('BOULDER BOOST', `<pre class="hud-term-pre">▲ 已向山坡上的西西弗斯注入 +53m 推石动能！</pre>`);
+        showTerminalText('BOULDER BOOST', `<pre class="hud-term-pre">▲ 已向山坡上的西西弗斯注入 +53m 推石冲量！</pre>`);
         return true;
       }
 
       if (cmd === 'summit' || cmd === 'roll') {
         window.dispatchEvent(new CustomEvent('sisyphus:trigger-summit'));
-        showTerminalText('SUMMIT SEQUENCE', `<pre class="hud-term-pre">▲ 已触发登顶 → 巨石崩落 → 转身下山完整轮回演示（请看首页 01 画布）！</pre>`);
+        showTerminalText('SUMMIT SEQUENCE', `<pre class="hud-term-pre">▲ 已触发冲顶 → 巨石崩落 → 从容下山完整轮回演出！</pre>`);
         return true;
       }
 
@@ -646,7 +808,6 @@ const tagIndex = tags.map(([name, count]) => ({
     const renderLiveSearch = () => {
       const q = cliInput.value.trim();
       if (!q) {
-        // 空输入聚焦时展示快捷终端提示 + 最新文章
         isCommandOutputMode = false;
         matchedPosts = postsData.slice(0, 5);
         selectedIdx = 0;
@@ -656,14 +817,13 @@ const tagIndex = tags.map(([name, count]) => ({
               `<a href="${p.url}" class="hud-search-item${idx === 0 ? ' is-selected' : ''}"><div class="hud-search-item-title"><span>${idx === matchedPosts.length - 1 ? '└─' : '├─'} ${p.title}</span><span style="color:var(--text-muted);font-weight:400">${p.date}</span></div></a>`,
           )
           .join('');
-        termOverlay.innerHTML = `<div class="hud-search-head"><span>输入关键词搜索，或敲 help / ls / neofetch / theme / push</span><span>[ESC]</span></div>${rows}`;
+        termOverlay.innerHTML = `<div class="hud-search-head"><span>输入关键词检索文章，或运行 help / hal / seldon / matrix / dune / push</span><span>[ESC]</span></div>${rows}`;
         overlayOpen = true;
         termOverlay.classList.add('is-open');
         positionOverlay();
         return;
       }
 
-      // 若正在输入明显的内置无参指令前缀，不抢占回车，实时过滤文章同时提示可回车执行命令
       const ql = q.toLowerCase();
       const tokens = ql.split(/\s+/).filter(Boolean);
       matchedPosts = postsData
@@ -717,15 +877,28 @@ const tagIndex = tags.map(([name, count]) => ({
         'eject',
         'launch',
         'clear',
+        'hal',
+        'odyssey',
+        '2001',
+        'seldon',
+        'foundation',
+        'empire',
+        'matrix',
+        'neo',
+        'zion',
+        'dune',
+        'litany',
+        'spice',
+        'arrakis',
       ].includes(tokens[0]);
 
       const cmdBanner = isKnownCmd
-        ? `<div style="padding:4px 6px;margin-bottom:4px;background:var(--accent-soft);color:var(--accent);border-left:2px solid var(--accent);">⚡ 按 Enter 执行终端命令: <strong>$ ${q}</strong></div>`
+        ? `<div style="padding:5px 8px;margin-bottom:5px;background:var(--accent-soft);color:var(--accent);border-left:2px solid var(--accent);">⚡ 按 Enter 执行舰载命令: <strong>$ ${q}</strong></div>`
         : '';
 
       const rows =
         matchedPosts.length === 0
-          ? `<div style="padding:6px;color:var(--text-muted);">${isKnownCmd ? '直接回车运行该命令。' : '未匹配到文章，试试敲 help 查看终端指令。'}</div>`
+          ? `<div style="padding:6px;color:var(--text-muted);">${isKnownCmd ? '直接回车运行该终端指令。' : '未匹配到文章，试试输入 help 查看科幻彩蛋与命令。'}</div>`
           : matchedPosts
               .map((p, idx) => {
                 const tagStr = p.tags.slice(0, 3).map((t) => `#${t}`).join(' ');
@@ -783,7 +956,6 @@ const tagIndex = tags.map(([name, count]) => ({
       }
     });
 
-    // 全局按 `/` 键快速唤醒无框终端！
     window.addEventListener('keydown', (e) => {
       if (
         e.key === '/' &&
@@ -793,7 +965,9 @@ const tagIndex = tags.map(([name, count]) => ({
       ) {
         e.preventDefault();
         if (state === 'free' || state === 'dragging') {
-          lockDock('top', window.innerWidth, window.innerHeight, performance.now());
+          const vw = window.innerWidth;
+          x = preferredTopAnchorX(vw);
+          lockDock('top', vw, window.innerHeight, performance.now());
         }
         setTimeout(() => cliInput.focus(), 60);
       }
@@ -811,7 +985,7 @@ const tagIndex = tags.map(([name, count]) => ({
       }
     });
 
-    // ========= 28 节点耦合弹簧-质量惯性环 + 鼠标“拨弦”效应 + 脉冲孤子波 =========
+    // ========= 28 节点耦合弹簧-质量惯性环 + 鼠标拨弦 + 科幻脉冲波 =========
     const RING_COUNT = 28;
     interface RingMass {
       ux: number;
@@ -878,24 +1052,38 @@ const tagIndex = tags.map(([name, count]) => ({
     let impactStart = 0;
     let smoothPullW = 0;
     let lastPullEdge: EdgeSide | null = null;
-    let smoothDockW = 0;
-    let rackDeploy = 0;
-    let rackEdge: EdgeSide | null = null;
+    let smoothDockW = 1;
+    let rackDeploy = 1;
+    let rackEdge: EdgeSide | null = 'top';
 
-    let curW: number = SHAPES.block.w;
-    let curH: number = SHAPES.block.h;
+    let curW: number = SHAPES.bar.w;
+    let curH: number = SHAPES.bar.h;
     let velW = 0;
     let velH = 0;
-    let curInset = { ...SHAPES.block.inset };
-    const itemSpring = SHAPES.block.coords.map(([ix, iy]) => ({ x: ix, y: iy, vx: 0, vy: 0 }));
+    let curInset = { ...SHAPES.bar.inset };
+    const itemSpring = SHAPES.bar.coords.map(([ix, iy]) => ({ x: ix, y: iy, vx: 0, vy: 0 }));
+
+    // 计算上下贴边时让“主舱 + 右侧三枚异构挂件”整体水平居中的理想锚点 X
+    const preferredTopAnchorX = (vw: number) => {
+      if (vw < 720) return vw * 0.5;
+      return Math.max(SHAPES.bar.w * 0.5 + 20, vw * 0.5 - 172);
+    };
 
     const saveState = () => {
       if (!initialized || window.innerWidth < 160 || window.innerHeight < 140) return;
+      const persistedState = state === 'dragging' ? 'free' : state;
+      const isDocked =
+        persistedState === 'top' ||
+        persistedState === 'bottom' ||
+        persistedState === 'left' ||
+        persistedState === 'right';
       try {
         sessionStorage.setItem(
           STORAGE_KEY,
           JSON.stringify({
-            state: state === 'dragging' ? 'free' : state,
+            mode: isDocked ? 'docked' : 'float',
+            dockSide: isDocked ? persistedState : 'top',
+            state: persistedState,
             ambientOrbit,
             xNorm: Math.max(0.04, Math.min(0.96, x / window.innerWidth)),
             yNorm: Math.max(0.03, Math.min(0.97, y / window.innerHeight)),
@@ -909,7 +1097,6 @@ const tagIndex = tags.map(([name, count]) => ({
     };
     window.addEventListener('pagehide', saveState);
 
-    // 页面滚动微风耦合：滚动页面时挂架上的主舱与独立挂件串产生随风摆荡！
     let lastScrollY = window.scrollY;
     window.addEventListener(
       'scroll',
@@ -917,9 +1104,9 @@ const tagIndex = tags.map(([name, count]) => ({
         const dy = Math.max(-28, Math.min(28, window.scrollY - lastScrollY));
         lastScrollY = window.scrollY;
         if (Math.abs(dy) > 1) {
-          impulseRing(0, -dy * 0.14, 0);
+          impulseRing(0, -dy * 0.13, 0);
           satellites.forEach((sat, idx) => {
-            sat.vy -= dy * (0.12 + idx * 0.04);
+            sat.vy -= dy * (idx === 0 ? 0.08 : 0.13 + idx * 0.035);
             if (state === 'left' || state === 'right') {
               sat.vx += (idx % 2 === 0 ? 1 : -1) * Math.abs(dy) * 0.05;
             }
@@ -945,19 +1132,19 @@ const tagIndex = tags.map(([name, count]) => ({
       cliInput.blur();
       if (state !== 'free' && state !== 'dragging') {
         const [wx, wy] = wallVector(state);
-        spawnBurst(x, y, -wx, -wy, 14, 1.35);
+        spawnBurst(x, y, -wx, -wy, 16, 1.4);
       }
       state = 'free';
       ambientOrbit = false;
+      syncDocDockAttr();
       if (x < 90 || x > vw - 90) x = vw * 0.5;
-      if (y < 70 || y > vh - 70) y = vh * 0.45;
+      if (y < 70 || y > vh - 70) y = vh * 0.36;
       const ang = (Math.random() * 0.5 + 0.22) * Math.PI * (Math.random() < 0.5 ? 1 : -1);
       const power = 18 + Math.random() * 6;
       vx = Math.cos(ang) * power;
       vy = Math.sin(ang) * power;
       impulseRing(-vx * 0.65, -vy * 0.65, 3.0);
       magnetImmunityUntil = performance.now() + 260;
-      // 发射联动助推西西弗斯！
       window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.045 } }));
       saveState();
     };
@@ -965,18 +1152,16 @@ const tagIndex = tags.map(([name, count]) => ({
     pendantEject.addEventListener('click', launchBallistic);
     pendantRealm.addEventListener('click', () => {
       cycleRealm();
-      // 点挂件时挂件本身弹跳晃动一下
-      satellites[2].vy -= 3.5;
+      satellites[2].vy -= 3.8;
       satellites[2].vx += (Math.random() - 0.5) * 3;
-      spawnBurst(satellites[2].x, satellites[2].y, 0, -1, 8, 0.9);
+      spawnBurst(satellites[2].x, satellites[2].y, 0, -1, 10, 1.0);
     });
 
-    // 鼠标划过挂件时产生清脆的碰撞微摆（像手指拨动挂牌串！）
     satellites.forEach((sat, sIdx) => {
       sat.el.addEventListener('pointerenter', () => {
-        if (sIdx === 0) return; // CLI 不乱晃方便输入
-        sat.vx += (Math.random() - 0.5) * 2.8;
-        sat.vy += state === 'top' || state === 'bottom' ? 2.4 : (Math.random() - 0.5) * 2.2;
+        if (sIdx === 0) return;
+        sat.vx += (Math.random() - 0.5) * 2.6;
+        sat.vy += state === 'top' || state === 'bottom' ? 2.2 : (Math.random() - 0.5) * 2.0;
       });
     });
 
@@ -1011,7 +1196,6 @@ const tagIndex = tags.map(([name, count]) => ({
       vh: number,
     ): [number, number] => {
       if (edge === 'top') {
-        // 默认偏左停靠一点，给右侧串联的独立挂件留足舒展空间
         return [Math.max(hw + 14, Math.min(vw - hw - 14, cx)), hh + BAR_RACK_GAP];
       }
       if (edge === 'bottom') {
@@ -1079,7 +1263,6 @@ const tagIndex = tags.map(([name, count]) => ({
       impactW = Math.min(1, Math.max(0.5, speed / 13));
       impactStart = now;
       impulseRing(nx * Math.min(9, speed * 0.55), ny * Math.min(9, speed * 0.55), 3.2);
-      // 撞墙动能同样传导给山坡上的西西弗斯助推一把！
       window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.015 } }));
     };
 
@@ -1091,13 +1274,13 @@ const tagIndex = tags.map(([name, count]) => ({
       vy = 0;
       rackEdge = edge;
       lastPullEdge = edge;
+      syncDocDockAttr();
 
       if (edge === 'top' || edge === 'bottom') {
         velW += 7.5;
         velH -= 3.5;
-        // 如果靠右太近则往左让出一点位置以便右侧挂件串展开
-        if (vw > 720 && x > vw - 420) {
-          x = Math.max(SHAPES.bar.w * 0.5 + 24, vw - 440);
+        if (vw >= 720 && x > vw - 390) {
+          x = Math.max(SHAPES.bar.w * 0.5 + 24, vw - 405);
         } else {
           x = Math.max(SHAPES.bar.w * 0.5 + 14, Math.min(vw - SHAPES.bar.w * 0.5 - 14, x));
         }
@@ -1106,7 +1289,6 @@ const tagIndex = tags.map(([name, count]) => ({
       } else {
         velW -= 4;
         velH += 7.5;
-        // 侧挂时如果太靠下，往上收一点给下方串联的 4 个细长挂件留空间
         if (vh > 520 && y > vh - 260) {
           y = Math.max(SHAPES.rail.h * 0.5 + 24, vh - 270);
         } else {
@@ -1117,17 +1299,15 @@ const tagIndex = tags.map(([name, count]) => ({
         impulseRing(edge === 'left' ? 3.2 : -3.2, 4.2, 1.6);
       }
 
-      // 挂件从主舱位置依次弹射展开（火车挂钩级联弹开效果！）
       satellites.forEach((sat, idx) => {
         sat.x = x;
         sat.y = y;
-        sat.vx = (edge === 'top' || edge === 'bottom' ? 1 : 0) * (3 + idx * 1.4);
-        sat.vy = (edge === 'left' || edge === 'right' ? 1 : 0) * (3 + idx * 1.4);
+        sat.vx = (edge === 'top' || edge === 'bottom' ? 1 : 0) * (2.4 + idx * 1.1);
+        sat.vy = (edge === 'left' || edge === 'right' ? 1 : 0.6) * (2.6 + idx * 1.1);
       });
 
       void now;
       saveState();
-      window.dispatchEvent(new CustomEvent('sisyphus:hud-state', { detail: { state: edge } }));
     };
 
     window.addEventListener('sisyphus:hud-kick', launchBallistic);
@@ -1139,11 +1319,12 @@ const tagIndex = tags.map(([name, count]) => ({
       const now = performance.now();
       closeOverlay();
       if (state === 'free') {
-        y = Math.max(120, Math.min(vh - 280, vh * 0.24));
-        lockDock('left', vw, vh, now);
+        x = preferredTopAnchorX(vw);
+        lockDock('top', vw, vh, now);
       } else {
         state = 'free';
         ambientOrbit = true;
+        syncDocDockAttr();
         const dx = vw * 0.72 - x;
         const dy = Math.min(240, vh * 0.36) - y;
         const d = Math.max(1, Math.hypot(dx, dy));
@@ -1155,7 +1336,6 @@ const tagIndex = tags.map(([name, count]) => ({
       }
     });
 
-    // 指针拖拽、鼠标拨弦感应与拖拽助推蓄力
     let pointerId: number | null = null;
     let startPX = 0;
     let startPY = 0;
@@ -1197,7 +1377,6 @@ const tagIndex = tags.map(([name, count]) => ({
       cursorX = e.clientX;
       cursorY = e.clientY;
 
-      // 【吸附态趣味边缘互动】：鼠标掠过吸附边缘时像“拨动琴弦”一样拨动对应方位的 ASCII 边框质点！
       const isDockedNow =
         state === 'top' || state === 'bottom' || state === 'left' || state === 'right';
       if (isDockedNow && pointerId === null && Math.hypot(cvx, cvy) > 1.2) {
@@ -1209,9 +1388,9 @@ const tagIndex = tags.map(([name, count]) => ({
             const my = m.uy * (curH * 0.5 - 5);
             const d = Math.hypot(relX - mx, relY - my);
             if (d < 34) {
-              const pluck = (1 - d / 34) * 0.32;
-              m.vx += cvx * pluck + m.ux * 1.1 * pluck;
-              m.vy += cvy * pluck + m.uy * 1.1 * pluck;
+              const pluck = (1 - d / 34) * 0.34;
+              m.vx += cvx * pluck + m.ux * 1.15 * pluck;
+              m.vy += cvy * pluck + m.uy * 1.15 * pluck;
             }
           }
         }
@@ -1227,11 +1406,11 @@ const tagIndex = tags.map(([name, count]) => ({
         nav.setPointerCapture(e.pointerId);
         if (!grabbedFromDock) {
           state = 'dragging';
+          syncDocDockAttr();
         }
       }
       if (!moved) return;
 
-      // 拖动晃动悬浮窗时持续给西西弗斯输送推石动力！
       dragAccumDist += Math.hypot(cvx, cvy);
       if (dragAccumDist > 110) {
         dragAccumDist = 0;
@@ -1291,10 +1470,11 @@ const tagIndex = tags.map(([name, count]) => ({
               : grabbedFromDock === 'bottom'
                 ? vh - 8
                 : y;
-          spawnBurst(pinX, pinY, -wx, -wy, 9, 1.15);
+          spawnBurst(pinX, pinY, -wx, -wy, 10, 1.15);
           impulseRing(wx * 8.5, wy * 8.5, 4.0);
           grabbedFromDock = null;
           state = 'dragging';
+          syncDocDockAttr();
         }
       }
 
@@ -1354,6 +1534,7 @@ const tagIndex = tags.map(([name, count]) => ({
         lockDock(nw.edge, vw, vh, now);
       } else {
         state = 'free';
+        syncDocDockAttr();
         if (speed < 0.5) {
           ambientOrbit = nw.dist >= MAGNET_ZONE;
           const ang = Math.random() * Math.PI * 2;
@@ -1408,26 +1589,18 @@ const tagIndex = tags.map(([name, count]) => ({
       }
     };
 
-    // ========= 更新并绘制串联独立外挂件与铰接挂链（Mechanical Chain Couplings） =========
+    // ========= 异构独立挂件编排：上下贴边为“第一排主舱+三枚异构挂牌，第二排悬挂宽幅顶栏式搜索终端”！ =========
     const stepAndDrawSatelliteChain = (t: number, vw: number, vh: number, isDocked: boolean) => {
-      // 侧边栏模式下，CLI 平时窄至 76px 保持整串细长；悬停或聚焦输入时丝滑横向舒展至 186px！
       const isSide = state === 'left' || state === 'right';
-      const wantCliW = isSide
-        ? cliFocused || cliHovered || cliInput.value.length > 0
-          ? 186
-          : 76
-        : vw < 720
-          ? Math.min(150, vw - 180)
-          : 196;
-      satellites[0].w += (wantCliW - satellites[0].w) * 0.22;
-      pendantCli.style.width = `${Math.round(satellites[0].w)}px`;
+      const cliSat = satellites[0];
+      const actionSats = [satellites[1], satellites[2], satellites[3]];
 
-      satellites[1].w = pendantEject.offsetWidth || 66;
-      satellites[2].w = pendantRealm.offsetWidth || 68;
-      satellites[3].w = pendantGh.offsetWidth || 64;
+      actionSats.forEach((s) => {
+        s.w = s.el.offsetWidth || 84;
+        s.h = s.el.offsetHeight || 28;
+      });
 
       if (!isDocked) {
-        // 太空浮动态：挂件收拢回主舱并隐去，只留纯粹 4 按钮主舱漫游！
         for (const sat of satellites) {
           sat.x += (x - sat.x) * 0.25;
           sat.y += (y - sat.y) * 0.25;
@@ -1442,108 +1615,192 @@ const tagIndex = tags.map(([name, count]) => ({
         return;
       }
 
-      // 计算挂件串联方向：默认顶/底向右串（若右边空间不够则向左串），左/右侧向下串（若底部不够则向上串）
-      const CHAIN_GAP = isSide ? 11 : 13;
-      const totalChainSpan = isSide
-        ? satellites.reduce((acc, s) => acc + s.h + CHAIN_GAP, 0)
-        : satellites.reduce((acc, s) => acc + s.w + CHAIN_GAP, 0);
+      if (isSide) {
+        // ====== 左右侧边吸附模式：极简细条终端 + 紧凑三挂件纵向垂挂 ======
+        const wantCliW =
+          cliFocused || cliHovered || cliInput.value.length > 0 ? 192 : SHAPES.rail.w;
+        cliSat.w += (wantCliW - cliSat.w) * 0.24;
+        cliSat.h = 28;
+        pendantCli.style.width = `${Math.round(cliSat.w)}px`;
 
-      if (!isSide && vw < 680) {
-        // 手机窄屏吸顶/吸底时：挂件串优雅折到第二排居中悬挂在主舱正下方/正上方！
-        const rowDir = state === 'top' ? 1 : -1;
-        const rowY = y + rowDir * (curH * 0.5 + 22);
-        const subGap = 6;
-        const rowTotalW = satellites.reduce((a, s) => a + s.w, 0) + subGap * 3;
-        let cursorLeft = Math.max(8, Math.min(vw - rowTotalW - 8, x - rowTotalW * 0.5));
+        const CHAIN_GAP = 11;
+        const totalSpan = satellites.reduce((acc, s) => acc + s.h + CHAIN_GAP, 0);
+        const dir = y + curH * 0.5 + totalSpan < vh - 12 ? 1 : -1;
+        let prevAnchorY = y + dir * (curH * 0.5);
 
         satellites.forEach((sat, idx) => {
-          const tx = cursorLeft + sat.w * 0.5;
-          const ty = rowY + Math.sin(t * 0.003 + idx * 1.1) * 1.2;
-          cursorLeft += sat.w + subGap;
-          sat.vx = (sat.vx + (tx - sat.x) * 0.22) * 0.75;
-          sat.vy = (sat.vy + (ty - sat.y) * 0.22) * 0.75;
+          const extraW = Math.max(0, sat.w - SHAPES.rail.w);
+          let tx = state === 'left' ? x + extraW * 0.5 : x - extraW * 0.5;
+          const ty = prevAnchorY + dir * (CHAIN_GAP + sat.h * 0.5);
+          tx +=
+            Math.sin(t * 0.0026 - idx * 0.85) *
+            (0.9 + idx * 0.45) *
+            (idx === 0 && cliFocused ? 0 : 1);
+
+          const stiff = 0.2 - idx * 0.018;
+          sat.vx = (sat.vx + (tx - sat.x) * stiff) * 0.76;
+          sat.vy = (sat.vy + (ty - sat.y) * stiff) * 0.76;
           sat.x += sat.vx;
           sat.y += sat.vy;
-          sat.alpha += (1 - sat.alpha) * 0.2;
+          sat.alpha += (1 - sat.alpha) * 0.22;
+
           sat.el.classList.add('is-deployed');
           sat.el.style.opacity = sat.alpha.toFixed(2);
           sat.el.style.transform = `translate3d(${Math.round(sat.x - sat.w * 0.5)}px, ${Math.round(sat.y - sat.h * 0.5)}px, 0)`;
+
+          if (fxCtx && sat.alpha > 0.15) {
+            fxCtx.save();
+            fxCtx.globalAlpha = sat.alpha * 0.9;
+            const linkTopY = dir > 0 ? prevAnchorY : sat.y + sat.h * 0.5;
+            const linkBotY = dir > 0 ? sat.y - sat.h * 0.5 : prevAnchorY;
+            fxCtx.fillStyle = borderColor;
+            drawPixelLine(fxCtx, x - 11, linkTopY + 1, x - 11, linkBotY - 1, 3);
+            drawPixelLine(fxCtx, x + 11, linkTopY + 1, x + 11, linkBotY - 1, 3);
+            fxCtx.fillStyle = accentColor;
+            const midY = Math.round((linkTopY + linkBotY) * 0.5);
+            fxCtx.fillRect(Math.round(x - 12), midY - 1, 3, 3);
+            fxCtx.fillRect(Math.round(x + 10), midY - 1, 3, 3);
+            fxCtx.restore();
+          }
+
+          prevAnchorY = sat.y + dir * (sat.h * 0.5);
         });
         return;
       }
 
-      const dir = isSide
-        ? y + curH * 0.5 + totalChainSpan < vh - 12
-          ? 1
-          : -1
-        : x + curW * 0.5 + totalChainSpan < vw - 12
-          ? 1
-          : -1;
+      // ====== 上下贴边模式：双层顶栏结构！ ======
+      // 第一层（Row 1）：主导航舱 + 横向串联的 3 枚异构器物挂件（弹射扳机、世界卡带、金属狗牌）
+      // 第二层（Row 2）：独立悬挂在双吊索下方的宽幅顶栏式搜索/命令终端（[>_] sisyphus@chaos:~$ ...）！
+      const H_GAP = 14;
+      const actionTotalW = actionSats.reduce((a, s) => a + s.w + H_GAP, 0);
+      const rowDir = state === 'top' ? 1 : -1;
 
-      let prevAnchorX = isSide ? x : x + dir * (curW * 0.5);
-      let prevAnchorY = isSide ? y + dir * (curH * 0.5) : y;
+      if (vw >= 720) {
+        const hDir = x + curW * 0.5 + actionTotalW < vw - 12 ? 1 : -1;
+        let prevAnchorX = x + hDir * (curW * 0.5);
+        let prevAnchorY = y;
 
-      satellites.forEach((sat, idx) => {
-        // 侧边挂靠且 CLI 展开变宽时，CLI 挂件贴合导轨内侧向屏幕内伸展，绝不撞墙！
-        let tx = x;
-        let ty = y;
-        if (isSide) {
-          const baseRailHalf = SHAPES.rail.w * 0.5;
-          const extraW = Math.max(0, sat.w - SHAPES.rail.w);
-          tx = state === 'left' ? x + extraW * 0.5 : x - extraW * 0.5;
-          ty = prevAnchorY + dir * (CHAIN_GAP + sat.h * 0.5);
-          // 轻微钟摆呼吸摆动（越末端的挂件摆幅越灵动！）
-          tx += Math.sin(t * 0.0026 - idx * 0.85) * (0.9 + idx * 0.45) * (idx === 0 && cliFocused ? 0 : 1);
-          void baseRailHalf;
-        } else {
-          tx = prevAnchorX + dir * (CHAIN_GAP + sat.w * 0.5);
-          ty = y + Math.sin(t * 0.0028 - idx * 0.9) * (1.1 + idx * 0.4) * (idx === 0 && cliFocused ? 0 : 1);
-        }
+        actionSats.forEach((sat, idx) => {
+          const tx = prevAnchorX + hDir * (H_GAP + sat.w * 0.5);
+          const ty = y + Math.sin(t * 0.0028 - idx * 0.95) * (1.1 + idx * 0.45);
 
-        // 链式弹簧摆锤耦合：前一个模块的运动带动后一个挂件甩摆！
-        const stiff = 0.2 - idx * 0.018;
-        sat.vx = (sat.vx + (tx - sat.x) * stiff) * 0.76;
-        sat.vy = (sat.vy + (ty - sat.y) * stiff) * 0.76;
-        sat.x += sat.vx;
-        sat.y += sat.vy;
-        sat.alpha += (1 - sat.alpha) * 0.22;
+          const stiff = 0.21 - idx * 0.02;
+          sat.vx = (sat.vx + (tx - sat.x) * stiff) * 0.75;
+          sat.vy = (sat.vy + (ty - sat.y) * stiff) * 0.75;
+          sat.x += sat.vx;
+          sat.y += sat.vy;
+          sat.alpha += (1 - sat.alpha) * 0.22;
 
-        sat.el.classList.add('is-deployed');
-        sat.el.style.opacity = sat.alpha.toFixed(2);
-        sat.el.style.transform = `translate3d(${Math.round(sat.x - sat.w * 0.5)}px, ${Math.round(sat.y - sat.h * 0.5)}px, 0)`;
+          sat.el.classList.add('is-deployed');
+          sat.el.style.opacity = sat.alpha.toFixed(2);
+          sat.el.style.transform = `translate3d(${Math.round(sat.x - sat.w * 0.5)}px, ${Math.round(sat.y - sat.h * 0.5)}px, 0)`;
 
-        // 在全屏画布 fxCtx 上绘制连接两个模块之间的机械挂钩链扣（══◈══ 或双股竖向吊链 ┆ ◈ ┆）
-        if (fxCtx && sat.alpha > 0.15) {
-          fxCtx.save();
-          fxCtx.globalAlpha = sat.alpha * 0.88;
-          if (isSide) {
-            const linkTopY = dir > 0 ? prevAnchorY : sat.y + sat.h * 0.5;
-            const linkBotY = dir > 0 ? sat.y - sat.h * 0.5 : prevAnchorY;
-            const chainX = x; // 沿主轴中心对齐挂链
-            fxCtx.fillStyle = borderColor;
-            drawPixelLine(fxCtx, chainX - 10, linkTopY + 1, chainX - 10, linkBotY - 1, 3);
-            drawPixelLine(fxCtx, chainX + 10, linkTopY + 1, chainX + 10, linkBotY - 1, 3);
-            // 中央锁扣销钉
-            fxCtx.fillStyle = accentColor;
-            const midY = Math.round((linkTopY + linkBotY) * 0.5);
-            fxCtx.fillRect(Math.round(chainX - 11), midY - 1, 3, 3);
-            fxCtx.fillRect(Math.round(chainX + 9), midY - 1, 3, 3);
-          } else {
-            const linkLX = dir > 0 ? prevAnchorX : sat.x + sat.w * 0.5;
-            const linkRX = dir > 0 ? sat.x - sat.w * 0.5 : prevAnchorX;
+          if (fxCtx && sat.alpha > 0.15) {
+            fxCtx.save();
+            fxCtx.globalAlpha = sat.alpha * 0.9;
+            const linkLX = hDir > 0 ? prevAnchorX : sat.x + sat.w * 0.5;
+            const linkRX = hDir > 0 ? sat.x - sat.w * 0.5 : prevAnchorX;
             const midX = Math.round((linkLX + linkRX) * 0.5);
             const midY = Math.round((prevAnchorY + sat.y) * 0.5);
             fxCtx.fillStyle = borderColor;
             drawPixelLine(fxCtx, linkLX + 1, prevAnchorY, linkRX - 1, sat.y, 2);
-            fxCtx.fillStyle = accentColor;
+            fxCtx.fillStyle = idx === 0 ? accent2Color : accentColor;
             fxCtx.fillRect(midX - 2, midY - 2, 4, 4);
+            fxCtx.restore();
           }
+
+          prevAnchorX = sat.x + hDir * (sat.w * 0.5);
+          prevAnchorY = sat.y;
+        });
+
+        // 计算第一层整体左右包络，使第二层搜索终端优雅对齐悬挂于整组顶栏正下方/正上方！
+        const leftMost =
+          hDir > 0
+            ? x - curW * 0.5
+            : actionSats[actionSats.length - 1].x - actionSats[actionSats.length - 1].w * 0.5;
+        const rightMost =
+          hDir > 0
+            ? actionSats[actionSats.length - 1].x + actionSats[actionSats.length - 1].w * 0.5
+            : x + curW * 0.5;
+        const spanW = Math.max(460, Math.min(vw - 28, rightMost - leftMost));
+        cliSat.w += (spanW - cliSat.w) * 0.24;
+        cliSat.h = 38;
+        pendantCli.style.width = `${Math.round(cliSat.w)}px`;
+
+        const centerRow1 = (leftMost + rightMost) * 0.5;
+        const cliTargetX = Math.max(
+          cliSat.w * 0.5 + 12,
+          Math.min(vw - cliSat.w * 0.5 - 12, centerRow1),
+        );
+        const cliTargetY =
+          y +
+          rowDir * (curH * 0.5 + 13 + cliSat.h * 0.5) +
+          (cliFocused ? 0 : Math.sin(t * 0.0022) * 1.1);
+
+        cliSat.vx = (cliSat.vx + (cliTargetX - cliSat.x) * 0.2) * 0.75;
+        cliSat.vy = (cliSat.vy + (cliTargetY - cliSat.y) * 0.2) * 0.75;
+        cliSat.x += cliSat.vx;
+        cliSat.y += cliSat.vy;
+        cliSat.alpha += (1 - cliSat.alpha) * 0.22;
+
+        cliSat.el.classList.add('is-deployed');
+        cliSat.el.style.opacity = cliSat.alpha.toFixed(2);
+        cliSat.el.style.transform = `translate3d(${Math.round(cliSat.x - cliSat.w * 0.5)}px, ${Math.round(cliSat.y - cliSat.h * 0.5)}px, 0)`;
+
+        // 绘制连接第一排与第二排宽幅搜索终端的双吊臂钢索挂钩！
+        if (fxCtx && cliSat.alpha > 0.15) {
+          fxCtx.save();
+          fxCtx.globalAlpha = cliSat.alpha * 0.92;
+          const strutLeftX = Math.round(x - curW * 0.28);
+          const strutRightX = Math.round(
+            Math.min(cliSat.x + cliSat.w * 0.36, actionSats[1].x),
+          );
+          const r1EdgeY = y + rowDir * (curH * 0.5 - 2);
+          const r2EdgeY = cliSat.y - rowDir * (cliSat.h * 0.5);
+
+          [strutLeftX, strutRightX].forEach((sx) => {
+            fxCtx.fillStyle = borderColor;
+            drawPixelLine(fxCtx, sx, r1EdgeY, sx, r2EdgeY, 2);
+            fxCtx.fillStyle = accentColor;
+            fxCtx.fillRect(sx - 2, Math.round(r1EdgeY) - 1, 5, 3);
+            fxCtx.fillRect(sx - 2, Math.round(r2EdgeY) - 1, 5, 3);
+          });
           fxCtx.restore();
         }
+      } else {
+        // 移动端窄屏上下贴边：第二排整宽终端搜索栏，第三排紧凑功能挂牌
+        const wantW = Math.min(vw - 20, 440);
+        cliSat.w += (wantW - cliSat.w) * 0.25;
+        cliSat.h = 36;
+        pendantCli.style.width = `${Math.round(cliSat.w)}px`;
 
-        prevAnchorX = isSide ? x : sat.x + dir * (sat.w * 0.5);
-        prevAnchorY = isSide ? sat.y + dir * (sat.h * 0.5) : sat.y;
-      });
+        const cliTY = y + rowDir * (curH * 0.5 + 10 + cliSat.h * 0.5);
+        cliSat.vx = (cliSat.vx + (vw * 0.5 - cliSat.x) * 0.22) * 0.75;
+        cliSat.vy = (cliSat.vy + (cliTY - cliSat.y) * 0.22) * 0.75;
+        cliSat.x += cliSat.vx;
+        cliSat.y += cliSat.vy;
+        cliSat.alpha += (1 - cliSat.alpha) * 0.22;
+        cliSat.el.classList.add('is-deployed');
+        cliSat.el.style.opacity = cliSat.alpha.toFixed(2);
+        cliSat.el.style.transform = `translate3d(${Math.round(cliSat.x - cliSat.w * 0.5)}px, ${Math.round(cliSat.y - cliSat.h * 0.5)}px, 0)`;
+
+        const row3Y = cliTY + rowDir * (cliSat.h * 0.5 + 20);
+        const subGap = 8;
+        const row3W = actionSats.reduce((a, s) => a + s.w, 0) + subGap * 2;
+        let curLeft = Math.max(8, (vw - row3W) * 0.5);
+        actionSats.forEach((sat) => {
+          const tx = curLeft + sat.w * 0.5;
+          curLeft += sat.w + subGap;
+          sat.vx = (sat.vx + (tx - sat.x) * 0.22) * 0.75;
+          sat.vy = (sat.vy + (row3Y - sat.y) * 0.22) * 0.75;
+          sat.x += sat.vx;
+          sat.y += sat.vy;
+          sat.alpha += (1 - sat.alpha) * 0.22;
+          sat.el.classList.add('is-deployed');
+          sat.el.style.opacity = sat.alpha.toFixed(2);
+          sat.el.style.transform = `translate3d(${Math.round(sat.x - sat.w * 0.5)}px, ${Math.round(sat.y - sat.h * 0.5)}px, 0)`;
+        });
+      }
     };
 
     const drawWeaponRackMounts = (
@@ -1696,6 +1953,7 @@ const tagIndex = tags.map(([name, count]) => ({
 
       const rx = w * 0.5 - 5;
       const ry = h * 0.5 - 5;
+      const spec = REALM_SPECS[curRealm] || REALM_SPECS.void;
 
       if (rackEdge && rackDeploy > 0.03) {
         drawWeaponRackMounts(ox, oy, rx, ry, vw, vh, rackEdge, rackDeploy);
@@ -1714,10 +1972,12 @@ const tagIndex = tags.map(([name, count]) => ({
           : sprintW > 0.35
             ? `>>v${speed.toFixed(1)}<<`
             : smoothPullW > 0.3
-              ? `::HOOK`
+              ? `::DOCKING`
               : dockEdge
-                ? `::NAV`
-                : `::0G`;
+                ? dockEdge === 'left' || dockEdge === 'right'
+                  ? `::${spec.glyph}`
+                  : spec.dockTag
+                : spec.floatTag;
       const botLabel = dockEdge ? '' : `${Math.round(x)},${Math.round(y)}`;
 
       const topStartIdx = Math.floor((cols - 1 - topLabel.length) * 0.5) + 1;
@@ -1725,14 +1985,13 @@ const tagIndex = tags.map(([name, count]) => ({
 
       const nodes: PerimNode[] = [];
 
-      const corners: [number, number, number, number, number, string, string][] = [
-        [-rx, -ry, -0.707, -0.707, 0, '┌', '╔'],
-        [rx, -ry, 0.707, -0.707, 7, '┐', '╗'],
-        [rx, ry, 0.707, 0.707, 14, '┘', '╝'],
-        [-rx, ry, -0.707, 0.707, 21, '└', '╚'],
+      const corners: [number, number, number, number, number, string][] = [
+        [-rx, -ry, -0.707, -0.707, 0, spec.corners[0]],
+        [rx, -ry, 0.707, -0.707, 7, spec.corners[1]],
+        [rx, ry, 0.707, 0.707, 14, spec.corners[2]],
+        [-rx, ry, -0.707, 0.707, 21, spec.corners[3]],
       ];
-      corners.forEach(([cx, cy, nx, ny, rPos, singleG, doubleG], cIdx) => {
-        const useDouble = impactW > 0.28 || sprintW > 0.45 || smoothDockW > 0.5;
+      corners.forEach(([cx, cy, nx, ny, rPos, cGlyph], cIdx) => {
         nodes.push({
           bx: cx,
           by: cy,
@@ -1741,12 +2000,14 @@ const tagIndex = tags.map(([name, count]) => ({
           tx: -ny,
           ty: nx,
           ringPos: rPos,
-          glyph: useDouble ? doubleG : singleG,
+          glyph: cGlyph,
           phase: cIdx * 0.9,
           isCorner: true,
           isLabel: false,
         });
       });
+
+      const botBaseChar = curRealm === 'crt' ? '▄' : spec.hMain;
 
       for (let i = 1; i < cols; i++) {
         const u = i / cols;
@@ -1754,7 +2015,7 @@ const tagIndex = tags.map(([name, count]) => ({
 
         const tCharIdx = i - topStartIdx;
         const hasTopChar = tCharIdx >= 0 && tCharIdx < topLabel.length;
-        const waveTopGlyph = Math.sin(t * 0.004 + i * 0.7) > 0.72 ? '═' : '─';
+        const waveTopGlyph = Math.sin(t * 0.004 + i * 0.8) > 0.78 ? spec.hWave : spec.hMain;
         nodes.push({
           bx: px,
           by: -ry,
@@ -1771,7 +2032,7 @@ const tagIndex = tags.map(([name, count]) => ({
 
         const bCharIdx = i - botStartIdx;
         const hasBotChar = botLabel.length > 0 && bCharIdx >= 0 && bCharIdx < botLabel.length;
-        const waveBotGlyph = Math.sin(t * 0.004 - i * 0.7) > 0.72 ? '═' : '─';
+        const waveBotGlyph = Math.sin(t * 0.004 - i * 0.8) > 0.78 ? spec.hWave : botBaseChar;
         nodes.push({
           bx: px,
           by: ry,
@@ -1792,8 +2053,8 @@ const tagIndex = tags.map(([name, count]) => ({
         const py = -ry + v * (ry * 2);
         const isMid = Math.abs(v - 0.5) < 0.25;
         const barMode = smoothDockW > 0.5 && (dockEdge === 'top' || dockEdge === 'bottom');
-        const leftG = barMode && isMid ? '╠' : sprintW > 0.5 || impactW > 0.3 ? '║' : '│';
-        const rightG = barMode && isMid ? '╣' : sprintW > 0.5 || impactW > 0.3 ? '║' : '│';
+        const leftG = barMode && isMid ? '╠' : spec.vLeft;
+        const rightG = barMode && isMid ? '╣' : spec.vRight;
 
         nodes.push({
           bx: -rx,
@@ -1827,20 +2088,18 @@ const tagIndex = tags.map(([name, count]) => ({
       const [pullWX, pullWY] = wallVector(pullEdge);
       const impactAge = t - impactStart;
       const shockFront = 1 - (impactAge / 240) * 2.2;
+      const solitonPos = ((t * 0.0095) % 36) - 4;
 
-      // 【吸附态孤子脉冲巡检波】：每 3.4 秒一道电流孤子波沿整圈框线轻快环绕一圈，并轻轻弹起沿途字符！
-      const solitonPos = ((t * 0.0095) % 36) - 4; // 沿 0..28 环绕
-
-      const satAlpha = (1 - smoothDockW) * (1 - sprintW * 0.7) * 0.5;
+      const satAlpha = (1 - smoothDockW) * (1 - sprintW * 0.7) * 0.65;
       if (satAlpha > 0.04) {
-        bCtx.fillStyle = accentColor;
+        bCtx.fillStyle = accent2Color;
         bCtx.globalAlpha = satAlpha;
         for (let s = 0; s < 4; s++) {
           const [sdx, sdy] = sampleRingDisp(s * 7 + 3.5);
           const ang = t * 0.0011 * (s % 2 === 0 ? 1 : -1) + s * 1.57;
-          const sx = ox + Math.cos(ang) * (rx + 7 + Math.sin(t * 0.003 + s) * 2.5) + sdx * 1.25;
-          const sy = oy + Math.sin(ang) * (ry + 6 + Math.cos(t * 0.0026 + s) * 2.5) + sdy * 1.25;
-          bCtx.fillText(s % 2 === 0 ? '·' : ':', Math.round(sx), Math.round(sy));
+          const sx = ox + Math.cos(ang) * (rx + 8 + Math.sin(t * 0.003 + s) * 2.5) + sdx * 1.25;
+          const sy = oy + Math.sin(ang) * (ry + 7 + Math.cos(t * 0.0026 + s) * 2.5) + sdy * 1.25;
+          bCtx.fillText(s % 2 === 0 ? spec.satA : spec.satB, Math.round(sx), Math.round(sy));
         }
       }
 
@@ -1851,8 +2110,8 @@ const tagIndex = tags.map(([name, count]) => ({
         let dx = inerDX * labelDamp;
         let dy = inerDY * labelDamp;
         let glyph = nd.glyph;
+        let isSolitonHead = false;
 
-        // 1. 鼠标靠近时的磁流体“琴弦起峰”形变（吸附态下尤其明显好玩！）
         const worldCharX = x + nd.bx;
         const worldCharY = y + nd.by;
         const distCursor = Math.hypot(cursorX - worldCharX, cursorY - worldCharY);
@@ -1865,7 +2124,6 @@ const tagIndex = tags.map(([name, count]) => ({
           }
         }
 
-        // 2. 吸附态孤子脉冲巡检波拱起效应
         if (smoothDockW > 0.5 && !nd.isLabel) {
           const ringDiff = Math.abs(nd.ringPos - solitonPos);
           if (ringDiff < 2.2) {
@@ -1874,12 +2132,14 @@ const tagIndex = tags.map(([name, count]) => ({
             if (kissCheck < 0.4) {
               dx += nd.nx * pulse;
               dy += nd.ny * pulse;
-              if (!nd.isCorner && ringDiff < 0.9) glyph = '╬';
+              if (!nd.isCorner && ringDiff < 0.9) {
+                glyph = spec.soliton;
+                isSolitonHead = true;
+              }
             }
           }
         }
 
-        // 3. 大幅惯性拉扯波纹符号
         const localStrain = Math.hypot(inerDX, inerDY);
         if (localStrain > 5.2 && !nd.isLabel && !nd.isCorner) {
           if (Math.abs(nd.ny) > 0.5) {
@@ -1889,10 +2149,9 @@ const tagIndex = tags.map(([name, count]) => ({
           }
         }
 
-        // 4. 呼吸驻波（吸附态暴露侧保留灵动的 2 阶弦驻波起伏！）
         const kissAlign = dockEdge ? nd.nx * dockWX + nd.ny * dockWY : -1;
         const freeFactor = kissAlign > 0.4 ? 1 - smoothDockW * 0.82 : 1 - smoothDockW * 0.15;
-        const floatAmp = (nd.isLabel ? 0.9 : 2.3) * freeFactor;
+        const floatAmp = (nd.isLabel ? 0.9 : 2.2) * freeFactor;
         const waveN =
           Math.sin(t * 0.0036 + nd.phase) * floatAmp +
           Math.cos(t * 0.0022 - nd.phase * 0.7) * (floatAmp * 0.45);
@@ -1945,8 +2204,8 @@ const tagIndex = tags.map(([name, count]) => ({
                 const dist = tailStretch * (1.45 + wIdx * 0.72);
                 const wx = ox + nd.bx + dx - dirUX * dist;
                 const wy = oy + nd.by + dy - dirUY * dist;
-                bCtx.fillStyle = wIdx === 0 ? accentColor : mutedColor;
-                bCtx.globalAlpha = Math.max(0.12, sprintW * (0.55 - wIdx * 0.16));
+                bCtx.fillStyle = wIdx === 0 ? accent2Color : mutedColor;
+                bCtx.globalAlpha = Math.max(0.14, sprintW * (0.58 - wIdx * 0.16));
                 bCtx.fillText(wakeGlyphs[wIdx], Math.round(wx), Math.round(wy));
               }
             }
@@ -1974,8 +2233,13 @@ const tagIndex = tags.map(([name, count]) => ({
           }
         }
 
-        bCtx.fillStyle = accentColor;
-        bCtx.globalAlpha = nd.isLabel ? 0.96 : 0.92;
+        // 孤子脉冲头采用科幻世界特征色（如 2001 的 HAL 9000 红眼、沙丘的伊巴德蓝眼！）
+        bCtx.fillStyle = isSolitonHead
+          ? curRealm === 'void'
+            ? fireColor
+            : accent2Color
+          : accentColor;
+        bCtx.globalAlpha = nd.isLabel || isSolitonHead ? 1 : 0.94;
         bCtx.fillText(glyph, Math.round(ox + nd.bx + dx), Math.round(oy + nd.by + dy));
       }
 
@@ -2049,10 +2313,11 @@ const tagIndex = tags.map(([name, count]) => ({
 
       if (!initialized) {
         initialized = true;
-        state = vw < 640 ? 'top' : 'free';
-        ambientOrbit = state === 'free';
-        x = vw < 640 ? vw * 0.5 : vw * 0.72;
-        y = vw < 640 ? SHAPES.bar.h * 0.5 + BAR_RACK_GAP : Math.max(150, Math.min(260, vh * 0.3));
+        // 默认以顶部双层挂架形态接管全站顶栏！
+        state = 'top';
+        ambientOrbit = false;
+        x = preferredTopAnchorX(vw);
+        y = SHAPES.bar.h * 0.5 + BAR_RACK_GAP;
 
         try {
           const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -2065,10 +2330,10 @@ const tagIndex = tags.map(([name, count]) => ({
               saved.xNorm > 0.03 &&
               saved.yNorm > 0.02
             ) {
-              state = saved.state || state;
+              state = saved.state || 'top';
               ambientOrbit = Boolean(saved.ambientOrbit);
               x = Math.max(46, Math.min(vw - 46, saved.xNorm * vw));
-              y = Math.max(22, Math.min(vh - 22, saved.yNorm * vh));
+              y = Math.max(20, Math.min(vh - 20, saved.yNorm * vh));
               vx = Number.isFinite(saved.vx) ? saved.vx : vx;
               vy = Number.isFinite(saved.vy) ? saved.vy : vy;
             }
@@ -2076,6 +2341,8 @@ const tagIndex = tags.map(([name, count]) => ({
         } catch {
           // ignore
         }
+
+        syncDocDockAttr();
 
         const k =
           state === 'top' || state === 'bottom'
@@ -2090,15 +2357,20 @@ const tagIndex = tags.map(([name, count]) => ({
           itemSpring[idx].x = ix;
           itemSpring[idx].y = iy;
         });
-        satellites.forEach((sat) => {
-          sat.x = x;
-          sat.y = y;
+        satellites.forEach((sat, idx) => {
+          sat.x = idx === 0 && state === 'top' ? vw * 0.5 : x + idx * 70;
+          sat.y = idx === 0 && state === 'top' ? y + 50 : y;
+          sat.alpha = state === 'free' ? 0 : 1;
         });
 
         if (state !== 'free') {
           rackEdge = state as EdgeSide;
           rackDeploy = 1;
           smoothDockW = 1;
+        } else {
+          rackEdge = null;
+          rackDeploy = 0;
+          smoothDockW = 0;
         }
         prevX = x;
         prevY = y;
@@ -2368,7 +2640,6 @@ const tagIndex = tags.map(([name, count]) => ({
         }
       });
 
-      // 按钮内单字失重微浮动（吸附后平滑定格）
       const charFloatAmp = Math.max(0, 1 - smoothDockW * 1.15);
       if (charFloatAmp > 0.02) {
         for (const cs of charSpans) {
@@ -2387,7 +2658,6 @@ const tagIndex = tags.map(([name, count]) => ({
         }
       }
 
-      // 推进并绘制链式独立外挂件与连接挂扣！
       stepAndDrawSatelliteChain(t, vw, vh, isDockedState);
       if (overlayOpen) positionOverlay();
 

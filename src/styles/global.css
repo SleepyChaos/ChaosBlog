@@ -1,123 +1,200 @@
-/* ================= 四大终端美学风貌（REALMS：合并明暗、配色、字体与全站器物细节） ================= */
+/* ================= 四大 ASCII 艺术世界（统一半衬线书卷排版 = 零切换抖动 + 高对比度 + 7 通道多彩剧场色板） ================= */
 :root,
 :root[data-realm='void'] {
-  --bg: #07080e;
-  --bg-veil: rgba(7, 8, 14, 0.18);
-  --surface: rgba(15, 18, 30, 0.46);
-  --surface-strong: rgba(17, 21, 35, 0.56);
-  --surface-inner: rgba(11, 14, 25, 0.40);
-  --surface-hud: rgba(13, 16, 28, 0.42);
-  --glass-rim: rgba(255, 255, 255, 0.15);
-  --bg-code: rgba(10, 13, 22, 0.64);
-  --text: #e6e9f4;
-  --text-muted: #8d96ad;
-  --border: rgba(130, 144, 184, 0.24);
-  --border-strong: rgba(150, 166, 212, 0.44);
-  --accent: #818cf8;
-  --accent-fg: #07080e;
-  --accent-soft: rgba(129, 140, 248, 0.15);
-  --orb-1: rgba(129, 140, 248, 0.28);
-  --orb-2: rgba(34, 211, 238, 0.21);
-  --orb-3: rgba(192, 132, 252, 0.18);
-  --shadow-card: 0 12px 32px -12px rgba(0, 0, 0, 0.50), inset 0 1px 0 var(--glass-rim);
-  --shadow-float: 0 14px 34px -8px rgba(0, 0, 0, 0.62), inset 0 1px 0 var(--glass-rim);
+  /* 世界 01：星渊神殿 · ASTRAL MYTH（古典双线星盘 ASCII ╔═✦═╗） */
+  --bg: #080913;
+  --bg-veil: rgba(8, 9, 19, 0.14);
+  --surface: rgba(16, 19, 36, 0.54);
+  --surface-strong: rgba(18, 22, 42, 0.72);
+  --surface-inner: rgba(12, 15, 30, 0.52);
+  --surface-hud: rgba(15, 19, 38, 0.62);
+  --glass-rim: rgba(199, 210, 254, 0.22);
+  --bg-code: rgba(10, 13, 26, 0.76);
+
+  /* 高对比文字层（主文字 >16:1，次级文字 >8.5:1） */
+  --text: #f3f5ff;
+  --text-muted: #b8c2e6;
+  --border: rgba(148, 163, 218, 0.32);
+  --border-strong: rgba(175, 190, 248, 0.58);
+  --accent: #a5b4fc;
+  --accent-2: #38bdf8;
+  --accent-3: #fbbf24;
+  --accent-fg: #080913;
+  --accent-soft: rgba(165, 180, 252, 0.18);
+  --accent-glow: rgba(165, 180, 252, 0.45);
+
+  /* 2001 太空漫游剧场 8 通道高对比 ANSI 色板（木星金、星门青、黑石碑银白、HAL 9000 猩红之眼） */
+  --stage-bg: rgba(6, 8, 18, 0.85);
+  --stage-sky: #fde68a;
+  --stage-aurora: #38bdf8;
+  --stage-aurora-2: #a78bfa;
+  --stage-far: #818cf8;
+  --stage-ridge: #e2e8f0;
+  --stage-earth: #8896c7;
+  --stage-hero: #67e8f9;
+  --stage-rock: #f8fafc;
+  --stage-fire: #ff3b5c;
+
+  /* 卡片 ASCII 装饰符 */
+  --card-corner-tl: '╔═';
+  --card-corner-br: '═╝';
+  --h2-prefix: '✦ ';
+  --h3-prefix: '├─ ';
+
+  --orb-1: rgba(129, 140, 248, 0.30);
+  --orb-2: rgba(56, 189, 248, 0.24);
+  --orb-3: rgba(192, 132, 252, 0.20);
+  --shadow-card: 0 14px 34px -12px rgba(0, 0, 0, 0.56), inset 0 1px 0 var(--glass-rim);
+  --shadow-float: 0 16px 38px -8px rgba(0, 0, 0, 0.68), inset 0 1px 0 var(--glass-rim);
+
+  /* 全站锁定半衬线书卷字体栈（切换任意主题绝不触发字体回流与抖动） */
   --font-mono: ui-monospace, SFMono-Regular, 'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas,
     'Liberation Mono', monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --font-serif: 'Songti SC', 'STSong', 'Noto Serif SC', 'Source Han Serif SC', Georgia,
     'Times New Roman', serif;
-  --font-body: var(--font-sans);
-  --font-heading: var(--font-sans);
-  --h2-prefix: '## ';
-  --h3-prefix: '### ';
-  color-scheme: dark;
-}
-
-/* 风貌 02：PHOSPHOR_CRT（1984 绿磷显像管 · 全站等宽字体 + 双线终端框 + 扫描线） */
-:root[data-realm='crt'] {
-  --bg: #030905;
-  --bg-veil: rgba(3, 9, 5, 0.22);
-  --surface: rgba(6, 20, 11, 0.48);
-  --surface-strong: rgba(7, 24, 13, 0.58);
-  --surface-inner: rgba(4, 15, 8, 0.42);
-  --surface-hud: rgba(5, 18, 10, 0.44);
-  --glass-rim: rgba(52, 211, 153, 0.22);
-  --bg-code: rgba(3, 12, 6, 0.70);
-  --text: #d1fae5;
-  --text-muted: #6ee7b7;
-  --border: rgba(52, 211, 153, 0.26);
-  --border-strong: rgba(52, 211, 153, 0.52);
-  --accent: #34d399;
-  --accent-fg: #021208;
-  --accent-soft: rgba(52, 211, 153, 0.15);
-  --orb-1: rgba(16, 185, 129, 0.26);
-  --orb-2: rgba(20, 184, 166, 0.18);
-  --orb-3: rgba(52, 211, 153, 0.15);
-  --font-body: var(--font-mono);
-  --font-heading: var(--font-mono);
-  --h2-prefix: '>_ ';
-  --h3-prefix: '├─ ';
-  color-scheme: dark;
-}
-
-/* 风貌 03：PAPER_BLUEPRINT（手稿工程蓝图 · 亮色宣纸玻璃 + 文学衬线宋体 + 制图虚线框） */
-:root[data-realm='paper'] {
-  --bg: #f3efe6;
-  --bg-veil: rgba(243, 239, 230, 0.16);
-  --surface: rgba(255, 253, 247, 0.52);
-  --surface-strong: rgba(255, 253, 249, 0.64);
-  --surface-inner: rgba(255, 252, 244, 0.44);
-  --surface-hud: rgba(255, 252, 245, 0.48);
-  --glass-rim: rgba(255, 255, 255, 0.82);
-  --bg-code: rgba(232, 226, 213, 0.66);
-  --text: #1c1917;
-  --text-muted: #675f56;
-  --border: rgba(120, 113, 108, 0.30);
-  --border-strong: rgba(87, 83, 78, 0.54);
-  --accent: #1d4ed8;
-  --accent-fg: #ffffff;
-  --accent-soft: rgba(29, 78, 216, 0.10);
-  --orb-1: rgba(37, 99, 235, 0.20);
-  --orb-2: rgba(217, 119, 6, 0.18);
-  --orb-3: rgba(194, 65, 12, 0.13);
-  --shadow-card: 0 10px 28px -12px rgba(28, 25, 23, 0.12), inset 0 1px 0 var(--glass-rim);
-  --shadow-float: 0 12px 30px -8px rgba(28, 25, 23, 0.20), inset 0 1px 0 var(--glass-rim);
   --font-body: var(--font-serif);
   --font-heading: var(--font-serif);
+  color-scheme: dark;
+}
+
+/* 世界 02：浮世纸墨 · UKIYO SCROLL（宣纸版画印章 ASCII ┏━❖━┓ · 朱砂与松烟墨） */
+:root[data-realm='paper'] {
+  --bg: #f5f0e4;
+  --bg-veil: rgba(245, 240, 228, 0.12);
+  --surface: rgba(255, 252, 245, 0.66);
+  --surface-strong: rgba(255, 253, 248, 0.84);
+  --surface-inner: rgba(249, 244, 233, 0.62);
+  --surface-hud: rgba(255, 252, 245, 0.78);
+  --glass-rim: rgba(255, 255, 255, 0.90);
+  --bg-code: rgba(236, 229, 214, 0.78);
+
+  /* 宣纸高对比浓墨与熟褐次级字（彻底杜绝浅灰看不清） */
+  --text: #191613;
+  --text-muted: #52483e;
+  --border: rgba(105, 92, 78, 0.34);
+  --border-strong: rgba(74, 63, 52, 0.62);
+  --accent: #b93829;
+  --accent-2: #1f6f54;
+  --accent-3: #1d4ed8;
+  --accent-fg: #fffaf3;
+  --accent-soft: rgba(185, 56, 41, 0.12);
+  --accent-glow: rgba(185, 56, 41, 0.28);
+
+  /* 浮世绘山水剧场色板（朱砂红日、松石绿林、远黛青山、落樱绯粉） */
+  --stage-bg: rgba(246, 241, 229, 0.88);
+  --stage-sky: #c83223;
+  --stage-aurora: #d946ef;
+  --stage-aurora-2: #e11d48;
+  --stage-far: #3b5978;
+  --stage-ridge: #1c1917;
+  --stage-earth: #5c5346;
+  --stage-hero: #b93829;
+  --stage-rock: #1f6f54;
+  --stage-fire: #c2410c;
+
+  --card-corner-tl: '「';
+  --card-corner-br: '」';
   --h2-prefix: '§ ';
   --h3-prefix: '¶ ';
+
+  --orb-1: rgba(185, 56, 41, 0.16);
+  --orb-2: rgba(31, 111, 84, 0.16);
+  --orb-3: rgba(180, 83, 9, 0.13);
+  --shadow-card: 0 12px 28px -12px rgba(28, 25, 23, 0.14), inset 0 1px 0 var(--glass-rim);
+  --shadow-float: 0 14px 32px -8px rgba(28, 25, 23, 0.22), inset 0 1px 0 var(--glass-rim);
   color-scheme: light;
 }
 
-/* 风貌 04：AMBER_DUNE（沙丘琥珀磁带未来主义 · 暖金终端 + 工业斜纹顶栏 + λ 哲学符号） */
-:root[data-realm='amber'] {
-  --bg: #0c0906;
-  --bg-veil: rgba(12, 9, 6, 0.20);
-  --surface: rgba(26, 18, 11, 0.48);
-  --surface-strong: rgba(30, 21, 13, 0.58);
-  --surface-inner: rgba(20, 14, 8, 0.42);
-  --surface-hud: rgba(24, 16, 10, 0.45);
-  --glass-rim: rgba(251, 191, 36, 0.20);
-  --bg-code: rgba(18, 12, 7, 0.70);
-  --text: #fef3c7;
-  --text-muted: #d6a86c;
-  --border: rgba(245, 158, 11, 0.25);
-  --border-strong: rgba(251, 191, 36, 0.48);
-  --accent: #fbbf24;
-  --accent-fg: #140d04;
-  --accent-soft: rgba(251, 191, 36, 0.15);
-  --orb-1: rgba(245, 158, 11, 0.26);
-  --orb-2: rgba(234, 88, 12, 0.20);
-  --orb-3: rgba(217, 119, 6, 0.16);
-  --font-body: var(--font-sans);
-  --font-heading: var(--font-mono);
-  --h2-prefix: 'λ ';
-  --h3-prefix: '∷ ';
+/* 世界 03：霓虹矩阵 · CYBER ANSI（赛博半块像素 ASCII ▛▀▓▀▜ · 荧光绿与电光青洋红） */
+:root[data-realm='crt'] {
+  --bg: #040b07;
+  --bg-veil: rgba(4, 11, 7, 0.16);
+  --surface: rgba(7, 22, 13, 0.58);
+  --surface-strong: rgba(8, 27, 16, 0.76);
+  --surface-inner: rgba(5, 17, 10, 0.56);
+  --surface-hud: rgba(6, 22, 13, 0.68);
+  --glass-rim: rgba(52, 211, 153, 0.28);
+  --bg-code: rgba(4, 15, 8, 0.82);
+
+  --text: #ecfdf5;
+  --text-muted: #8ce9b5;
+  --border: rgba(52, 211, 153, 0.34);
+  --border-strong: rgba(52, 211, 153, 0.65);
+  --accent: #22ff88;
+  --accent-2: #00e5ff;
+  --accent-3: #ff4d94;
+  --accent-fg: #03140a;
+  --accent-soft: rgba(34, 255, 136, 0.16);
+  --accent-glow: rgba(34, 255, 136, 0.45);
+
+  --stage-bg: rgba(3, 12, 7, 0.86);
+  --stage-sky: #fde047;
+  --stage-aurora: #22ff88;
+  --stage-aurora-2: #00e5ff;
+  --stage-far: #ff4d94;
+  --stage-ridge: #bbf7d0;
+  --stage-earth: #34d399;
+  --stage-hero: #00e5ff;
+  --stage-rock: #fde047;
+  --stage-fire: #ff4d94;
+
+  --card-corner-tl: '▛▀';
+  --card-corner-br: '▄▟';
+  --h2-prefix: '>_ ';
+  --h3-prefix: '▓ ';
+
+  --orb-1: rgba(16, 185, 129, 0.28);
+  --orb-2: rgba(0, 229, 255, 0.20);
+  --orb-3: rgba(255, 77, 148, 0.15);
   color-scheme: dark;
 }
 
-/* ================= 全局基础 ================= */
+/* 世界 04：大漠星轨 · DUNE ASTROLABE（游牧黄铜星轨点阵 ASCII ╭─◈─╮ · 曜金与绿洲松石） */
+:root[data-realm='amber'] {
+  --bg: #0f0a06;
+  --bg-veil: rgba(15, 10, 6, 0.15);
+  --surface: rgba(28, 19, 11, 0.56);
+  --surface-strong: rgba(34, 23, 13, 0.75);
+  --surface-inner: rgba(22, 15, 9, 0.54);
+  --surface-hud: rgba(28, 19, 11, 0.66);
+  --glass-rim: rgba(251, 191, 36, 0.26);
+  --bg-code: rgba(18, 12, 7, 0.80);
+
+  /* 大幅提亮次级砂金文字对比度，彻底解决底色相近问题 */
+  --text: #fff8eb;
+  --text-muted: #e6c699;
+  --border: rgba(245, 158, 11, 0.34);
+  --border-strong: rgba(251, 191, 36, 0.62);
+  --accent: #ffb703;
+  --accent-2: #fb6f4c;
+  --accent-3: #38bdf8;
+  --accent-fg: #170e03;
+  --accent-soft: rgba(255, 183, 3, 0.17);
+  --accent-glow: rgba(255, 183, 3, 0.42);
+
+  --stage-bg: rgba(16, 11, 6, 0.84);
+  --stage-sky: #fde68a;
+  --stage-aurora: #38bdf8;
+  --stage-aurora-2: #fbbf24;
+  --stage-far: #d97706;
+  --stage-ridge: #fef3c7;
+  --stage-earth: #b47b38;
+  --stage-hero: #38bdf8;
+  --stage-rock: #ffb703;
+  --stage-fire: #fb6f4c;
+
+  --card-corner-tl: '╭◈';
+  --card-corner-br: '◈╯';
+  --h2-prefix: '◈ ';
+  --h3-prefix: '∷ ';
+
+  --orb-1: rgba(245, 158, 11, 0.28);
+  --orb-2: rgba(251, 111, 76, 0.22);
+  --orb-3: rgba(56, 189, 248, 0.16);
+  color-scheme: dark;
+}
+
+/* ================= 全局基础（全站半衬线，零抖动） ================= */
 * {
   box-sizing: border-box;
 }
@@ -129,13 +206,13 @@ html {
 body {
   margin: 0;
   font-family: var(--font-body);
-  font-size: 1rem;
-  line-height: 1.78;
+  font-size: 1.02rem;
+  line-height: 1.8;
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  transition: background-color 0.28s ease, color 0.25s ease;
+  transition: background-color 0.26s ease, color 0.22s ease;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -149,7 +226,7 @@ h3,
   font-family: var(--font-heading);
 }
 
-/* CRT 风貌专属：全屏细微显像管扫描线 + 卡片双线复古框 */
+/* CRT 霓虹世界专属：细腻扫描线 + 双线像素框 */
 :root[data-realm='crt'] body::after {
   content: '';
   position: fixed;
@@ -160,34 +237,36 @@ h3,
     0deg,
     transparent 0px,
     transparent 2px,
-    rgba(0, 0, 0, 0.16) 3px
+    rgba(0, 0, 0, 0.11) 3px
   );
 }
 
 :root[data-realm='crt'] .bento-card,
-:root[data-realm='crt'] .article-card,
-:root[data-realm='crt'] .top-term-inner {
+:root[data-realm='crt'] .article-card {
   border-style: double;
   border-width: 3px;
 }
 
-/* PAPER 蓝图手稿风貌专属：工程制图虚线边与十字裁切角标 */
+/* 浮世纸墨专属：古典线装书虚实边框 */
 :root[data-realm='paper'] .bento-card,
 :root[data-realm='paper'] .ascent-box {
-  border-style: dashed;
+  border-style: solid;
+  box-shadow:
+    0 10px 26px -12px rgba(28, 25, 23, 0.14),
+    inset 0 0 0 3px color-mix(in srgb, var(--border) 36%, transparent);
 }
 
-/* AMBER 工业琥珀风貌专属：模块顶栏斜纹警示底纹 */
+/* 大漠星轨专属：模块顶栏游牧织纹斜线 */
 :root[data-realm='amber'] .bento-head {
   background: repeating-linear-gradient(
     -45deg,
     transparent 0px,
     transparent 8px,
-    rgba(251, 191, 36, 0.05) 8px,
-    rgba(251, 191, 36, 0.05) 16px
+    rgba(255, 183, 3, 0.06) 8px,
+    rgba(255, 183, 3, 0.06) 16px
   );
   padding: 0.35rem 0.5rem 0.5rem;
-  margin: -0.2rem -0.3rem 0.75rem;
+  margin: -0.15rem -0.25rem 0.75rem;
 }
 
 a {
@@ -200,7 +279,7 @@ a:hover {
   text-underline-offset: 3px;
 }
 
-/* ================= 背景层：立体景深光池 + 坐标网格（让上层毛玻璃真正显现透明与模糊折射） ================= */
+/* ================= 背景层：立体景深光池 + 坐标网格 + 四主题 ASCII 漂浮字符画布 ================= */
 .ambient-bg {
   position: fixed;
   inset: 0;
@@ -252,14 +331,13 @@ a:hover {
   }
 }
 
-/* 清晰底层坐标网格：卡片外锐利清晰，透过毛玻璃卡片时被 backdrop-filter 模糊柔化，直观呈现玻璃质感 */
 .ambient-grid-marks {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--border) 62%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--border) 62%, transparent) 1px, transparent 1px),
-    radial-gradient(color-mix(in srgb, var(--border-strong) 55%, transparent) 1px, transparent 1px);
+    linear-gradient(to right, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px),
+    radial-gradient(color-mix(in srgb, var(--border-strong) 50%, transparent) 1px, transparent 1px);
   background-size:
     64px 64px,
     64px 64px,
@@ -281,10 +359,9 @@ a:hover {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  image-rendering: pixelated;
 }
 
-/* ================= 页面骨架与顶部终端状态条 ================= */
+/* ================= 页面主容器与悬浮顶栏自适应避让 ================= */
 .container-wide {
   width: 100%;
   max-width: 68rem;
@@ -292,51 +369,43 @@ a:hover {
   padding: 0 1.5rem;
 }
 
-.top-term-strip {
-  padding-top: 4.3rem;
-  padding-bottom: 0.75rem;
+main.page-main {
+  flex: 1;
+  padding-top: 7.4rem;
+  padding-bottom: 4.2rem;
+  transition: padding-top 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    padding-bottom 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.top-term-inner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.55rem 0.85rem;
-  background: var(--surface);
-  -webkit-backdrop-filter: blur(18px) saturate(170%);
-  backdrop-filter: blur(18px) saturate(170%);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-card);
-  border-radius: 2px;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
+/* 当悬浮导航离开顶部（悬浮、贴侧边或贴底）时，自动收拢顶部留白，不浪费首屏空间 */
+:root[data-hud-dock='float'] main.page-main,
+:root[data-hud-dock='left'] main.page-main,
+:root[data-hud-dock='right'] main.page-main {
+  padding-top: 2rem;
 }
 
-.term-prompt-group {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
+:root[data-hud-dock='bottom'] main.page-main {
+  padding-top: 2rem;
+  padding-bottom: 7.4rem;
 }
 
-.term-prompt-host {
-  color: var(--accent);
-  font-weight: 700;
-  white-space: nowrap;
+@media (min-width: 821px) and (max-width: 1240px) {
+  :root[data-hud-dock='left'] .container-wide {
+    padding-left: 5.8rem;
+  }
+  :root[data-hud-dock='right'] .container-wide {
+    padding-right: 5.8rem;
+  }
 }
 
-.term-prompt-path {
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.term-cursor {
-  color: var(--accent);
-  animation: term-blink 1s steps(1) infinite;
+/* 窄屏上下贴边时挂架为三排（主舱 / 终端 / 功能挂牌），预留更多首屏避让空间 */
+@media (max-width: 719px) {
+  :root[data-hud-dock='top'] main.page-main {
+    padding-top: 10.6rem;
+  }
+  :root[data-hud-dock='bottom'] main.page-main {
+    padding-bottom: 10.6rem;
+  }
 }
 
 @keyframes term-blink {
@@ -350,25 +419,18 @@ a:hover {
   }
 }
 
-.term-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  flex-wrap: wrap;
-}
-
 .term-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.2rem 0.5rem;
+  padding: 0.22rem 0.55rem;
   font-family: var(--font-mono);
   font-size: 0.76rem;
   line-height: 1.3;
   color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 1px;
+  background: var(--bg-code);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
   cursor: pointer;
   text-decoration: none;
   transition: border-color 0.12s steps(2), color 0.12s steps(2), background-color 0.12s steps(2);
@@ -377,6 +439,7 @@ a:hover {
 .term-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
+  background: var(--accent-soft);
   text-decoration: none;
 }
 
@@ -390,34 +453,28 @@ a:hover {
   color: var(--accent-fg);
 }
 
-/* 纯终端 + ASCII 字符徽标（硬朗 1px 像素框，零圆角玻璃高光） */
 .term-ascii-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.1rem 0.35rem;
+  padding: 0.12rem 0.38rem;
   font-family: var(--font-mono);
   font-size: 0.74rem;
   line-height: 1.15;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   border-radius: 1px;
   border: 1px solid var(--border-strong);
-  background: var(--bg);
+  background: var(--bg-code);
   color: var(--accent);
   flex-shrink: 0;
 }
 
-main.page-main {
-  flex: 1;
-  padding: 0.6rem 0 4.2rem;
-}
-
-/* ================= Bento 模块化雾面毛玻璃卡片 ================= */
+/* ================= Bento 模块化雾面毛玻璃卡片（含四主题 ASCII 刻印角标） ================= */
 .bento-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 0.95rem;
+  gap: 1rem;
 }
 
 .col-12 {
@@ -440,6 +497,7 @@ main.page-main {
 }
 
 .bento-card {
+  position: relative;
   background: var(--surface);
   -webkit-backdrop-filter: blur(18px) saturate(175%);
   backdrop-filter: blur(18px) saturate(175%);
@@ -449,9 +507,32 @@ main.page-main {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 1rem 1.15rem;
+  padding: 1.05rem 1.2rem;
   transition: border-color 0.15s steps(2), background-color 0.2s ease;
   min-width: 0;
+}
+
+.bento-card::before,
+.bento-card::after {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1;
+  color: var(--accent);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.bento-card::before {
+  content: var(--card-corner-tl);
+  top: 4px;
+  left: 5px;
+}
+
+.bento-card::after {
+  content: var(--card-corner-br);
+  bottom: 4px;
+  right: 5px;
 }
 
 .bento-card:hover {
@@ -495,15 +576,15 @@ main.page-main {
   margin-top: 0.85rem;
   border-top: 1px solid var(--border);
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
-/* ================= 首页模块细节 ================= */
+/* ================= 首页模块与多彩高分 ASCII 西西弗斯剧场 ================= */
 .identity-title {
   font-size: 1.55rem;
-  line-height: 1.3;
-  letter-spacing: -0.02em;
+  line-height: 1.34;
+  letter-spacing: -0.01em;
   margin: 0.1rem 0 0.55rem;
 }
 
@@ -515,21 +596,22 @@ main.page-main {
 .identity-desc {
   margin: 0 0 0.85rem;
   color: var(--text-muted);
-  font-size: 0.95rem;
-  line-height: 1.72;
+  font-size: 0.96rem;
+  line-height: 1.75;
 }
 
 .kv-list {
   font-family: var(--font-mono);
   font-size: 0.8rem;
   display: grid;
-  gap: 0.32rem;
+  gap: 0.35rem;
   color: var(--text-muted);
 }
 
 .kv-list .prompt {
   color: var(--accent);
   margin-right: 0.35rem;
+  font-weight: 700;
 }
 
 .kv-list strong {
@@ -537,46 +619,76 @@ main.page-main {
   font-weight: 600;
 }
 
+/* 84x18 多彩生态级西西弗斯 ASCII 剧场画布 */
 .ascii-slope-pre {
+  position: relative;
   margin: 0;
-  padding: 0.5rem 0.65rem;
-  background: color-mix(in srgb, var(--bg-code) 68%, transparent);
-  border: 1px solid var(--border);
-  border-radius: 1px;
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  line-height: 1.16;
-  letter-spacing: 0.005em;
-  color: var(--text-muted);
+  padding: 0.55rem 0.7rem;
+  background: var(--stage-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  font-family: Menlo, Monaco, Consolas, 'JetBrains Mono', 'SF Mono', monospace;
+  font-variant-east-asian: normal;
+  font-size: 0.635rem;
+  line-height: 1.17;
+  letter-spacing: 0;
+  color: var(--stage-earth);
   overflow-x: auto;
   user-select: none;
+  cursor: pointer;
+  box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.18);
 }
 
-.ascii-slope-pre .as-dim {
-  color: color-mix(in srgb, var(--text-muted) 68%, transparent);
+.ascii-slope-pre:hover {
+  border-color: var(--accent);
+}
+
+/* 8 通道高对比 ANSI 角色着色 */
+.ascii-slope-pre .as-sky {
+  color: var(--stage-sky);
+  font-weight: 700;
+}
+
+.ascii-slope-pre .as-aurora {
+  color: var(--stage-aurora);
+}
+
+.ascii-slope-pre .as-aurora2 {
+  color: var(--stage-aurora-2);
+}
+
+.ascii-slope-pre .as-far {
+  color: var(--stage-far);
 }
 
 .ascii-slope-pre .as-ridge {
-  color: var(--text);
+  color: var(--stage-ridge);
+  font-weight: 700;
+}
+
+.ascii-slope-pre .as-earth {
+  color: var(--stage-earth);
 }
 
 .ascii-slope-pre .as-hero {
-  color: var(--accent);
+  color: var(--stage-hero);
   font-weight: 700;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--stage-hero) 45%, transparent);
 }
 
 .ascii-slope-pre .as-rock {
-  color: var(--text);
+  color: var(--stage-rock);
   font-weight: 700;
-  text-shadow: 0 0 8px var(--accent-glow);
+  text-shadow: 0 0 9px color-mix(in srgb, var(--stage-rock) 42%, transparent);
 }
 
-.ascii-slope-pre .as-spark {
-  color: var(--accent);
+.ascii-slope-pre .as-fire {
+  color: var(--stage-fire);
+  font-weight: 700;
 }
 
 .ascii-slope-pre .as-hud {
-  color: var(--text-muted);
+  color: var(--text);
 }
 
 .featured-post-box {
@@ -597,20 +709,21 @@ main.page-main {
 .featured-badge {
   display: inline-block;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.73rem;
+  font-weight: 700;
   color: var(--accent);
   margin-bottom: 0.3rem;
 }
 
 .featured-post-box h3 {
   margin: 0 0 0.4rem;
-  font-size: 1.15rem;
-  line-height: 1.4;
+  font-size: 1.16rem;
+  line-height: 1.42;
 }
 
 .featured-post-box p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   color: var(--text-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -629,8 +742,8 @@ main.page-main {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.2rem 0.55rem;
-  border-radius: 1px;
+  padding: 0.22rem 0.58rem;
+  border-radius: 2px;
   border: 1px solid var(--border);
   background: var(--surface-inner);
   font-family: var(--font-mono);
@@ -657,7 +770,7 @@ main.page-main {
   align-items: center;
   gap: 0.65rem;
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 700;
   color: var(--accent);
   margin: 1.25rem 0 0.65rem;
@@ -689,9 +802,9 @@ main.page-main {
 }
 
 .post-row {
-  padding: 0.65rem 0.8rem;
+  padding: 0.68rem 0.85rem;
   border: 1px solid var(--border);
-  border-radius: 1px;
+  border-radius: 2px;
   background: var(--surface-inner);
   transition: border-color 0.12s steps(2), transform 0.12s steps(2);
 }
@@ -718,13 +831,13 @@ main.page-main {
 .post-tree-branch {
   font-family: var(--font-mono);
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: var(--accent);
   flex-shrink: 0;
 }
 
 .post-row-title {
   font-weight: 600;
-  font-size: 0.98rem;
+  font-size: 1rem;
   color: var(--text);
 }
 
@@ -746,7 +859,7 @@ main.page-main {
 
 .post-row-desc {
   margin: 0.3rem 0 0 1.65rem;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   color: var(--text-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -758,12 +871,12 @@ main.page-main {
   margin: 0.4rem 0 0 1.65rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
 .post-row-tags .mini-tag {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.73rem;
   color: var(--text-muted);
 }
 
@@ -772,7 +885,7 @@ main.page-main {
   text-decoration: none;
 }
 
-/* ================= 浮动 ASCII 终端块（外圈纯字符包裹内部缩小毛玻璃芯） ================= */
+/* ================= 浮动 ASCII 终端主舱（接管全站顶栏 + 0G 漂浮 + 四边磁吸） ================= */
 #fx-pixel-canvas {
   position: fixed;
   inset: 0;
@@ -811,7 +924,7 @@ main.page-main {
   position: fixed;
   left: 0;
   top: 0;
-  z-index: 90;
+  z-index: 91;
   background: transparent;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -826,21 +939,19 @@ main.page-main {
   cursor: grabbing;
 }
 
-/* 缩小一圈的内部高透雾面毛玻璃芯：清晰透出并模糊底层文字与卡片轮廓 */
 .ascii-inner-frost {
   position: absolute;
   background: var(--surface-hud);
-  -webkit-backdrop-filter: blur(15px) saturate(180%);
-  backdrop-filter: blur(15px) saturate(180%);
-  border: 1px solid color-mix(in srgb, var(--border-strong) 78%, transparent);
-  border-radius: 1px;
+  -webkit-backdrop-filter: blur(18px) saturate(185%);
+  backdrop-filter: blur(18px) saturate(185%);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
   box-shadow: var(--shadow-float);
   pointer-events: none;
   transform-origin: center center;
   will-change: transform, left, right, top, bottom;
 }
 
-/* 外圈逐字符动态浮动 ASCII 边界画布（含气动冲刺尾迹、撞墙冲击波与贴边磁吸触角） */
 .ascii-border-canvas {
   position: absolute;
   pointer-events: none;
@@ -851,12 +962,13 @@ main.page-main {
   left: 50%;
   top: 50%;
   white-space: nowrap;
-  padding: 2px 5px;
-  border-radius: 1px;
+  padding: 3px 6px;
+  border-radius: 2px;
   border: none;
   background: transparent;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 11.5px;
+  font-weight: 600;
   line-height: 1.15;
   color: var(--text);
   cursor: pointer;
@@ -866,7 +978,8 @@ main.page-main {
 }
 
 .ascii-nav-item:hover {
-  background: color-mix(in srgb, var(--text) 14%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent);
   text-decoration: none;
 }
 
@@ -875,13 +988,12 @@ main.page-main {
   color: var(--accent-fg);
 }
 
-/* 按钮内逐字微浮动单元（悬浮态失重呼吸，吸附态自动归零定格） */
 .ascii-char-span {
   display: inline-block;
   will-change: transform;
 }
 
-/* ================= 链式独立外挂件（Satellite Pendants）与无框融底闪烁终端 ================= */
+/* ================= 异构独立挂件系统（每个挂件拥有专属器物造型） ================= */
 .hud-pendant {
   position: fixed;
   left: 0;
@@ -890,18 +1002,13 @@ main.page-main {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: 4px 7px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 11.5px;
   line-height: 1.1;
   white-space: nowrap;
   color: var(--text);
-  background: var(--surface-hud);
-  -webkit-backdrop-filter: blur(14px) saturate(180%);
-  backdrop-filter: blur(14px) saturate(180%);
-  border: 1px solid color-mix(in srgb, var(--accent) 52%, transparent);
-  border-radius: 1px;
+  -webkit-backdrop-filter: blur(18px) saturate(185%);
+  backdrop-filter: blur(18px) saturate(185%);
   box-shadow: var(--shadow-float);
   cursor: pointer;
   user-select: none;
@@ -910,7 +1017,7 @@ main.page-main {
   visibility: hidden;
   pointer-events: none;
   will-change: transform, opacity;
-  transition: background-color 0.12s steps(2), color 0.12s steps(2), border-color 0.12s steps(2);
+  transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease;
 }
 
 .hud-pendant.is-deployed {
@@ -918,47 +1025,96 @@ main.page-main {
   pointer-events: auto;
 }
 
-.hud-pendant:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-soft);
+/* 挂件 01：八角工业切角弹射扳机（Octagonal Eject Trigger） */
+.hud-pendant.pendant-eject {
+  gap: 4px;
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--surface-strong) 88%, var(--accent-2) 12%);
+  border: 1.5px solid var(--accent-2);
+  color: var(--accent-2);
+  font-weight: 700;
+  clip-path: polygon(
+    6px 0,
+    calc(100% - 6px) 0,
+    100% 6px,
+    100% calc(100% - 6px),
+    calc(100% - 6px) 100%,
+    6px 100%,
+    0 calc(100% - 6px),
+    0 6px
+  );
+}
+
+.hud-pendant.pendant-eject:hover {
+  background: var(--accent-2);
+  color: var(--accent-fg);
   text-decoration: none;
 }
 
-.hud-pendant.is-eject {
+/* 挂件 02：双线印章卡带式世界切换器（World Totem Cartridge） */
+.hud-pendant.pendant-realm {
+  gap: 5px;
+  padding: 5px 10px;
+  background: var(--surface-strong);
+  border: 3px double var(--accent);
+  border-radius: 2px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.hud-pendant.pendant-realm .realm-glyph {
   color: var(--accent);
+  font-size: 12px;
 }
 
-.hud-pendant.is-eject:hover {
-  background: var(--accent);
-  color: var(--accent-fg);
-}
-
-.pendant-lug {
+.hud-pendant.pendant-realm:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
   color: var(--accent);
-  opacity: 0.75;
-  font-size: 10px;
+  text-decoration: none;
 }
 
-/* 无框融底闪烁终端挂件（去掉丑陋的传统输入框，字符直接浮在底部透明毛玻璃上！） */
-.naked-cli-pendant {
+/* 挂件 03：穿孔铆钉金属铭牌（Punched GitHub Dog-Tag） */
+.hud-pendant.pendant-dogtag {
+  gap: 6px;
+  padding: 5px 11px 5px 8px;
+  background: var(--surface-hud);
+  border: 1px dashed var(--border-strong);
+  border-left: 3px solid var(--accent-3);
+  border-radius: 1px 8px 8px 1px;
+  color: var(--text);
+}
+
+.hud-pendant.pendant-dogtag .dogtag-hole {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  border: 1.5px solid var(--accent-3);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+.hud-pendant.pendant-dogtag:hover {
+  border-color: var(--accent-3);
+  color: var(--accent-3);
+  text-decoration: none;
+}
+
+/* 侧边栏紧凑态自动收窄三枚功能挂件 */
+.hud-pendant.is-rail-compact {
+  padding: 5px 6px;
+  font-size: 10.5px;
+}
+
+/* ================= 挂件 04：双形态搜索/命令终端挂牌 ================= */
+.cli-pendant {
   position: fixed;
   left: 0;
   top: 0;
   z-index: 90;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 30px;
-  padding: 0 8px;
-  background: color-mix(in srgb, var(--surface-hud) 68%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(180%);
-  backdrop-filter: blur(14px) saturate(180%);
-  border: none;
-  border-bottom: 1px dashed color-mix(in srgb, var(--accent) 58%, transparent);
   font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1;
   color: var(--text);
   cursor: text;
   opacity: 0;
@@ -967,22 +1123,81 @@ main.page-main {
   will-change: transform, width, opacity;
 }
 
-.naked-cli-pendant.is-deployed {
+.cli-pendant.is-deployed {
   visibility: visible;
   pointer-events: auto;
 }
 
-.naked-cli-pendant:focus-within {
-  border-bottom-style: solid;
-  border-bottom-color: var(--accent);
-  background: color-mix(in srgb, var(--surface-hud) 86%, transparent);
+/* 形态 A：上下贴边时作为独立第二行悬挂的宽幅顶栏式终端（复刻 [>_] sisyphus@chaos:~$ 质感！） */
+.cli-pendant.is-bar {
+  height: 38px;
+  padding: 0 12px;
+  gap: 9px;
+  background: var(--surface-strong);
+  -webkit-backdrop-filter: blur(20px) saturate(185%);
+  backdrop-filter: blur(20px) saturate(185%);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  box-shadow: var(--shadow-float);
+  font-size: 12.5px;
 }
 
-.naked-cli-prompt {
-  color: var(--accent);
+.cli-pendant.is-bar:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-soft), var(--shadow-float);
+}
+
+/* 形态 B：左右侧边吸附时保持极简透明细条样式 */
+.cli-pendant.is-compact {
+  height: 28px;
+  padding: 0 6px;
+  gap: 4px;
+  background: color-mix(in srgb, var(--surface-hud) 76%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  backdrop-filter: blur(14px) saturate(180%);
+  border: none;
+  border-bottom: 1.5px dashed var(--accent);
+  font-size: 11px;
+}
+
+.cli-pendant.is-compact .cli-badge,
+.cli-pendant.is-compact .cli-host-full,
+.cli-pendant.is-compact .cli-hint-pill {
+  display: none;
+}
+
+.cli-pendant.is-bar .cli-host-short {
+  display: none;
+}
+
+.cli-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  font-size: 11px;
   font-weight: 700;
+  color: var(--accent);
+  background: var(--bg-code);
+  border: 1px solid var(--border-strong);
+  border-radius: 1px;
   flex-shrink: 0;
   user-select: none;
+}
+
+.cli-host-full {
+  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.cli-host-short {
+  color: var(--accent);
+  font-weight: 700;
+  user-select: none;
+  flex-shrink: 0;
 }
 
 .naked-cli-stage {
@@ -1004,7 +1219,7 @@ main.page-main {
   color: var(--text);
   caret-color: var(--accent);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: inherit;
   padding: 0;
   margin: 0;
 }
@@ -1019,14 +1234,25 @@ main.page-main {
   overflow: hidden;
   max-width: 100%;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: inherit;
 }
 
 .naked-cli-cursor {
   display: inline-block;
   color: var(--accent);
   animation: term-blink 0.95s steps(1) infinite;
-  margin-left: 1px;
+  margin-left: 2px;
+}
+
+.cli-hint-pill {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border: 1px dashed var(--border);
+  border-radius: 2px;
+  white-space: nowrap;
+  user-select: none;
+  flex-shrink: 0;
 }
 
 /* 交互式终端命令输出 & 搜索结果浮层 */
@@ -1034,19 +1260,19 @@ main.page-main {
   position: fixed;
   z-index: 95;
   display: none;
-  width: min(92vw, 410px);
-  max-height: 310px;
+  width: min(92vw, 520px);
+  max-height: 320px;
   overflow-y: auto;
   background: var(--surface-strong);
-  -webkit-backdrop-filter: blur(22px) saturate(185%);
-  backdrop-filter: blur(22px) saturate(185%);
+  -webkit-backdrop-filter: blur(24px) saturate(185%);
+  backdrop-filter: blur(24px) saturate(185%);
   border: 1px solid var(--accent);
   border-radius: 2px;
   box-shadow: var(--shadow-float);
-  padding: 8px 10px;
+  padding: 10px 12px;
   font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 11.5px;
+  line-height: 1.5;
 }
 
 .hud-term-overlay.is-open {
@@ -1056,11 +1282,11 @@ main.page-main {
 .hud-search-head {
   display: flex;
   justify-content: space-between;
-  padding: 0 2px 5px;
-  margin-bottom: 5px;
+  padding: 0 2px 6px;
+  margin-bottom: 6px;
   border-bottom: 1px dashed var(--border-strong);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .hud-term-pre {
@@ -1069,14 +1295,14 @@ main.page-main {
   word-break: break-word;
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 11.5px;
+  line-height: 1.5;
 }
 
 .hud-search-item {
   display: block;
-  padding: 5px 6px;
-  border-radius: 1px;
+  padding: 6px 8px;
+  border-radius: 2px;
   color: var(--text);
   text-decoration: none;
   border-left: 2px solid transparent;
@@ -1100,7 +1326,7 @@ main.page-main {
 .hud-search-item-sub {
   margin-top: 2px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 10.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1120,6 +1346,7 @@ main.page-main {
 }
 
 .article-card {
+  position: relative;
   background: var(--surface-strong);
   -webkit-backdrop-filter: blur(20px) saturate(175%);
   backdrop-filter: blur(20px) saturate(175%);
@@ -1151,8 +1378,8 @@ main.page-main {
 
 .post-header h1 {
   font-size: 1.85rem;
-  line-height: 1.35;
-  letter-spacing: -0.02em;
+  line-height: 1.36;
+  letter-spacing: -0.01em;
   margin: 0.35rem 0 0.85rem;
 }
 
@@ -1166,18 +1393,24 @@ main.page-main {
   font-size: 0.78rem;
 }
 
-/* 侧边登山海拔仪 + 目录树 */
 .ascent-sidebar {
   position: sticky;
-  top: 2.8rem;
+  top: 7.4rem;
   display: grid;
   gap: 0.85rem;
 }
 
+:root[data-hud-dock='float'] .ascent-sidebar,
+:root[data-hud-dock='left'] .ascent-sidebar,
+:root[data-hud-dock='right'] .ascent-sidebar,
+:root[data-hud-dock='bottom'] .ascent-sidebar {
+  top: 2rem;
+}
+
 .ascent-box {
   background: var(--surface);
-  -webkit-backdrop-filter: blur(22px) saturate(120%);
-  backdrop-filter: blur(22px) saturate(120%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter: blur(22px) saturate(140%);
   border: 1px solid var(--border);
   border-radius: 2px;
   padding: 0.85rem 0.95rem;
@@ -1204,39 +1437,37 @@ main.page-main {
   overflow-y: auto;
 }
 
-.toc-link {
+.toc-list a {
   display: block;
-  color: var(--text-muted);
-  font-size: 0.76rem;
-  line-height: 1.45;
-  padding: 0.15rem 0.3rem;
+  padding: 0.2rem 0.4rem;
   border-left: 2px solid transparent;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  transition: color 0.12s steps(2), border-color 0.12s steps(2);
 }
 
-.toc-link.depth-3 {
+.toc-list a.depth-3 {
   padding-left: 1rem;
-  font-size: 0.73rem;
 }
 
-.toc-link:hover,
-.toc-link.is-current {
-  color: var(--accent);
+.toc-list a:hover,
+.toc-list a.is-active,
+.toc-list a.is-current {
+  color: var(--text);
   border-left-color: var(--accent);
   background: var(--accent-soft);
   text-decoration: none;
 }
 
-/* ================= 正文排版（Prose + 终端代码块） ================= */
+/* ================= 正文排版（统一半衬线 Prose + 终端代码块） ================= */
 .prose {
-  font-size: 1rem;
-  line-height: 1.84;
+  font-size: 1.02rem;
+  line-height: 1.86;
 }
 
 .prose h2 {
-  font-size: 1.32rem;
+  font-size: 1.34rem;
   letter-spacing: -0.01em;
   margin: 2.3rem 0 0.9rem;
   padding-bottom: 0.35rem;
@@ -1244,25 +1475,25 @@ main.page-main {
 }
 
 .prose h2::before {
-  content: var(--h2-prefix, '## ');
+  content: var(--h2-prefix, '✦ ');
   font-family: var(--font-mono);
   font-size: 0.95rem;
   color: var(--accent);
 }
 
 .prose h3 {
-  font-size: 1.12rem;
+  font-size: 1.14rem;
   margin: 1.85rem 0 0.7rem;
 }
 
 .prose h3::before {
-  content: var(--h3-prefix, '### ');
+  content: var(--h3-prefix, '├─ ');
   font-family: var(--font-mono);
   font-size: 0.85rem;
   color: var(--text-muted);
 }
 
-/* Shiki 代码块在暗色系风貌（void / crt / amber）下自动切到暗色语法高亮，仅在亮色纸墨风貌（paper）保持浅色语法高亮 */
+/* Shiki 暗色语法高亮适配（仅亮色宣纸模式保持浅色高亮） */
 :root:not([data-realm='paper']) .astro-code,
 :root:not([data-realm='paper']) .astro-code span {
   color: var(--shiki-dark, inherit) !important;
@@ -1287,7 +1518,7 @@ main.page-main {
 
 .prose blockquote {
   margin: 1.4rem 0;
-  padding: 0.35rem 1.1rem;
+  padding: 0.4rem 1.15rem;
   color: var(--text-muted);
   border-left: 3px solid var(--accent);
   background: var(--surface-inner);
@@ -1307,7 +1538,6 @@ main.page-main {
   border-radius: 2px;
 }
 
-/* 终端顶栏包装后的代码块 */
 .code-term-frame {
   margin: 1.4rem 0;
   border: 1px solid var(--border);
@@ -1320,11 +1550,11 @@ main.page-main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.32rem 0.75rem;
+  padding: 0.34rem 0.75rem;
   border-bottom: 1px solid var(--border);
   background: var(--surface-inner);
   font-family: var(--font-mono);
-  font-size: 0.73rem;
+  font-size: 0.74rem;
   color: var(--text-muted);
 }
 
@@ -1332,9 +1562,9 @@ main.page-main {
   padding: 0.1rem 0.45rem;
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: var(--text-muted);
+  color: var(--text);
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 1px;
   cursor: pointer;
 }
@@ -1408,7 +1638,6 @@ main.page-main {
   padding: 0.4rem 0;
 }
 
-/* Callout 适配 */
 :root:root {
   --callout-bg-color: var(--bg-code);
 }
@@ -1437,7 +1666,7 @@ main.page-main {
   border-radius: 2px;
   background: var(--surface-inner);
   color: var(--text);
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   transition: border-color 0.12s steps(2);
 }
 
@@ -1491,12 +1720,12 @@ main.page-main {
   font-family: var(--font-mono);
   font-size: 0.76rem;
   padding: 0.25rem 0.6rem;
-  background: var(--surface);
+  background: var(--surface-strong);
   color: var(--text);
   border: 1px solid var(--border-strong);
 }
 
-/* ================= 页脚与 404 ================= */
+/* ================= 页脚 ================= */
 .site-footer {
   padding: 1.2rem 0 3rem;
 }
@@ -1507,10 +1736,10 @@ main.page-main {
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem 1.2rem;
-  padding: 0.7rem 1rem;
+  padding: 0.75rem 1.05rem;
   background: var(--surface);
-  -webkit-backdrop-filter: blur(20px) saturate(120%);
-  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(140%);
   border: 1px solid var(--border);
   border-radius: 2px;
   font-family: var(--font-mono);
