@@ -874,20 +874,31 @@ main.page-main {
   -webkit-line-clamp: 2;
 }
 
-/* 112x32 (224x128 亚像素 = 28,672 点阵) 固定格点 Canvas 光栅化西西弗斯 ASCII 剧场画布 */
+/* 112x36 (224x144 亚像素 = 32,256 点阵) 固定格点 Canvas 光栅化西西弗斯 ASCII 剧场画布 */
 .sisyphus-stage-card {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
 }
 
+.sisyphus-stage-card .bento-head {
+  margin-bottom: 0.4rem;
+}
+
+.sisyphus-stage-card .bento-foot {
+  margin-top: 0.45rem;
+}
+
 .ascii-slope-viewport {
   position: relative;
+  flex: 1;
+  display: flex;
+  align-items: stretch;
   width: 100%;
   background: var(--stage-bg);
   border: 1px solid var(--border-strong);
   border-radius: 2px;
-  padding: 0.35rem 0.4rem;
+  padding: 0.25rem 0.3rem;
   cursor: pointer;
   user-select: none;
   box-shadow: inset 0 0 32px rgba(0, 0, 0, 0.22);
@@ -901,8 +912,8 @@ main.page-main {
 .ascii-slope-canvas {
   display: block;
   width: 100%;
-  height: auto;
-  aspect-ratio: 896 / 448;
+  height: 100%;
+  aspect-ratio: 896 / 504;
   image-rendering: auto;
 }
 
