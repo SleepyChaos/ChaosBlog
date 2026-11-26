@@ -57,10 +57,10 @@ const { initialSummits = 1 } = Astro.props;
   const summitBtn = document.getElementById('sisyphus-summit-btn');
 
   if (stageEl && telemetryEl) {
-    // 108x30 字符网格 + Drawille 2x4 亚像素盲文光栅化层 = 216x120 (25,920 亚像素超高分辨率！)
-    const COLS = 108;
+    // 98x30 字符网格 + Drawille 2x4 亚像素盲文光栅化层 = 196x120 (23,520 亚像素高分辨率，严格贴合卡片不溢出！)
+    const COLS = 98;
     const ROWS = 30;
-    const SUB_W = COLS * 2; // 216 水平亚像素
+    const SUB_W = COLS * 2; // 196 水平亚像素
     const SUB_H = ROWS * 4; // 120 垂直亚像素
     const CYCLE_MS = 8 * 60 * 60 * 1000;
     const PEAK_ALT = 884.8;
@@ -168,7 +168,7 @@ const { initialSummits = 1 } = Astro.props;
     }
     const subParticles: SubParticle[] = [];
 
-    const matrixDrops = Array.from({ length: 22 }, (_, i) => ({
+    const matrixDrops = Array.from({ length: 20 }, (_, i) => ({
       col: 4 + i * 4.5 + (i % 2),
       y: (i * 3.7) % 24,
       speed: 3.4 + (i % 4) * 1.2,
@@ -176,24 +176,23 @@ const { initialSummits = 1 } = Astro.props;
     }));
 
     let skyStrikeTimer = 0;
-    let skyStrikeCol = 52;
+    let skyStrikeCol = 48;
 
-    // 山脊地形曲线：c ∈ [0, 107] -> 行坐标 y ∈ [5.5, 26.5]
+    // 半山构图山脊地形曲线（无右侧陡崖，山顶高原自然延展至画幅最右边缘）：c ∈ [0, 97] -> y ∈ [5.5, 26.5]
     const terrainY = (c: number): number => {
       if (c <= 9) return 26.5;
-      if (c >= 94 && c <= 101.5) return 5.5;
-      if (c > 101.5) return Math.min(27.0, 5.5 + (c - 101.5) * 3.2);
-      const u = (c - 9) / 85;
+      if (c >= 87) return 5.5;
+      const u = (c - 9) / 78;
       const base = 26.5 - u * 21.0;
       const crag =
-        Math.sin(u * Math.PI * 3.0) * 0.48 * Math.sin(u * Math.PI) +
-        Math.sin(u * Math.PI * 7.0) * 0.18 * Math.sin(u * Math.PI);
+        Math.sin(u * Math.PI * 3.0) * 0.46 * Math.sin(u * Math.PI) +
+        Math.sin(u * Math.PI * 7.0) * 0.17 * Math.sin(u * Math.PI);
       return base + crag;
     };
 
     const progToCol = (p: number): number => {
       const clamped = Math.max(0, Math.min(1, p));
-      return 12.5 + clamped * 83.5; // 12.5 -> 96.0
+      return 12.5 + clamped * 76.0; // 12.5 -> 88.5
     };
 
     const spawnSubParticles = (
@@ -677,13 +676,13 @@ const { initialSummits = 1 } = Astro.props;
 
       const sec = nowPerf * 0.001;
 
-      // ================= 1. Drawille 216x120 亚像素天体与双层远山科幻奇观层 =================
+      // ================= 1. Drawille 196x120 亚像素天体与双层远山科幻奇观层 =================
       if (hdSubpixelMode) {
-        // 远景双层立体山脉的 216x120 亚像素精密等高轮廓线与山脊阴影线
-        for (let px = 22; px < 146; px++) {
-          const p1 = 30 + Math.abs(px - 54) * 0.52 + Math.sin(px * 0.32) * 1.4;
-          const p2 = 34 + Math.abs(px - 92) * 0.48 + Math.cos(px * 0.25) * 1.3;
-          const p3 = 40 + Math.abs(px - 122) * 0.55 + Math.sin(px * 0.29) * 1.1;
+        // 远景双层立体山脉的 196x120 亚像素精密等高轮廓线与山脊阴影线
+        for (let px = 22; px < 134; px++) {
+          const p1 = 30 + Math.abs(px - 50) * 0.52 + Math.sin(px * 0.32) * 1.4;
+          const p2 = 34 + Math.abs(px - 84) * 0.48 + Math.cos(px * 0.25) * 1.3;
+          const p3 = 40 + Math.abs(px - 112) * 0.55 + Math.sin(px * 0.29) * 1.1;
           const py = Math.min(p1, p2, p3);
           setSubPixel(px, py, 4);
           if (px % 2 === 0) setSubPixel(px, py + 2, 4);
@@ -694,7 +693,7 @@ const { initialSummits = 1 } = Astro.props;
         }
 
         // 高空细微星尘点阵
-        for (let sIdx = 0; sIdx < 18; sIdx++) {
+        for (let sIdx = 0; sIdx < 16; sIdx++) {
           const sx = (sIdx * 37 + 19) % (SUB_W - 16) + 8;
           const sy = (sIdx * 23 + 7) % 34 + 4;
           if (Math.sin(sec * 1.8 + sIdx * 1.7) > -0.25) {
@@ -703,17 +702,17 @@ const { initialSummits = 1 } = Astro.props;
         }
 
         if (realm === 'void') {
-          // 《2001：太空漫游》：216x120 亚像素精密木星圆盘 + 多层风暴云带 + 双倾斜卫星轨道 + TMA-1 球面谐波
-          const jx = 36;
+          // 《2001：太空漫游》：196x120 亚像素精密木星圆盘 + 多层风暴云带 + 双倾斜卫星轨道 + TMA-1 球面谐波
+          const jx = 34;
           const jy = 16;
-          drawSubCircle(jx, jy, 11.2, 1, false);
+          drawSubCircle(jx, jy, 11.0, 1, false);
           for (let bandY = -8; bandY <= 8; bandY += 3) {
-            const halfW = Math.sqrt(Math.max(0, 122 - bandY * bandY));
+            const halfW = Math.sqrt(Math.max(0, 118 - bandY * bandY));
             drawSubLine(jx - halfW + 1, jy + bandY, jx + halfW - 1, jy + bandY, 1);
           }
           // 环木星双层椭圆卫星轨道
-          drawSubEllipseRing(jx, jy, 24, 5.5, -0.18, 2);
-          drawSubEllipseRing(jx, jy, 30, 7.0, -0.18, 4);
+          drawSubEllipseRing(jx, jy, 23, 5.4, -0.18, 2);
+          drawSubEllipseRing(jx, jy, 28, 6.8, -0.18, 4);
 
           // TMA-1 黑石碑发射的同心亚像素球面谐波弧
           for (let wIdx = 0; wIdx < 4; wIdx++) {
@@ -724,15 +723,15 @@ const { initialSummits = 1 } = Astro.props;
           }
         } else if (realm === 'paper') {
           // 《银河帝国》：川陀带环恒星 + 谢顿“第一辐光”三维双螺旋心理史学流形曲面！
-          drawSubCircle(36, 16, 7.4, 1, true);
-          drawSubEllipseRing(36, 16, 20, 4.8, -0.26, 3);
-          drawSubEllipseRing(36, 16, 25, 6.2, -0.26, 4);
+          drawSubCircle(34, 16, 7.2, 1, true);
+          drawSubEllipseRing(34, 16, 19, 4.6, -0.26, 3);
+          drawSubEllipseRing(34, 16, 24, 6.0, -0.26, 4);
 
-          // 第一辐光 (Prime Radiant) 216x120 亚像素相位流形与积分网格
-          for (let px = 60; px < 174; px++) {
-            const u = (px - 60) * 0.08;
-            const yA = 18 + Math.sin(u + sec * 2.0) * 7.2;
-            const yB = 18 + Math.cos(u * 0.85 - sec * 1.6) * 6.5;
+          // 第一辐光 (Prime Radiant) 196x120 亚像素相位流形与积分网格
+          for (let px = 56; px < 156; px++) {
+            const u = (px - 56) * 0.085;
+            const yA = 18 + Math.sin(u + sec * 2.0) * 7.0;
+            const yB = 18 + Math.cos(u * 0.85 - sec * 1.6) * 6.3;
             setSubPixel(px, yA, 3);
             setSubPixel(px, yB, 1);
             if (px % 7 === 0) {
@@ -741,14 +740,14 @@ const { initialSummits = 1 } = Astro.props;
           }
         } else if (realm === 'crt') {
           // 《黑客帝国》：锡安主机双层电磁脉冲场线 + 劈向构造层的亚像素分叉闪电树
-          for (let px = 48; px < 168; px += 2) {
+          for (let px = 44; px < 152; px += 2) {
             const py = 18 + Math.sin(px * 0.12 - sec * 5) * 4.2;
             const py2 = 22 + Math.cos(px * 0.09 + sec * 3.8) * 3.2;
             setSubPixel(px, py, 2);
             if (px % 4 === 0) setSubPixel(px, py2, 4);
           }
           if (sec % 2.4 < 0.48) {
-            let lx = 104 + Math.sin(sec * 17) * 18;
+            let lx = 94 + Math.sin(sec * 17) * 16;
             let ly = 2;
             for (let seg = 0; seg < 9; seg++) {
               const nx = lx + (Math.sin(seg * 3.7 + sec * 31) * 8);
@@ -763,13 +762,13 @@ const { initialSummits = 1 } = Astro.props;
           }
         } else {
           // 《沙丘》：厄拉科斯精密亚像素新月双星 + 巨型沙虫夏胡鲁蜿蜒亚像素环状躯干 + 沙槌地震波
-          drawSubCircle(28, 14, 8.8, 1, true, 4.0); // 穆阿迪布弯月
-          drawSubCircle(54, 19, 4.5, 2, true, 2.2); // 弗雷曼蓝光伴月
+          drawSubCircle(26, 14, 8.6, 1, true, 3.9); // 穆阿迪布弯月
+          drawSubCircle(50, 19, 4.4, 2, true, 2.1); // 弗雷曼蓝光伴月
 
-          // 巨型沙虫夏胡鲁 (Shai-Hulud) 216x120 亚像素厚重拱起躯干与体节环纹
+          // 巨型沙虫夏胡鲁 (Shai-Hulud) 196x120 亚像素厚重拱起躯干与体节环纹
           const wormPhase = sec * 3.6;
-          for (let wx = 30; wx < 112; wx++) {
-            const arch = Math.sin((wx - 30) * 0.12 - wormPhase) * 9.0;
+          for (let wx = 28; wx < 104; wx++) {
+            const arch = Math.sin((wx - 28) * 0.125 - wormPhase) * 8.8;
             const groundPy = terrainY(wx * 0.5) * 4;
             const wy = groundPy - 4 - arch;
             if (wy < groundPy - 2) {
@@ -785,13 +784,13 @@ const { initialSummits = 1 } = Astro.props;
           drawSubEllipseRing(12, 96, thumpR * 1.5, thumpR * 0.48, 0, 2);
         }
 
-        // 将所有亚像素火花/流星/香料粒子光栅化至 216x120 盲文缓冲区
+        // 将所有亚像素火花/流星/香料粒子光栅化至 196x120 盲文缓冲区
         for (const sp of subParticles) {
           setSubPixel(sp.x, sp.y, sp.cls);
           setSubPixel(sp.x - sp.vx * 0.018, sp.y - sp.vy * 0.018, sp.cls);
         }
 
-        // 点击画布触发的 216x120 亚像素高能天象集束流
+        // 点击画布触发的 196x120 亚像素高能天象集束流
         if (skyStrikeTimer > 0) {
           const bTargetPx = progToCol(boulderProg) * 2;
           const bTargetPy = (terrainY(progToCol(boulderProg)) - 2) * 4;
@@ -800,7 +799,7 @@ const { initialSummits = 1 } = Astro.props;
           drawSubCircle(bTargetPx, bTargetPy, (0.6 - skyStrikeTimer) * 20, 9, false);
         }
 
-        // 将 216x120 盲文缓冲区合成为 108x30 的 Unicode 盲文字符 (U+2800..U+28FF，严格 1ch 宽度)
+        // 将 196x120 盲文缓冲区合成为 98x30 的 Unicode 盲文字符 (U+2800..U+28FF，严格 1ch 宽度)
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS; c++) {
             const mask = brailleMask[r][c];
@@ -819,23 +818,23 @@ const { initialSummits = 1 } = Astro.props;
           putStr(2, 12, '│▒▒(o)░░│', 1);
           putStr(3, 12, "'─~═══~─'", 1);
         }
-        put(4, 18, 'o', 9); // 木星大红斑核心
-        const m1x = Math.round(18 + Math.cos(sec * 0.9) * 11);
-        const m2x = Math.round(18 + Math.sin(sec * 0.55) * 14);
+        put(4, 17, 'o', 9); // 木星大红斑核心
+        const m1x = Math.round(17 + Math.cos(sec * 0.9) * 11);
+        const m2x = Math.round(17 + Math.sin(sec * 0.55) * 13);
         put(4, m1x, '*', 2);
         put(3, m2x, '+', 3);
 
         // 发现号深空飞船 (XD-1 Discovery One) 加长精密舰体
-        const shipX = 30 + (Math.floor(sec * 3.5) % 48);
-        if (shipX + 12 < 90) {
+        const shipX = 28 + (Math.floor(sec * 3.5) % 42);
+        if (shipX + 12 < 82) {
           putStr(5, shipX, ':::', sec % 0.4 < 0.2 ? 2 : 3);
           putStr(5, shipX + 3, 'O═══╤══>', 5);
         }
 
         const halPulse = Math.floor(sec * 2) % 2 === 0 ? '(o)' : '(O)';
-        putStr(0, 92, '[HAL:9000 ', 10);
-        putStr(0, 102, halPulse, 9);
-        put(0, 105, ']', 10);
+        putStr(0, 83, '[HAL:9000 ', 10);
+        putStr(0, 93, halPulse, 9);
+        put(0, 96, ']', 10);
 
         // 第谷环形山 TMA-1 1:4:9 黑色方尖碑
         for (let r = 20; r <= 25; r++) {
@@ -847,12 +846,12 @@ const { initialSummits = 1 } = Astro.props;
           putStr(2, 13, '══╡ O ╞══', 1);
           putStr(3, 13, "  '─═─'  ", 1);
         } else {
-          put(4, 18, 'O', 1);
+          put(4, 17, 'O', 1);
         }
-        putStr(0, 82, '[PRIME_RADIANT // SELDON]', 1);
+        putStr(0, 72, '[PRIME_RADIANT // SELDON]', 1);
 
-        const fleetX = 30 + (Math.floor(sec * 4.5) % 50);
-        if (fleetX + 8 < 88) {
+        const fleetX = 28 + (Math.floor(sec * 4.5) % 44);
+        if (fleetX + 8 < 80) {
           putStr(6, fleetX, '...-==>', 1);
           putStr(7, fleetX - 5, '..-=>', 4);
         }
@@ -898,20 +897,20 @@ const { initialSummits = 1 } = Astro.props;
         });
 
         // 尼布甲尼撒号气垫船 (Nebuchadnezzar)
-        const hoverX = Math.round(48 + Math.sin(sec * 1.3) * 12);
+        const hoverX = Math.round(44 + Math.sin(sec * 1.3) * 10);
         const hoverY = Math.round(5.0 + Math.cos(sec * 2.2) * 0.9);
         putStr(hoverY, hoverX, '<═╦═╬═╦═>', 3);
-        putStr(0, 80, '[ZION_MAINFRAME // 0x5F37]', 2);
+        putStr(0, 71, '[ZION_MAINFRAME // 0x5F37]', 2);
       } else {
         if (!hdSubpixelMode) {
           putStr(1, 11, '(o)', 1);
           put(2, 19, 'o', 2);
         }
         // 阿崔迪扑翼机 (Ornithopter) 高频振翅掠过障壁山脉
-        const thopterX = 28 + (Math.floor(sec * 5.5) % 54);
+        const thopterX = 26 + (Math.floor(sec * 5.5) % 48);
         const wingFrame = Math.floor(sec * 11) % 3;
         const wings = wingFrame === 0 ? '\\\\═╦═//' : wingFrame === 1 ? '──═╦═──' : '//═╦═\\\\';
-        if (thopterX + 8 < 90) {
+        if (thopterX + 8 < 82) {
           putStr(3 + (wingFrame === 2 ? 1 : 0), thopterX, wings, 1);
         }
 
@@ -921,7 +920,7 @@ const { initialSummits = 1 } = Astro.props;
         put(23, 5, '║', 1);
         put(24, 5, '║', 1);
         put(25, 5, '╩', 1);
-        putStr(0, 80, '[ARRAKIS // SHIELD_WALL]', 1);
+        putStr(0, 73, '[ARRAKIS // SHIELD_WALL]', 1);
       }
 
       if (!hdSubpixelMode) {
@@ -939,9 +938,8 @@ const { initialSummits = 1 } = Astro.props;
         const diff = nextY - yExact;
 
         let ridgeChar = '─';
-        if (c >= 94 && c <= 101) ridgeChar = '═';
+        if (c >= 87) ridgeChar = '═';
         else if (diff < -0.1) ridgeChar = '/';
-        else if (diff > 0.25) ridgeChar = '\\';
         else ridgeChar = '_';
 
         if (sr >= 0 && sr < ROWS) {
@@ -990,12 +988,13 @@ const { initialSummits = 1 } = Astro.props;
         }
       }
 
-      // 峰顶信标旗帜与海拔里程碑柱
-      const peakR = Math.round(terrainY(99));
+      // 峰顶信标红旗与山巅界碑（全部严格收拢在 98 列可视画幅内部，右侧山顶直接延展至画框边缘）
+      const peakR = Math.round(terrainY(90));
       const flagWave = Math.floor(sec * 5) % 2 === 0 ? '[~>' : '[=>';
-      put(peakR - 2, 99, '│', 5);
-      put(peakR - 1, 99, '┴', 5);
-      putStr(peakR - 2, 100, flagWave, 9);
+      put(peakR - 2, 91, '│', 5);
+      put(peakR - 1, 91, '┴', 5);
+      putStr(peakR - 2, 92, flagWave, 9);
+      put(peakR - 1, 96, '▲', 4);
 
       // ================= 4. 绘制 6x4 超清立体滚动多面体巨石 =================
       const bCol = progToCol(boulderProg);
