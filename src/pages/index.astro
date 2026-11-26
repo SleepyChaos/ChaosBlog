@@ -34,7 +34,7 @@ const computePostTerrain = (body: string) => {
     <!-- [01] 西西弗斯 8 小时真实时间轮回高分多彩科幻剧场 -->
     <AsciiSisyphus initialSummits={Math.max(1, posts.length)} />
 
-    <!-- [02] 身份与浮动 HUD 物理控制台（随四大科幻世界切换专属艺术字体与身份印章） -->
+    <!-- [02] 个人自我介绍卡（随四大科幻世界切换专属艺术字体与单行印章） -->
     <section class="bento-card col-5 whoami-card">
       <div>
         <div class="bento-head">
@@ -46,13 +46,11 @@ const computePostTerrain = (body: string) => {
         </div>
 
         <div class="whoami-insignia-row" id="whoami-world-insignia">
-          <span>[▮ 1:4:9]</span>
-          <span>DISCOVERY_ONE // 深空推石档案</span>
+          [TMA-1 · 发现号深空日志]
         </div>
 
         <h1 class="identity-title">
-          你好，我是 <span class="handle">{GITHUB_HANDLE}</span>{' '}
-          <span class="sub-author">({SITE_SUB_AUTHOR})</span>
+          你好，我是 <span class="handle">{GITHUB_HANDLE}</span>
         </h1>
         <p class="identity-desc">
           “正在努力从 vibecoding 的浪潮中寻找属于我的石头。希望过一阵回头看，能发现自己又多弄懂了一点 (´･ω･)”
@@ -62,25 +60,19 @@ const computePostTerrain = (body: string) => {
           <div>
             <span class="prompt">$</span>github:
             <a href={GITHUB_URL} target="_blank" rel="noopener">
-              <strong>@{GITHUB_HANDLE}</strong> (SleepyChaos)
+              <strong>@SleepyChaos</strong>
             </a>
           </div>
           <div>
-            <span class="prompt">$</span>worlds:
-            <strong>太空漫游 · 银河帝国 · 黑客帝国 · 沙丘</strong>
+            <span class="prompt">$</span>focus:
+            <strong>Rust · CodeQL 静态分析 · 系统与安全</strong>
           </div>
           <div>
-            <span class="prompt">$</span>hud_rig:
-            <strong>三段机械棘轮挂架 / 168x72 亚像素点阵 / 点击左图天象助推</strong>
+            <span class="prompt">$</span>notes:
+            <strong>SemFlow Audit / 读书笔记与踩坑复盘</strong>
           </div>
-          <div style="display: flex; gap: 0.45rem; padding-top: 0.25rem; flex-wrap: wrap;">
-            <button type="button" class="term-btn is-primary" id="bento-kick-btn">
-              [&gt;&gt; 弹射 HUD + 助推]
-            </button>
-            <button type="button" class="term-btn" id="bento-realm-btn">
-              [╬ 跃迁科幻世界]
-            </button>
-            <a class="term-btn" href={`${base}/about/`}>[?ABOUT]</a>
+          <div style="display: flex; gap: 0.45rem; padding-top: 0.3rem; flex-wrap: wrap;">
+            <a class="term-btn is-primary" href={`${base}/about/`}>[?ABOUT 关于我 →]</a>
           </div>
         </div>
       </div>
@@ -263,22 +255,12 @@ const computePostTerrain = (body: string) => {
 </BaseLayout>
 
 <script>
-  document.getElementById('bento-kick-btn')?.addEventListener('click', () => {
-    window.dispatchEvent(new CustomEvent('sisyphus:hud-kick'));
-    window.dispatchEvent(
-      new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.035 } }),
-    );
-  });
-  document.getElementById('bento-realm-btn')?.addEventListener('click', () => {
-    window.dispatchEvent(new CustomEvent('sisyphus:cycle-realm'));
-  });
-
   const insigniaEl = document.getElementById('whoami-world-insignia');
   const INSIGNIA_MAP: Record<string, string> = {
-    void: '[▮ 1:4:9] DISCOVERY_ONE // 克拉维斯深空推石档案',
-    paper: '〘 Ψ 〙 ENCYCLOPEDIA GALACTICA // 端点星第一基地编纂官',
-    crt: '[▛╬▜] ZION_MAINFRAME // 尼布甲尼撒号构造层领航员',
-    amber: '◈ SIETCH_TABR // 厄拉科斯障壁山脉弗雷曼行者',
+    void: '[TMA-1 · 发现号深空日志]',
+    paper: '〘 银河百科全书 · 端点星 〙',
+    crt: '[ZION · 尼布甲尼撒号]',
+    amber: '◈ ARRAKIS · 塔布尔穴地',
   };
   const syncInsignia = () => {
     const r = document.documentElement.dataset.realm || 'void';

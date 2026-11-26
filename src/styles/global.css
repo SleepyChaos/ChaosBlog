@@ -364,9 +364,9 @@ a:hover {
 /* ================= 页面主容器与悬浮顶栏自适应避让 ================= */
 .container-wide {
   width: 100%;
-  max-width: 68rem;
+  max-width: 76rem;
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 1.75rem;
 }
 
 main.page-main {
@@ -585,16 +585,20 @@ main.page-main {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.16rem 0.55rem;
+  padding: 0.16rem 0.58rem;
   margin-bottom: 0.45rem;
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: var(--accent);
   background: var(--accent-soft);
   border: 1px solid var(--border-strong);
   border-radius: 1px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .identity-title {
@@ -1427,7 +1431,7 @@ main.page-main {
 }
 
 .reader-layout.is-single {
-  grid-template-columns: minmax(0, 50rem);
+  grid-template-columns: minmax(0, 56rem);
   justify-content: center;
 }
 

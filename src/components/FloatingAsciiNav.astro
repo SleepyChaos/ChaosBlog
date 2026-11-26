@@ -740,7 +740,7 @@ const tagIndex = tags.map(([name, count]) => ({
       if (typeof d?.frac === 'number') liveBoulderFrac = d.frac;
       if (cliHintPill && typeof d?.alt === 'number') {
         const fl = (d?.flow ?? 1) > 1.05 ? ` · ${(d?.flow ?? 1).toFixed(1)}x` : '';
-        cliHintPill.textContent = `[${d.alt.toFixed(0)}m${fl} · /]`;
+        cliHintPill.textContent = `[${d.alt.toFixed(1)}m${fl} · /]`;
       }
     });
 

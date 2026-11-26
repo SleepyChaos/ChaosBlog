@@ -12,17 +12,9 @@ const { initialSummits = 1 } = Astro.props;
   <div class="bento-head">
     <span class="bento-head-title">
       <span class="term-ascii-icon">/▲</span>
-      <span id="sisyphus-stage-title">01 // TMA-1 · CLAVIUS_CRATER</span>
+      <span id="sisyphus-stage-title">01 // TMA-1 · 第谷环形山</span>
     </span>
     <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-      <button
-        type="button"
-        class="term-btn"
-        id="sisyphus-res-btn"
-        title="切换 Drawille 168x72 亚字符盲文点阵混合渲染器 / 经典 84x18 纯字符渲染"
-      >
-        [HD: 168x72 点阵]
-      </button>
       <button
         type="button"
         class="term-btn is-primary"
@@ -63,7 +55,6 @@ const { initialSummits = 1 } = Astro.props;
   const quoteEl = document.getElementById('sisyphus-phase-quote');
   const pushBtn = document.getElementById('sisyphus-push-btn');
   const summitBtn = document.getElementById('sisyphus-summit-btn');
-  const resBtn = document.getElementById('sisyphus-res-btn');
 
   if (stageEl && telemetryEl) {
     // 84x18 字符网格 + Drawille 2x4 亚像素盲文光栅化层 = 168x72 (12,096 亚像素分辨率！)
@@ -76,20 +67,14 @@ const { initialSummits = 1 } = Astro.props;
     const STORAGE_KEY = 'sisyphus_8h_cycle_v2';
     const baseSummits = Number(telemetryEl.dataset.summits || '1');
 
-    let hdSubpixelMode = true;
-    resBtn?.addEventListener('click', () => {
-      hdSubpixelMode = !hdSubpixelMode;
-      if (resBtn) {
-        resBtn.textContent = hdSubpixelMode ? '[HD: 168x72 点阵]' : '[MODE: 84x18 经典]';
-      }
-    });
+    const hdSubpixelMode = true;
 
-    // 严格对照四部科幻原著的经典地点与名词
+    // 严格对照四部科幻原著的经典地点，采用 `·` 分隔，不使用括号
     const STAGE_TITLES: Record<string, string> = {
-      void: '01 // TMA-1 · CLAVIUS_CRATER (第谷磁异常-1)',
-      paper: '01 // TERMINUS · SELDON_VAULT (端点星穹顶)',
-      crt: '01 // ZION_MAINFRAME · NEBUCHADNEZZAR (锡安主机)',
-      amber: '01 // ARRAKIS · SIETCH_TABR (塔布尔穴地)',
+      void: '01 // TMA-1 · 第谷环形山',
+      paper: '01 // TERMINUS · 端点星穹顶',
+      crt: '01 // ZION · 尼布甲尼撒号',
+      amber: '01 // ARRAKIS · 塔布尔穴地',
     };
 
     const WORLD_QUOTES: Record<string, string> = {
@@ -1064,9 +1049,15 @@ const { initialSummits = 1 } = Astro.props;
         }
       }
 
-      // ================= 6. 左上角内嵌 TUI 遥测角标 =================
-      const shownCycle = baseSummits + activeCycleIndex;
-      const altNow = (boulderProg * PEAK_ALT).toFixed(1).padStart(5, '0');
+      // ================= 6. 左上角内嵌 TUI 遥测角标（与全站全局海拔数据源 100% 统一） =================
+      const latestTotalNow = getTotalRawCycles(Date.now());
+      const unifiedCycleIdx = Math.floor(latestTotalNow);
+      const unifiedFrac =
+        phase === 'CLIMB' && !sprintToSummit
+          ? Math.max(0, Math.min(1, latestTotalNow - unifiedCycleIdx))
+          : Math.max(0, Math.min(1, boulderProg));
+      const shownCycle = baseSummits + unifiedCycleIdx;
+      const altNow = (unifiedFrac * PEAK_ALT).toFixed(1);
       const phaseTag =
         phase === 'CLIMB'
           ? sprintToSummit
@@ -1111,9 +1102,9 @@ const { initialSummits = 1 } = Astro.props;
 
       stageEl.innerHTML = htmlLines.join('\n');
 
-      const filled = Math.max(0, Math.min(10, Math.round(boulderProg * 10)));
+      const filled = Math.max(0, Math.min(10, Math.round(unifiedFrac * 10)));
       const bar = '▪'.repeat(filled) + '▫'.repeat(10 - filled);
-      const remainMs = Math.max(0, (1 - displayFrac) * CYCLE_MS);
+      const remainMs = Math.max(0, (1 - unifiedFrac) * CYCLE_MS);
       const boostNote =
         save.boostMeters >= 0.5 ? ` · BOOST +${Math.round(save.boostMeters)}m` : '';
 

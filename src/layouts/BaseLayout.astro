@@ -44,6 +44,37 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
             parsed.mode === 'docked' ? parsed.dockSide || 'top' : 'float';
         }
       } catch {}
+
+      // 在 <head> 最先注册全局唯一推石进度持久化监听器，确保所有组件拿到的海拔与随机助推值 100% 同步
+      window.addEventListener('sisyphus:boulder-boost', (ev) => {
+        const detail = (ev && ev.detail) || {};
+        const PEAK_ALT = 884.8;
+        const CYCLE_MS = 8 * 60 * 60 * 1000;
+        const KEY = 'sisyphus_8h_cycle_v2';
+        let rawAmt = detail.rolledAmount;
+        if (typeof rawAmt !== 'number') {
+          if (typeof detail.minM === 'number' && typeof detail.maxM === 'number') {
+            rawAmt = (detail.minM + Math.random() * (detail.maxM - detail.minM)) / PEAK_ALT;
+          } else {
+            const baseAmt = Math.max(0.001, Math.min(0.12, detail.amount || 0.015));
+            rawAmt = baseAmt * (0.58 + Math.random() * 0.87);
+          }
+          detail.rolledAmount = rawAmt;
+        }
+        if (!detail.persisted) {
+          detail.persisted = true;
+          try {
+            const nowEpoch = Math.floor(Date.now() / CYCLE_MS);
+            const raw = localStorage.getItem(KEY);
+            const save = raw
+              ? JSON.parse(raw)
+              : { anchorEpoch: nowEpoch, boostAccum: 0, boostMeters: 0 };
+            save.boostAccum = Number(save.boostAccum || 0) + rawAmt;
+            save.boostMeters = Number(save.boostMeters || 0) + rawAmt * PEAK_ALT;
+            localStorage.setItem(KEY, JSON.stringify(save));
+          } catch {}
+        }
+      });
     </script>
   </head>
   <body>

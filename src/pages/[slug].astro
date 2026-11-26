@@ -1,7 +1,7 @@
 ---
-import { getAllPages, getAllPosts, renderPage, type PageFull } from '../lib/content';
+import { getAllPages, renderPage, type PageFull } from '../lib/content';
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { GITHUB_HANDLE, GITHUB_URL } from '../consts';
+import { GITHUB_URL } from '../consts';
 
 export async function getStaticPaths() {
   const pages = await getAllPages();
@@ -10,7 +10,6 @@ export async function getStaticPaths() {
 
 const page = Astro.props.page as PageFull;
 const { Content } = await renderPage(page);
-const posts = await getAllPosts();
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const isAbout = page.slug === 'about';
 ---
@@ -34,42 +33,17 @@ const isAbout = page.slug === 'about';
 
       {
         isAbout && (
-          <div style="margin-top: 2.2rem; padding-top: 1.4rem; border-top: 1px dashed var(--border-strong);">
-            <div class="bento-head">
-              <span class="bento-head-title">
-                <span class="term-ascii-icon">◈</span>
-                <span>EXPEDITION_DOSSIER // 舰载推石手札与技能雷达</span>
-              </span>
-              <span class="bento-head-meta">ID::{GITHUB_HANDLE.toUpperCase()}</span>
-            </div>
-
-            <pre
-              class="ascii-slope-pre"
-              style="cursor: default; margin-bottom: 0.9rem; font-size: 0.72rem; line-height: 1.45;"
-            ><span class="as-hero">  ┌──────────────────────────────────────────────────────────────────────┐</span>
-<span class="as-hero">  │</span>  <strong>OPERATOR</strong> : Sisyphus (@SleepyChaos) · 杭师大在读                     <span class="as-hero">│</span>
-<span class="as-hero">  │</span>  <strong>CREDO</strong>    : "正在努力从 vibecoding 的浪潮中寻找属于我的石头"         <span class="as-hero">│</span>
-<span class="as-hero">  ├──────────────────────────────────────────────────────────────────────┤</span>
-<span class="as-hero">  │</span>  <span class="as-sky">Rust Systems &amp; CLI</span>       [▪▪▪▪▪▪▪▪▫▫]  所有权 / 错误处理 / Serde   <span class="as-hero">│</span>
-<span class="as-hero">  │</span>  <span class="as-aurora">CodeQL &amp; SemFlow Audit</span>   [▪▪▪▪▪▪▪▪▫▫]  污点追踪 / LLM 漏洞修复分析 <span class="as-hero">│</span>
-<span class="as-hero">  │</span>  <span class="as-rock">Astro &amp; ASCII Craft</span>      [▪▪▪▪▪▪▪▪▪▫]  零重力终端 / 四大科幻世界   <span class="as-hero">│</span>
-<span class="as-hero">  │</span>  <span class="as-fire">Boulder Endurance</span>        [██████████]  8h 真实时间轮回 · 永不妥协  <span class="as-hero">│</span>
-<span class="as-hero">  └──────────────────────────────────────────────────────────────────────┘</span></pre>
-
-            <div
-              style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted);"
-            >
-              <span id="about-live-telemetry">
-                已发布笔记: {posts.length} 篇 · 累计助推里程读取中...
-              </span>
-              <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
-                <button type="button" class="term-btn is-primary" id="about-boost-btn">
-                  [+PUSH 为石头注能 +35m]
-                </button>
-                <a class="term-btn" href={GITHUB_URL} target="_blank" rel="noopener">
-                  [GitHub @SleepyChaos ↗]
-                </a>
-              </div>
+          <div
+            style="margin-top: 2rem; padding-top: 1.1rem; border-top: 1px dashed var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.65rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted);"
+          >
+            <span id="about-live-telemetry">ALT 210.0m / 884.8m</span>
+            <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
+              <button type="button" class="term-btn is-primary" id="about-boost-btn">
+                [+PUSH 推一把石头]
+              </button>
+              <a class="term-btn" href={GITHUB_URL} target="_blank" rel="noopener">
+                [GitHub @SleepyChaos ↗]
+              </a>
             </div>
           </div>
         )
@@ -82,40 +56,47 @@ const isAbout = page.slug === 'about';
   const teleEl = document.getElementById('about-live-telemetry');
   const boostBtn = document.getElementById('about-boost-btn');
   const STORAGE_KEY = 'sisyphus_8h_cycle_v2';
-  const CYCLE_MS = 8 * 3600 * 1000;
+  const CYCLE_MS = 8 * 60 * 60 * 1000;
+  const PEAK_ALT = 884.8;
 
-  const refreshDossier = () => {
+  const refreshTelemetry = () => {
     if (!teleEl) return;
-    let boostM = 0;
+    const nowEpoch = Math.floor(Date.now() / CYCLE_MS);
+    let anchorEpoch = nowEpoch;
+    let boostAccum = 0;
+    let boostMeters = 0;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        boostM = Math.round(Number(parsed.boostMeters || 0));
+        if (typeof parsed.anchorEpoch === 'number') anchorEpoch = parsed.anchorEpoch;
+        if (typeof parsed.boostAccum === 'number') boostAccum = parsed.boostAccum;
+        boostMeters = Math.round(Number(parsed.boostMeters || 0));
       }
     } catch {}
-    const r = document.documentElement.dataset.realm || 'void';
-    teleEl.textContent = `当前世界: ${r.toUpperCase()} · 累计助推里程: +${boostM}m`;
+    const total = Math.max(0, Date.now() / CYCLE_MS - anchorEpoch + boostAccum);
+    const frac = total - Math.floor(total);
+    const alt = (frac * PEAK_ALT).toFixed(1);
+    teleEl.textContent = `当前推石进度: ALT ${alt}m / 884.8m · 累计助推 +${boostMeters}m`;
   };
-  refreshDossier();
-  window.addEventListener('sisyphus:realmchange', refreshDossier);
+
+  refreshTelemetry();
+  window.addEventListener('sisyphus:boulder-telemetry', refreshTelemetry);
+  window.addEventListener('sisyphus:realmchange', refreshTelemetry);
 
   boostBtn?.addEventListener('click', () => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const parsed = raw
-        ? JSON.parse(raw)
-        : { anchorEpoch: Math.floor(Date.now() / CYCLE_MS), boostAccum: 0, boostMeters: 0 };
-      parsed.boostAccum = Number(parsed.boostAccum || 0) + 0.04;
-      parsed.boostMeters = Number(parsed.boostMeters || 0) + 35.4;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-    } catch {}
-    window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: { amount: 0.04 } }));
-    refreshDossier();
+    const dObj: { minM: number; maxM: number; source: string; rolledAmount?: number } = {
+      minM: 14,
+      maxM: 38,
+      source: '关于页助推',
+    };
+    window.dispatchEvent(new CustomEvent('sisyphus:boulder-boost', { detail: dObj }));
+    refreshTelemetry();
+    const rolledM = ((dObj.rolledAmount ?? 0.025) * PEAK_ALT).toFixed(1);
     if (boostBtn) {
-      boostBtn.textContent = '[OK 已注入 +35m 推石动能]';
+      boostBtn.textContent = `[OK 已向前推进 +${rolledM}m]`;
       setTimeout(() => {
-        boostBtn.textContent = '[+PUSH 为石头注能 +35m]';
+        boostBtn.textContent = '[+PUSH 推一把石头]';
       }, 1600);
     }
   });
