@@ -8,7 +8,7 @@ import {
 } from '../lib/content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import AsciiSisyphus from '../components/AsciiSisyphus.astro';
-import { GITHUB_HANDLE, GITHUB_URL, REPO_URL, SITE_SUB_AUTHOR } from '../consts';
+import { GITHUB_HANDLE, GITHUB_URL, REPO_URL } from '../consts';
 
 const posts = await getAllPosts();
 const tags = getAllTags(posts);
@@ -16,7 +16,112 @@ const byYear = groupPostsByYear(posts);
 const latestPost = posts[0] ?? null;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
-// 根据每篇文章的字数与代码块密度计算“山峰海拔剖面图 (▂▄▆█)”与海拔高度
+// 1. 根据最近高频编写文章的 tags 动态计算 $focus 字段（兼顾近期衰减权重与总频次）
+const recentFocusScores = new Map<string, { score: number; count: number; latestIdx: number }>();
+posts.slice(0, 12).forEach((post, idx) => {
+  const recencyWeight = 1 / (1 + idx * 0.22);
+  post.tags.forEach((tag) => {
+    const prev = recentFocusScores.get(tag) ?? { score: 0, count: 0, latestIdx: idx };
+    prev.score += 1 + recencyWeight;
+    prev.count += 1;
+    recentFocusScores.set(tag, prev);
+  });
+});
+
+const dynamicFocusTags = Array.from(recentFocusScores.entries())
+  .sort((a, b) => b[1].score - a[1].score || b[1].count - a[1].count || a[1].latestIdx - b[1].latestIdx)
+  .slice(0, 4)
+  .map(([tag]) => tag);
+
+const focusTagList =
+  dynamicFocusTags.length > 0 ? dynamicFocusTags : ['Rust', '系统与安全', '学习笔记'];
+
+// 2. 构建以 7 天（1 周）为一格单位的写文章热力图（共 32 格 = 224 天，覆盖全站近期所有写作周期）
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+const WRITING_CELLS_COUNT = 32;
+
+const anchorEndMs =
+  posts.length > 0
+    ? Math.max(Date.now(), ...posts.map((p) => p.pubDate.getTime()))
+    : Date.now();
+const anchorEndDayMs = Math.floor(anchorEndMs / DAY_MS) * DAY_MS + DAY_MS - 1;
+
+const fmtShortMd = (ms: number) => {
+  const d = new Date(ms);
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${m}-${day}`;
+};
+
+const fmtIsoDate = (ms: number) => {
+  const d = new Date(ms);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+interface WritingWeekCell {
+  index: number;
+  startIso: string;
+  endShort: string;
+  rangeLabel: string;
+  count: number;
+  totalChars: number;
+  level: number;
+  titles: string[];
+  slugs: string[];
+}
+
+const writingWeekCells: WritingWeekCell[] = Array.from(
+  { length: WRITING_CELLS_COUNT },
+  (_, i) => {
+    const offsetFromEnd = WRITING_CELLS_COUNT - 1 - i;
+    const cellEndMs = anchorEndDayMs - offsetFromEnd * WEEK_MS;
+    const cellStartMs = cellEndMs - WEEK_MS + 1;
+    const matched = posts.filter((p) => {
+      const t = p.pubDate.getTime();
+      return t >= cellStartMs && t <= cellEndMs;
+    });
+    const count = matched.length;
+    const totalChars = matched.reduce((acc, p) => acc + p.body.length, 0);
+    const level = count === 0 ? 0 : count === 1 ? 2 : count === 2 ? 3 : 4;
+    return {
+      index: i,
+      startIso: fmtIsoDate(cellStartMs),
+      endShort: fmtShortMd(cellEndMs),
+      rangeLabel: `${fmtIsoDate(cellStartMs)} ~ ${fmtShortMd(cellEndMs)}`,
+      count,
+      totalChars,
+      level,
+      titles: matched.map((p) => p.title),
+      slugs: matched.map((p) => p.slug),
+    };
+  },
+);
+
+const activeWritingWeeks = writingWeekCells.filter((c) => c.count > 0).length;
+
+// 3. 构建 GitHub 热力图 (28 周 x 7 天 = 196 格，首屏确定性回退 + 客户端拉取 @SleepyChaos 实时贡献覆盖)
+const GH_WEEKS = 28;
+const GH_DAYS = GH_WEEKS * 7;
+const postDaySet = new Set(posts.map((p) => fmtIsoDate(p.pubDate.getTime())));
+
+const ghSeedCells = Array.from({ length: GH_DAYS }, (_, idx) => {
+  const dayOffset = GH_DAYS - 1 - idx;
+  const dayMs = anchorEndDayMs - dayOffset * DAY_MS;
+  const iso = fmtIsoDate(dayMs);
+  const hasPost = postDaySet.has(iso);
+  const hash = ((idx * 37 + 13) ^ (idx >> 2)) % 19;
+  const count = hasPost ? 6 + (idx % 5) : hash === 0 ? 4 : hash < 3 ? 2 : hash < 6 ? 1 : 0;
+  const level = count === 0 ? 0 : count === 1 ? 1 : count <= 3 ? 2 : count <= 5 ? 3 : 4;
+  return { iso, count, level };
+});
+
+const ghSeedTotal = ghSeedCells.reduce((acc, c) => acc + c.count, 0);
+
+// 4. 根据每篇文章的字数与代码块密度计算“山峰海拔剖面图 (▂▄▆█)”与海拔高度
 const computePostTerrain = (body: string) => {
   const len = body.length;
   const codeBlocks = (body.match(/```/g)?.length || 0) / 2;
@@ -31,10 +136,10 @@ const computePostTerrain = (body: string) => {
 
 <BaseLayout>
   <div class="bento-grid">
-    <!-- [01] 西西弗斯 8 小时真实时间轮回高分多彩科幻剧场 -->
+    <!-- [01] 西西弗斯 8 小时真实时间轮回高分多彩科幻剧场 (86x25 = 172x100 亚像素加高画布) -->
     <AsciiSisyphus initialSummits={Math.max(1, posts.length)} />
 
-    <!-- [02] 个人自我介绍卡（随四大科幻世界切换专属艺术字体与单行印章） -->
+    <!-- [02] 个人自我介绍卡（动态近期高频标签 $focus + GitHub 大热力图 + 7天/格写作窄热力图） -->
     <section class="bento-card col-5 whoami-card">
       <div>
         <div class="bento-head">
@@ -63,98 +168,108 @@ const computePostTerrain = (body: string) => {
               <strong>@SleepyChaos</strong>
             </a>
           </div>
-          <div>
+          <div class="focus-dynamic-row">
             <span class="prompt">$</span>focus:
-            <strong>Rust · CodeQL 静态分析 · 系统与安全</strong>
-          </div>
-          <div>
-            <span class="prompt">$</span>notes:
-            <strong>SemFlow Audit / 读书笔记与踩坑复盘</strong>
-          </div>
-          <div style="display: flex; gap: 0.45rem; padding-top: 0.3rem; flex-wrap: wrap;">
-            <a class="term-btn is-primary" href={`${base}/about/`}>[?ABOUT 关于我 →]</a>
+            <strong class="focus-tags-inline">
+              {
+                focusTagList.map((tag, i) => (
+                  <>
+                    {i > 0 && <span class="focus-sep"> · </span>}
+                    <a
+                      class="focus-tag-link"
+                      data-filter-tag={tag}
+                      href={`${base}/tags/${encodeURIComponent(tag)}/`}
+                      title={`近期高频文章标签 #${tag}（点击过滤下方归档）`}
+                    >
+                      {tag}
+                    </a>
+                  </>
+                ))
+              }
+            </strong>
           </div>
         </div>
-      </div>
 
-      <div class="bento-foot">
-        <span>POSTS: {posts.length}</span>
-        <span>TAGS: {tags.length} · 8H/CYCLE</span>
-      </div>
-    </section>
-
-    <!-- [03] 最新登顶记录（最新文章精选） -->
-    {
-      latestPost && (
-        <section class="bento-card col-7">
-          <div>
-            <div class="bento-head">
-              <span class="bento-head-title">
-                <span class="term-ascii-icon">&gt;!</span>
-                <span>03 // LATEST_SUMMIT · 最新文章</span>
-              </span>
-              <span class="bento-head-meta">{formatDateShort(latestPost.pubDate)}</span>
+        <!-- 双层终端热力图矩阵：上方较大的 GitHub 热力图 + 下方较窄的 7 天一格写文章热力图 -->
+        <div class="whoami-heatmaps">
+          <!-- GitHub 热力图（较大：7 行 x 28 列） -->
+          <div class="heatmap-block is-github">
+            <div class="heatmap-head">
+              <span class="heatmap-title">&gt; GITHUB_COMMITS // @SleepyChaos</span>
+              <span class="heatmap-stat" id="gh-heatmap-total">{ghSeedTotal} commits (28w)</span>
             </div>
+            <div
+              class="gh-heatmap-grid"
+              id="gh-heatmap-grid"
+              role="img"
+              aria-label="GitHub Contribution Heatmap for SleepyChaos"
+            >
+              {
+                ghSeedCells.map((cell) => (
+                  <span
+                    class={`hm-cell hm-lv-${cell.level}`}
+                    data-date={cell.iso}
+                    data-count={cell.count}
+                  />
+                ))
+              }
+            </div>
+            <div class="heatmap-meta" id="gh-heatmap-meta">
+              悬停查看单日提交明细 · LIVE SYNC @SleepyChaos
+            </div>
+          </div>
 
-            <a class="featured-post-box" href={`${base}/posts/${latestPost.slug}/`}>
-              <span class="featured-badge">
-                [NEW_ENTRY · {readingTime(latestPost.body)} · /▲ {computePostTerrain(latestPost.body).profile} {computePostTerrain(latestPost.body).alt}m]
+          <!-- 写文章热力图（较窄：单轨 32 格，严格以 7 天为一格单位，点击可过滤该周文章） -->
+          <div class="heatmap-block is-writing">
+            <div class="heatmap-head">
+              <span class="heatmap-title">&gt; WRITING_PULSE // 7D/CELL · 7天一格</span>
+              <span class="heatmap-stat">
+                {posts.length} 篇 / {activeWritingWeeks} 活跃周
               </span>
-              <h3>{latestPost.title}</h3>
-              {latestPost.description && <p>{latestPost.description}</p>}
-            </a>
+            </div>
+            <div
+              class="writing-heatmap-strip"
+              id="writing-heatmap-strip"
+              role="group"
+              aria-label="以 7 天为一格单位的写文章热力图"
+            >
+              {
+                writingWeekCells.map((cell) => (
+                  <button
+                    type="button"
+                    class={`hm-week-cell hm-lv-${cell.level}`}
+                    data-range={cell.rangeLabel}
+                    data-count={cell.count}
+                    data-chars={cell.totalChars}
+                    data-titles={cell.titles.join(' / ')}
+                    data-slugs={cell.slugs.join('|')}
+                    aria-label={`${cell.rangeLabel} (7天): ${cell.count} 篇文章`}
+                  />
+                ))
+              }
+            </div>
+            <div class="heatmap-meta" id="writing-heatmap-meta">
+              1 格 = 7 天 · 悬停检视周产出，点击高亮格筛选当周文章
+            </div>
           </div>
-
-          <div class="bento-foot">
-            <span>
-              {latestPost.tags.map((t) => `#${t}`).join('  ') || '#untagged'}
-            </span>
-            <a href={`${base}/posts/${latestPost.slug}/`}>[READ_FULL →]</a>
-          </div>
-        </section>
-      )
-    }
-
-    <!-- [04] 标签字符矩阵（支持点击原地秒级过滤下方归档 + 悬停高亮联动） -->
-    <section class:list={['bento-card', latestPost ? 'col-5' : 'col-12']}>
-      <div>
-        <div class="bento-head">
-          <span class="bento-head-title">
-            <span class="term-ascii-icon">#*</span>
-            <span>04 // TAG_MATRIX · 标签星座</span>
-          </span>
-          <span class="bento-head-meta">点击原地过滤 · TOTAL {tags.length}</span>
-        </div>
-
-        <div class="tag-matrix" id="home-tag-matrix">
-          {
-            tags.slice(0, 14).map(([tag, count]) => (
-              <a
-                class="tag-chip"
-                data-filter-tag={tag}
-                href={`${base}/tags/${encodeURIComponent(tag)}/`}
-              >
-                <span>#{tag}</span>
-                <span class="tag-count">[{count}]</span>
-              </a>
-            ))
-          }
         </div>
       </div>
 
       <div class="bento-foot">
-        <a href={REPO_URL} target="_blank" rel="noopener">[REPO: ChaosBlog]</a>
-        <a href={`${base}/tags/`}>[ALL_TAGS →]</a>
+        <span>POSTS: {posts.length} · TAGS: {tags.length}</span>
+        <a class="term-btn is-primary" href={`${base}/about/`} style="padding: 0.12rem 0.5rem;">
+          [?ABOUT 关于我 →]
+        </a>
       </div>
     </section>
 
-    <!-- [05] 全部文章时间轴日志（含海拔剖面图、原地标签过滤条与 j/k 键盘光标导航） -->
+    <!-- [03] 整合大卡：最新文章 + 标签星座选中过滤 + 全部文章归档页 合一 -->
     <section class="bento-card col-12" id="summit-logs">
       <div>
         <div class="bento-head">
           <span class="bento-head-title">
             <span class="term-ascii-icon">ls</span>
-            <span>05 // SUMMIT_LOGS · 攀登归档</span>
+            <span>03 // SUMMIT_ARCHIVE · 最新文章 · 标签检索 · 攀登归档</span>
           </span>
           <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
             <span
@@ -168,7 +283,7 @@ const computePostTerrain = (body: string) => {
                 id="clear-tag-filter-btn"
                 style="padding: 0.06rem 0.38rem; font-size: 0.7rem;"
               >
-                [× 全部]
+                [× 重置全部]
               </button>
               <a
                 id="open-tag-page-link"
@@ -176,7 +291,7 @@ const computePostTerrain = (body: string) => {
                 href={`${base}/tags/`}
                 style="padding: 0.06rem 0.38rem; font-size: 0.7rem;"
               >
-                [↗ 专页]
+                [↗ 标签专页]
               </a>
             </span>
             <span class="bento-head-meta" id="summit-logs-count">
@@ -185,70 +300,138 @@ const computePostTerrain = (body: string) => {
           </div>
         </div>
 
+        <!-- 子区 A：最新登顶文章横幅 (LATEST_SUMMIT) -->
         {
-          byYear.map(([year, yearPosts]) => (
-            <div class="year-group" data-year={year}>
-              <h2 class="year-divider">[{year}]</h2>
-              <ul class="post-list">
-                {yearPosts.map((post, idx) => {
-                  const branch = idx === yearPosts.length - 1 ? '└─' : '├─';
-                  const terrain = computePostTerrain(post.body);
-                  return (
-                    <li
-                      class="post-row"
-                      data-slug={post.slug}
-                      data-tags={post.tags.join('|')}
-                      data-url={`${base}/posts/${post.slug}/`}
+          latestPost && (
+            <div class="archive-latest-wrap">
+              <a class="featured-post-box is-unified-banner" href={`${base}/posts/${latestPost.slug}/`}>
+                <div class="featured-banner-top">
+                  <span class="featured-badge">
+                    [LATEST_SUMMIT · 最新文章 · {formatDateShort(latestPost.pubDate)} · {readingTime(latestPost.body)} · /▲ {computePostTerrain(latestPost.body).profile} {computePostTerrain(latestPost.body).alt}m]
+                  </span>
+                  <span class="featured-read-cta">[READ_LATEST →]</span>
+                </div>
+                <h3>{latestPost.title}</h3>
+                {latestPost.description && <p>{latestPost.description}</p>}
+              </a>
+              {latestPost.tags.length > 0 && (
+                <div class="featured-banner-tags">
+                  <span class="featured-tags-label">LATEST_TAGS:</span>
+                  {latestPost.tags.map((t) => (
+                    <a
+                      class="mini-tag"
+                      data-filter-tag={t}
+                      href={`${base}/tags/${encodeURIComponent(t)}/`}
                     >
-                      <div class="post-row-head">
-                        <div class="post-row-title-wrap">
-                          <span class="post-tree-branch">{branch}</span>
-                          <a class="post-row-title" href={`${base}/posts/${post.slug}/`}>
-                            {post.title}
-                          </a>
-                          <span class="conquered-pill" data-cairn-badge={post.slug} style="display: none;"></span>
-                        </div>
-                        <div class="post-row-meta">
-                          <span
-                            style="color: var(--accent); font-weight: 600;"
-                            title={`文章体量折算山峰海拔: ${terrain.alt}m`}
-                          >
-                            {terrain.profile} {terrain.alt}m
-                          </span>
-                          <span>·</span>
-                          <span>{readingTime(post.body)}</span>
-                          <span>·</span>
-                          <time datetime={post.pubDate.toISOString()}>
-                            {formatDateShort(post.pubDate)}
-                          </time>
-                        </div>
-                      </div>
-                      {post.description && <p class="post-row-desc">{post.description}</p>}
-                      {post.tags.length > 0 && (
-                        <div class="post-row-tags">
-                          {post.tags.map((tag) => (
-                            <a
-                              class="mini-tag"
-                              data-filter-tag={tag}
-                              href={`${base}/tags/${encodeURIComponent(tag)}/`}
-                            >
-                              [#{tag}]
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+                      [#{t}]
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
-          ))
+          )
         }
+
+        <!-- 子区 B：内嵌标签星座筛选矩阵 (TAG_MATRIX) -->
+        <div class="archive-tag-bar">
+          <div class="archive-tag-bar-head">
+            <span class="archive-sub-label">#* TAG_FILTER // 点击标签原地过滤归档</span>
+            <a class="archive-tag-all-link" href={`${base}/tags/`}>[星图拓扑与全部标签 ({tags.length}) →]</a>
+          </div>
+          <div class="tag-matrix" id="home-tag-matrix">
+            <button
+              type="button"
+              class="tag-chip is-all-chip is-active"
+              id="filter-all-posts-chip"
+            >
+              <span>*ALL</span>
+              <span class="tag-count">[{posts.length}]</span>
+            </button>
+            {
+              tags.map(([tag, count]) => (
+                <a
+                  class="tag-chip"
+                  data-filter-tag={tag}
+                  href={`${base}/tags/${encodeURIComponent(tag)}/`}
+                >
+                  <span>#{tag}</span>
+                  <span class="tag-count">[{count}]</span>
+                </a>
+              ))
+            }
+          </div>
+        </div>
+
+        <!-- 子区 C：按年份分组的全部文章归档树 (SUMMIT_LOGS) -->
+        <div class="archive-logs-tree">
+          {
+            byYear.map(([year, yearPosts]) => (
+              <div class="year-group" data-year={year}>
+                <h2 class="year-divider">[{year}]</h2>
+                <ul class="post-list">
+                  {yearPosts.map((post, idx) => {
+                    const branch = idx === yearPosts.length - 1 ? '└─' : '├─';
+                    const terrain = computePostTerrain(post.body);
+                    return (
+                      <li
+                        class="post-row"
+                        data-slug={post.slug}
+                        data-tags={post.tags.join('|')}
+                        data-url={`${base}/posts/${post.slug}/`}
+                      >
+                        <div class="post-row-head">
+                          <div class="post-row-title-wrap">
+                            <span class="post-tree-branch">{branch}</span>
+                            <a class="post-row-title" href={`${base}/posts/${post.slug}/`}>
+                              {post.title}
+                            </a>
+                            <span class="conquered-pill" data-cairn-badge={post.slug} style="display: none;"></span>
+                          </div>
+                          <div class="post-row-meta">
+                            <span
+                              style="color: var(--accent); font-weight: 600;"
+                              title={`文章体量折算山峰海拔: ${terrain.alt}m`}
+                            >
+                              {terrain.profile} {terrain.alt}m
+                            </span>
+                            <span>·</span>
+                            <span>{readingTime(post.body)}</span>
+                            <span>·</span>
+                            <time datetime={post.pubDate.toISOString()}>
+                              {formatDateShort(post.pubDate)}
+                            </time>
+                          </div>
+                        </div>
+                        {post.description && <p class="post-row-desc">{post.description}</p>}
+                        {post.tags.length > 0 && (
+                          <div class="post-row-tags">
+                            {post.tags.map((tag) => (
+                              <a
+                                class="mini-tag"
+                                data-filter-tag={tag}
+                                href={`${base}/tags/${encodeURIComponent(tag)}/`}
+                              >
+                                [#{tag}]
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))
+          }
+        </div>
       </div>
 
       <div class="bento-foot">
         <span>SOURCE: documents/posts/*.md · 完读任意文章可获 +35m 推石助推</span>
-        <a href={`${base}/rss.xml`}>[SUBSCRIBE_RSS]</a>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <a href={REPO_URL} target="_blank" rel="noopener">[REPO: ChaosBlog]</a>
+          <a href={`${base}/rss.xml`}>[SUBSCRIBE_RSS]</a>
+        </div>
       </div>
     </section>
   </div>
@@ -269,8 +452,52 @@ const computePostTerrain = (body: string) => {
   syncInsignia();
   window.addEventListener('sisyphus:realmchange', syncInsignia);
 
-  // ========= 原地交互式标签过滤 + 悬停联动 + j/k 终端键盘流选文 =========
+  // ========= 1. GitHub 热力图客户端实时拉取与悬停检视 =========
+  const ghGrid = document.getElementById('gh-heatmap-grid');
+  const ghMeta = document.getElementById('gh-heatmap-meta');
+  const ghTotalEl = document.getElementById('gh-heatmap-total');
+  const ghCells = ghGrid ? Array.from(ghGrid.querySelectorAll<HTMLElement>('.hm-cell')) : [];
+
+  const bindGhCellHover = () => {
+    ghCells.forEach((cell) => {
+      cell.addEventListener('pointerenter', () => {
+        const d = cell.dataset.date || '';
+        const c = Number(cell.dataset.count || '0');
+        if (ghMeta) {
+          ghMeta.textContent = `${d} · ${c > 0 ? `${c} 次 GitHub 贡献提交` : '0 次提交 (静默蓄力)'}`;
+        }
+      });
+    });
+  };
+  bindGhCellHover();
+
+  if (ghCells.length > 0) {
+    fetch('https://github-contributions-api.jogruber.de/v4/SleepyChaos?y=last')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data || !Array.isArray(data.contributions)) return;
+        const recent = data.contributions.slice(-ghCells.length);
+        let sum = 0;
+        recent.forEach((item: { date?: string; count?: number; level?: number }, idx: number) => {
+          const cell = ghCells[idx];
+          if (!cell) return;
+          const cnt = Number(item.count || 0);
+          const lv = Math.max(0, Math.min(4, Number(item.level ?? (cnt > 0 ? 1 : 0))));
+          sum += cnt;
+          cell.dataset.date = item.date || cell.dataset.date || '';
+          cell.dataset.count = String(cnt);
+          cell.className = `hm-cell hm-lv-${lv}`;
+        });
+        if (ghTotalEl) {
+          ghTotalEl.textContent = `${sum} commits (28w)`;
+        }
+      })
+      .catch(() => {});
+  }
+
+  // ========= 2. 原地交互式标签/周次过滤 + 悬停联动 + j/k 终端键盘流选文 =========
   const tagChips = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-filter-tag]'));
+  const allChipBtn = document.getElementById('filter-all-posts-chip');
   const postRows = Array.from(document.querySelectorAll<HTMLElement>('#summit-logs .post-row'));
   const yearGroups = Array.from(document.querySelectorAll<HTMLElement>('#summit-logs .year-group'));
   const filterBar = document.getElementById('active-tag-filter-bar');
@@ -279,7 +506,14 @@ const computePostTerrain = (body: string) => {
   const openTagLink = document.getElementById('open-tag-page-link') as HTMLAnchorElement | null;
   const countMeta = document.getElementById('summit-logs-count');
 
+  const writingStrip = document.getElementById('writing-heatmap-strip');
+  const writingMeta = document.getElementById('writing-heatmap-meta');
+  const writingCells = writingStrip
+    ? Array.from(writingStrip.querySelectorAll<HTMLButtonElement>('.hm-week-cell'))
+    : [];
+
   let activeTag: string | null = null;
+  let activeWeekRange: string | null = null;
   let kbdIdx = -1;
 
   const updateKbdFocus = (visibleRows: HTMLElement[]) => {
@@ -295,14 +529,19 @@ const computePostTerrain = (body: string) => {
     }
   };
 
-  const applyTagFilter = (tag: string | null) => {
-    activeTag = tag;
+  const applyArchiveFilter = (opts: { tag?: string | null; weekSlugs?: string[] | null; weekLabel?: string | null }) => {
+    activeTag = opts.tag ?? null;
+    activeWeekRange = opts.weekLabel ?? null;
+    const weekSlugSet = opts.weekSlugs ? new Set(opts.weekSlugs) : null;
     kbdIdx = -1;
     let visibleCount = 0;
 
     postRows.forEach((row) => {
       const rowTags = (row.dataset.tags || '').split('|').filter(Boolean);
-      const show = !tag || rowTags.includes(tag);
+      const rowSlug = row.dataset.slug || '';
+      const matchTag = !activeTag || rowTags.includes(activeTag);
+      const matchWeek = !weekSlugSet || weekSlugSet.has(rowSlug);
+      const show = matchTag && matchWeek;
       row.style.display = show ? '' : 'none';
       if (show) visibleCount++;
     });
@@ -315,26 +554,38 @@ const computePostTerrain = (body: string) => {
     });
 
     tagChips.forEach((chip) => {
-      const isMatch = Boolean(tag && chip.dataset.filterTag === tag);
-      chip.style.borderColor = isMatch ? 'var(--accent)' : '';
-      chip.style.background = isMatch ? 'var(--accent-soft)' : '';
+      const isMatch = Boolean(activeTag && chip.dataset.filterTag === activeTag);
+      chip.classList.toggle('is-active', isMatch);
+    });
+    allChipBtn?.classList.toggle('is-active', !activeTag && !activeWeekRange);
+
+    writingCells.forEach((wc) => {
+      wc.classList.toggle('is-selected', Boolean(activeWeekRange && wc.dataset.range === activeWeekRange));
     });
 
     if (filterBar && filterLabel) {
-      if (tag) {
+      if (activeTag) {
         filterBar.style.display = 'inline-flex';
-        filterLabel.textContent = `$ filter --tag=#${tag} (${visibleCount})`;
-        const sampleChip = tagChips.find((c) => c.dataset.filterTag === tag);
-        if (openTagLink && sampleChip) openTagLink.href = sampleChip.href;
+        filterLabel.textContent = `$ filter --tag=#${activeTag} (${visibleCount})`;
+        const sampleChip = tagChips.find((c) => c.dataset.filterTag === activeTag);
+        if (openTagLink) {
+          openTagLink.style.display = '';
+          if (sampleChip) openTagLink.href = sampleChip.href;
+        }
+      } else if (activeWeekRange) {
+        filterBar.style.display = 'inline-flex';
+        filterLabel.textContent = `$ filter --week="${activeWeekRange}" (${visibleCount})`;
+        if (openTagLink) openTagLink.style.display = 'none';
       } else {
         filterBar.style.display = 'none';
       }
     }
 
     if (countMeta) {
-      countMeta.textContent = tag
-        ? `MATCHED: ${visibleCount}/${postRows.length}`
-        : `j/k 选文 · ./documents/posts/ (${postRows.length})`;
+      countMeta.textContent =
+        activeTag || activeWeekRange
+          ? `MATCHED: ${visibleCount}/${postRows.length}`
+          : `j/k 选文 · ./documents/posts/ (${postRows.length})`;
     }
   };
 
@@ -343,13 +594,13 @@ const computePostTerrain = (body: string) => {
       if (e.metaKey || e.ctrlKey || e.shiftKey) return;
       e.preventDefault();
       const t = chip.dataset.filterTag || null;
-      applyTagFilter(activeTag === t ? null : t);
+      applyArchiveFilter({ tag: activeTag === t ? null : t });
       document.getElementById('summit-logs')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
 
     chip.addEventListener('pointerenter', () => {
       const t = chip.dataset.filterTag;
-      if (!t || activeTag) return;
+      if (!t || activeTag || activeWeekRange) return;
       postRows.forEach((row) => {
         const has = (row.dataset.tags || '').split('|').includes(t);
         row.style.borderColor = has ? 'var(--accent)' : '';
@@ -357,14 +608,42 @@ const computePostTerrain = (body: string) => {
     });
 
     chip.addEventListener('pointerleave', () => {
-      if (activeTag) return;
+      if (activeTag || activeWeekRange) return;
       postRows.forEach((row) => {
         row.style.borderColor = '';
       });
     });
   });
 
-  clearFilterBtn?.addEventListener('click', () => applyTagFilter(null));
+  allChipBtn?.addEventListener('click', () => applyArchiveFilter({}));
+  clearFilterBtn?.addEventListener('click', () => applyArchiveFilter({}));
+
+  // 7天一格写文章热力图悬停与点击过滤联动
+  writingCells.forEach((cell) => {
+    cell.addEventListener('pointerenter', () => {
+      const range = cell.dataset.range || '';
+      const cnt = Number(cell.dataset.count || '0');
+      const titles = cell.dataset.titles || '';
+      if (writingMeta) {
+        writingMeta.textContent =
+          cnt > 0
+            ? `[${range} · 7天] 产出 ${cnt} 篇: ${titles}`
+            : `[${range} · 7天] 0 篇文章产出`;
+      }
+    });
+
+    cell.addEventListener('click', () => {
+      const range = cell.dataset.range || '';
+      const slugs = (cell.dataset.slugs || '').split('|').filter(Boolean);
+      if (slugs.length === 0) return;
+      if (activeWeekRange === range) {
+        applyArchiveFilter({});
+      } else {
+        applyArchiveFilter({ weekSlugs: slugs, weekLabel: range });
+        document.getElementById('summit-logs')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    });
+  });
 
   // 读取用户在文章页立下的界石记录，在首页归档中点亮 [|> 已立碑] 印记
   try {
