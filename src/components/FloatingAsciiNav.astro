@@ -694,6 +694,7 @@ const tagIndex = tags.map(([name, count]) => ({
 
     const SIDE_RACK_GAP = 24;
     const BAR_RACK_GAP = 14;
+    const BOTTOM_RACK_GAP = 32; // 底部吸附时额外上移，完整让出底部 18px 西西弗斯推石地平线进度条！
     const UNHOOK_PULL_DIST = 30;
     const CAPTURE_SPEED = 3.8;
     const MAGNET_ZONE = 60;
@@ -1494,12 +1495,12 @@ const tagIndex = tags.map(([name, count]) => ({
         return [Math.max(hw + 14, Math.min(vw - hw - 14, cx)), hh + BAR_RACK_GAP];
       }
       if (edge === 'bottom') {
-        return [Math.max(hw + 14, Math.min(vw - hw - 14, cx)), vh - hh - BAR_RACK_GAP];
+        return [Math.max(hw + 14, Math.min(vw - hw - 14, cx)), vh - hh - BOTTOM_RACK_GAP];
       }
       if (edge === 'left') {
-        return [hw + SIDE_RACK_GAP, Math.max(hh + 16, Math.min(vh - hh - 16, cy))];
+        return [hw + SIDE_RACK_GAP, Math.max(hh + 16, Math.min(vh - hh - 28, cy))];
       }
-      return [vw - hw - SIDE_RACK_GAP, Math.max(hh + 16, Math.min(vh - hh - 16, cy))];
+      return [vw - hw - SIDE_RACK_GAP, Math.max(hh + 16, Math.min(vh - hh - 28, cy))];
     };
 
     const nearestWall = (
@@ -1540,7 +1541,7 @@ const tagIndex = tags.map(([name, count]) => ({
         ruler.style.width = `${span}px`;
         ruler.style.height = '3px';
         ruler.style.left = `${left}px`;
-        ruler.style.top = edge === 'top' ? '1px' : `${vh - 4}px`;
+        ruler.style.top = edge === 'top' ? '1px' : `${vh - 21}px`;
       } else {
         ruler.classList.add('is-vert');
         const vSpan = Math.round((70 + strength * 60) / 6) * 6;
@@ -1599,10 +1600,10 @@ const tagIndex = tags.map(([name, count]) => ({
           x = Math.max(SHAPES.bar.w * 0.5 + 14, Math.min(vw - SHAPES.bar.w * 0.5 - 14, x));
         }
       } else {
-        if (vh > 520 && y > vh - 260) {
-          y = Math.max(SHAPES.rail.h * 0.5 + 24, vh - 270);
+        if (vh > 520 && y > vh - 275) {
+          y = Math.max(SHAPES.rail.h * 0.5 + 24, vh - 285);
         } else {
-          y = Math.max(SHAPES.rail.h * 0.5 + 16, Math.min(vh - SHAPES.rail.h * 0.5 - 16, y));
+          y = Math.max(SHAPES.rail.h * 0.5 + 16, Math.min(vh - SHAPES.rail.h * 0.5 - 28, y));
         }
       }
 
@@ -2205,12 +2206,12 @@ const tagIndex = tags.map(([name, count]) => ({
       } else {
         const isTop = edge === 'top';
         const sign = isTop ? 1 : -1;
-        const wallY = isTop ? oy - y : oy + (vh - y);
+        const wallY = isTop ? oy - y : oy + (vh - 18 - y);
         const [, midDY] = sampleRingDisp(isTop ? 3.5 : 17.5);
         const targetLugY = oy + (isTop ? -ry : ry) + midDY * 0.5;
         const span = Math.abs(targetLugY - wallY);
         const reachY = wallY + sign * span * deploy;
-        const isStretched = span > BAR_RACK_GAP + 6;
+        const isStretched = span > (isTop ? BAR_RACK_GAP : BOTTOM_RACK_GAP - 18) + 6;
 
         const trackL = ox - rx * 0.78;
         const trackR = ox + rx * 0.78;
@@ -2754,7 +2755,12 @@ const tagIndex = tags.map(([name, count]) => ({
           pullingEdge = nw.edge;
           pullStrength = 1 - Math.max(0, nw.dist) / MAGNET_ZONE;
           const accel = 0.16 + pullStrength * 0.44;
-          const standOff = nw.edge === 'left' || nw.edge === 'right' ? SIDE_RACK_GAP : BAR_RACK_GAP;
+          const standOff =
+            nw.edge === 'left' || nw.edge === 'right'
+              ? SIDE_RACK_GAP
+              : nw.edge === 'bottom'
+                ? BOTTOM_RACK_GAP
+                : BAR_RACK_GAP;
           const barHalf = SHAPES.bar.w * 0.5 + 14;
           const railHalf = SHAPES.rail.h * 0.5 + 16;
 
