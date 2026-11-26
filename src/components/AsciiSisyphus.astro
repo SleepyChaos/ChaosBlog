@@ -13,15 +13,26 @@ const { initialSummits = 1 } = Astro.props;
     <span class="bento-head-title">
       <span class="term-ascii-icon">/▲</span>
       <span id="sisyphus-stage-title">01 // TMA-1 · 第谷环形山</span>
+      <span class="sisyphus-res-pill" title="xterm.js 离屏字形纹理图集 (224×72 格) + Chafa 双色象限/盲文混合光栅 (448×288 亚像素) + 3D 法线球体光照">
+        448×288 HD
+      </span>
     </span>
-    <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+    <div class="sisyphus-head-actions">
       <button
         type="button"
         class="term-btn is-primary"
         id="sisyphus-push-btn"
-        title="助推巨石（点击下方画布任意处、拖拽或弹射悬浮舱均可助推）"
+        title="卡准下方节拍槽亮起时点击（或按空格键），触发 2.2x 完美发力暴击！"
       >
         [+PUSH 助推]
+      </button>
+      <button
+        type="button"
+        class="term-btn is-theme-skill"
+        id="sisyphus-skill-btn"
+        title="触发当前文艺作品主题专属天象神迹与互动机制 (快捷键 E)"
+      >
+        [◈ 1:4:9 星门]
       </button>
       <button
         type="button"
@@ -34,20 +45,48 @@ const { initialSummits = 1 } = Astro.props;
     </div>
   </div>
 
-  <!-- 固定格点终端光栅渲染容器：Canvas 绝对定宽网格渲染（借鉴 ROT.Display / Xterm.js Canvas Renderer，彻底根除行宽抖动与错位）+ 隐藏无障碍文本镜面 -->
+  <!-- 224x72 (448x288 亚像素 = 129,024 点阵) xterm.js CustomGlyph 图集 + Chafa 双色象限光栅混合渲染容器 -->
   <div
     class="ascii-slope-viewport"
     id="sisyphus-stage-viewport"
-    title="点击画布任意位置召唤天象助推西西弗斯！"
+    tabindex="0"
+    aria-label="西西弗斯四大科幻文学主题高分像素终端互动剧场（支持鼠标点击热点、空格键节拍助推与 E 键主题神迹）"
   >
     <canvas
       id="sisyphus-ascii-canvas"
       class="ascii-slope-canvas"
-      aria-label="224x128 亚像素点阵与固定格点 ASCII 混合渲染的四大科幻主题西西弗斯推石剧场"></canvas>
+      aria-label="448x288 亚像素点阵、Chafa 双色象限像素骨骼、3D 法线光照巨石与 xterm.js 字形图集混合渲染的西西弗斯剧场"></canvas>
     <pre
       class="ascii-slope-pre is-sr-mirror"
       id="sisyphus-ascii-stage"
       aria-hidden="true"></pre>
+  </div>
+
+  <!-- 终端互动小游戏状态栏：推石节拍共鸣槽 + 沿途五大文学地标 + 热点交互提示 -->
+  <div class="sisyphus-minigame-bar" id="sisyphus-minigame-bar">
+    <div
+      class="minigame-cadence-box"
+      id="sisyphus-cadence-box"
+      title="当游标进入中央 [█] 共振区时点击助推或按 Space 键，触发 2.2x 完美发力与连击！"
+    >
+      <span class="cadence-label">CADENCE</span>
+      <span class="cadence-track" id="sisyphus-cadence-meter">░░▒▓█▓▒░░</span>
+      <span class="cadence-combo" id="sisyphus-combo-badge">SYNC</span>
+    </div>
+    <div class="minigame-milestones" id="sisyphus-milestone-strip" aria-label="攀登沿途五大文学主题营地">
+      <span class="ms-node is-reached" data-ms-idx="0" title="营地 I (180m)">I</span>
+      <span class="ms-sep">─</span>
+      <span class="ms-node" data-ms-idx="1" title="营地 II (380m)">II</span>
+      <span class="ms-sep">─</span>
+      <span class="ms-node" data-ms-idx="2" title="营地 III (580m)">III</span>
+      <span class="ms-sep">─</span>
+      <span class="ms-node" data-ms-idx="3" title="营地 IV (740m)">IV</span>
+      <span class="ms-sep">─</span>
+      <span class="ms-node" data-ms-idx="4" title="峰顶圣殿 (884.8m)">▲</span>
+    </div>
+    <div class="minigame-hotspot-hint" id="sisyphus-hotspot-hint">
+      ◈ 悬停画布锁定天象/地下奇观 · 卡准节拍点击触发完美共鸣
+    </div>
   </div>
 
   <div class="bento-foot">
@@ -66,39 +105,114 @@ const { initialSummits = 1 } = Astro.props;
   const telemetryEl = document.getElementById('sisyphus-telemetry');
   const quoteEl = document.getElementById('sisyphus-phase-quote');
   const pushBtn = document.getElementById('sisyphus-push-btn');
+  const skillBtn = document.getElementById('sisyphus-skill-btn') as HTMLButtonElement | null;
   const summitBtn = document.getElementById('sisyphus-summit-btn');
+  const cadenceMeterEl = document.getElementById('sisyphus-cadence-meter');
+  const comboBadgeEl = document.getElementById('sisyphus-combo-badge');
+  const cadenceBoxEl = document.getElementById('sisyphus-cadence-box');
+  const hotspotHintEl = document.getElementById('sisyphus-hotspot-hint');
+  const milestoneNodes = Array.from(
+    document.querySelectorAll<HTMLElement>('#sisyphus-milestone-strip .ms-node'),
+  );
 
   if (stageEl && telemetryEl) {
-    // 112x36 固定格点矩阵 + Drawille 2x4 亚像素盲文光栅化层 = 224x144 (32,256 亚像素高分辨率，0.0px 行宽抖动！)
-    const COLS = 112;
-    const ROWS = 36;
-    const SUB_W = COLS * 2; // 224 水平亚像素
-    const SUB_H = ROWS * 4; // 144 垂直亚像素
-    const CELL_W = 8; // 严格锁定每列像素宽度
-    const CELL_H = 14; // 严格锁定每行像素高度
+    // ================= 1. 4倍超采样分辨率矩阵参数 (xterm.js Atlas + Chafa Hybrid) =================
+    // 224x72 字符格 = 16,128 格；Drawille 2x4 盲文层 = 448x288 (129,024 亚像素)；Chafa 2x2 双色象限层 = 448x144
+    const COLS = 224;
+    const ROWS = 72;
+    const SUB_W = COLS * 2; // 448 水平亚像素
+    const SUB_H = ROWS * 4; // 288 垂直盲文亚像素
+    const QUAD_W = COLS * 2; // 448 水平象限像素
+    const QUAD_H = ROWS * 2; // 144 垂直象限像素
+    const CELL_W = 4; // 逻辑列宽 4px (224 * 4 = 896)
+    const CELL_H = 7; // 逻辑行高 7px (72 * 7 = 504)
     const CYCLE_MS = 8 * 60 * 60 * 1000;
     const PEAK_ALT = 884.8;
     const STORAGE_KEY = 'sisyphus_8h_cycle_v2';
     const baseSummits = Number(telemetryEl.dataset.summits || '1');
 
-    // 初始化高分 DPR 定宽格点 Canvas（借鉴 ROT.Display / Xterm.js Canvas Renderer）
-    const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+    // 物理像素倍率锁定 >=2，保证每个 4x7 单元格在纹理图集中拥有至少 8x14 乃至 12x21 的物理像素锐度
+    const atlasDpr = Math.max(2, Math.min(3, Math.ceil(window.devicePixelRatio || 2)));
+    const TILE_W = CELL_W * atlasDpr; // 8px or 12px
+    const TILE_H = CELL_H * atlasDpr; // 14px or 21px
+
     let ctx: CanvasRenderingContext2D | null = null;
     if (canvasEl && typeof canvasEl.getContext === 'function') {
-      canvasEl.width = Math.round(COLS * CELL_W * dpr);
-      canvasEl.height = Math.round(ROWS * CELL_H * dpr);
-      ctx = canvasEl.getContext('2d');
-      if (ctx && typeof ctx.scale === 'function') {
-        ctx.scale(dpr, dpr);
+      canvasEl.width = COLS * TILE_W;
+      canvasEl.height = ROWS * TILE_H;
+      ctx = canvasEl.getContext('2d', { alpha: false });
+      if (ctx) {
+        ctx.imageSmoothingEnabled = false;
       }
     }
 
-    // 严格对照四部科幻原著的经典地点，采用 `·` 分隔
+    // ================= 2. 四部科幻巨著的文本与地标配置 =================
     const STAGE_TITLES: Record<string, string> = {
       void: '01 // TMA-1 · 第谷环形山',
       paper: '01 // TERMINUS · 端点星穹顶',
       crt: '01 // ZION · 尼布甲尼撒号',
       amber: '01 // ARRAKIS · 塔布尔穴地',
+    };
+
+    const SKILL_SPECS: Record<
+      string,
+      { label: string; activeName: string; desc: string; quote: string }
+    > = {
+      void: {
+        label: '[◈ 1:4:9 星门]',
+        activeName: 'STAR-GATE HARMONIC // 1:4:9 星门引力走廊',
+        desc: '点击大红斑木星、旋转离心舱发现号或红眼 HAL-9000，开启 1:4:9 星门零重力跃迁',
+        quote: '"My God, it\'s full of stars! 1:4:9 星门引力场已接管三维巨石质量。"',
+      },
+      paper: {
+        label: '[Ψ 辐光推演]',
+        activeName: 'PRIME RADIANT // 谢顿危机微分奇点配平',
+        desc: '点击三维第一辐光流形上的谢顿危机奇点或地下全息穹顶，钤盖【基地纪元】朱砂大印',
+        quote: '"心理史学方程收敛：∆S/∆t = 0，第三次谢顿危机已化为历史必然性推力！"',
+      },
+      crt: {
+        label: '[⚡ 矩阵EMP]',
+        activeName: 'NEBUCHADNEZZAR EMP // 锡安电磁脉冲与子弹时间',
+        desc: '点击 6 触手 IK 机械乌贼哨兵或气垫船，释放 EMP 令巨石进入 0x00 线框减重与子弹时间',
+        quote: '"There is no boulder. 尼布甲尼撒号 EMP 已震碎乌贼哨兵，母体重力代码重写！"',
+      },
+      amber: {
+        label: '[◈ 沙槌驭虫]',
+        activeName: 'SHAI-HULUD BREACH // 弗雷曼沙钩驭虫冲锋',
+        desc: '点击山脚沙槌、香料喷发带或扑翼机，召唤环形晶齿巨型沙虫夏胡鲁破沙驮石狂飙',
+        quote: '"Bless the Maker and His water! 弗雷曼沙钩已挂住夏胡鲁背鳞，驭虫冲顶！"',
+      },
+    };
+
+    const REALM_MILESTONES: Record<string, { col: number; alt: number; code: string; name: string }[]> = {
+      void: [
+        { col: 60, alt: 180, code: 'CLV', name: '克拉维斯基地 (180m)' },
+        { col: 100, alt: 380, code: 'TMA', name: 'TMA-1 发掘坑 (380m)' },
+        { col: 138, alt: 580, code: 'JUP', name: '木星引力锚点 (580m)' },
+        { col: 172, alt: 740, code: 'HAL', name: '发现号离心舱 (740m)' },
+        { col: 206, alt: 884.8, code: '1:4:9', name: '星门方尖碑巅 (884.8m)' },
+      ],
+      paper: [
+        { col: 60, alt: 180, code: 'TRM', name: '端点星百科馆 (180m)' },
+        { col: 100, alt: 380, code: 'VLT', name: '谢顿全息穹顶 (380m)' },
+        { col: 138, alt: 580, code: 'TRN', name: '川陀帝国书库 (580m)' },
+        { col: 172, alt: 740, code: '2ND', name: '第二基地星院 (740m)' },
+        { col: 206, alt: 884.8, code: 'GAL', name: '银河新纪元巅 (884.8m)' },
+      ],
+      crt: [
+        { col: 60, alt: 180, code: 'CST', name: '纯白构造层 (180m)' },
+        { col: 100, alt: 380, code: 'ORC', name: '先知公寓节点 (380m)' },
+        { col: 138, alt: 580, code: 'ZIN', name: '锡安船坞防线 (580m)' },
+        { col: 172, alt: 740, code: 'MCH', name: '零一机械城门 (740m)' },
+        { col: 206, alt: 884.8, code: 'SRC', name: '万物之源核心 (884.8m)' },
+      ],
+      amber: [
+        { col: 60, alt: 180, code: 'TBR', name: '塔布尔穴地 (180m)' },
+        { col: 100, alt: 380, code: 'SHD', name: '障壁山脉裂口 (380m)' },
+        { col: 138, alt: 580, code: 'SPC', name: '大香料盐盘 (580m)' },
+        { col: 172, alt: 740, code: 'WND', name: '弗雷曼集风塔 (740m)' },
+        { col: 206, alt: 884.8, code: 'ARK', name: '厄拉奇恩皇座巅 (884.8m)' },
+      ],
     };
 
     const WORLD_QUOTES: Record<string, string> = {
@@ -115,27 +229,185 @@ const { initialSummits = 1 } = Astro.props;
       amber: ['(Sietch Tabr)', '(Shield Wall)', '(walk without)', '(Shai-Hulud!)', '(Kull Wahad!)'],
     };
 
-    // 从 CSS 变量读取当前主题调色板，保证 Canvas 渲染与全站四大科幻主题 100% 同步
+    // ================= 3. 16 通道扩展色板与 xterm.js 离屏 CustomGlyph 字形纹理图集 =================
     interface StagePalette {
       bg: string;
-      colors: string[];
+      colors: string[]; // 0..15
     }
     let cachedRealm = '';
     let palette: StagePalette = {
       bg: '#060813',
-      colors: [
-        '#64748b',
-        '#f8fafc',
-        '#38bdf8',
-        '#818cf8',
-        '#475569',
-        '#e2e8f0',
-        '#475569',
-        '#38bdf8',
-        '#cbd5e1',
-        '#f43f5e',
-        '#f8fafc',
-      ],
+      colors: Array(16).fill('#64748b'),
+    };
+
+    const parseRgb = (colorStr: string): [number, number, number] => {
+      const s = colorStr.trim();
+      if (s.startsWith('#')) {
+        const hex = s.slice(1);
+        const full =
+          hex.length === 3
+            ? hex
+                .split('')
+                .map((c) => c + c)
+                .join('')
+            : hex.slice(0, 6);
+        const num = parseInt(full, 16);
+        if (!Number.isNaN(num)) {
+          return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+        }
+      }
+      if (s.startsWith('rgb')) {
+        const nums = s.match(/\d+(\.\d+)?/g);
+        if (nums && nums.length >= 3) {
+          return [Number(nums[0]), Number(nums[1]), Number(nums[2])];
+        }
+      }
+      return [100, 116, 139];
+    };
+
+    const mixColor = (cA: string, cB: string, t: number): string => {
+      const [r1, g1, b1] = parseRgb(cA);
+      const [r2, g2, b2] = parseRgb(cB);
+      const r = Math.round(r1 + (r2 - r1) * t);
+      const g = Math.round(g1 + (g2 - g1) * t);
+      const b = Math.round(b1 + (b2 - b1) * t);
+      return `rgb(${r},${g},${b})`;
+    };
+
+    // xterm.js 风格离屏字形纹理图集缓存 (按 (char, fgColorId) 懒加载烘焙至 64x128 瓦片网格)
+    const ATLAS_COLS = 64;
+    const ATLAS_ROWS = 128;
+    const atlasCanvas = document.createElement('canvas');
+    atlasCanvas.width = ATLAS_COLS * TILE_W;
+    atlasCanvas.height = ATLAS_ROWS * TILE_H;
+    const atlasCtx = atlasCanvas.getContext('2d');
+    const atlasMap = new Map<string, number>();
+    let atlasNextSlot = 0;
+
+    const clearGlyphAtlas = () => {
+      atlasMap.clear();
+      atlasNextSlot = 0;
+      if (atlasCtx) {
+        atlasCtx.clearRect(0, 0, atlasCanvas.width, atlasCanvas.height);
+      }
+    };
+
+    // Unicode 象限块字符集 (Chafa 2x2 掩码 0..15)
+    const QUAD_CHARS = [
+      ' ',
+      '▘',
+      '▝',
+      '▀',
+      '▖',
+      '▌',
+      '▞',
+      '▛',
+      '▗',
+      '▚',
+      '▐',
+      '▜',
+      '▄',
+      '▙',
+      '▟',
+      '█',
+    ] as const;
+    const QUAD_CHAR_MAP = new Map<string, number>(QUAD_CHARS.map((ch, idx) => [ch, idx]));
+
+    const BRAILLE_BITS = [
+      [0x01, 0x02, 0x04, 0x40],
+      [0x08, 0x10, 0x20, 0x80],
+    ];
+
+    // Bayer 8x8 有序抖动矩阵 (0..1)
+    const BAYER_8X8 = [
+      [0, 32, 8, 40, 2, 34, 10, 42],
+      [48, 16, 56, 24, 50, 18, 58, 26],
+      [12, 44, 4, 36, 14, 46, 6, 38],
+      [60, 28, 52, 20, 62, 30, 54, 22],
+      [3, 35, 11, 43, 1, 33, 9, 41],
+      [51, 19, 59, 27, 49, 17, 57, 25],
+      [15, 47, 7, 39, 13, 45, 5, 37],
+      [63, 31, 55, 23, 61, 29, 53, 21],
+    ].map((row) => row.map((v) => (v + 0.5) / 64));
+
+    // xterm.js CustomGlyphs 整数像素精确自绘（彻底消除字体拼缝！）
+    const getOrBakeGlyphSlot = (ch: string, colorId: number): number => {
+      const key = `${ch}_${colorId}`;
+      const existing = atlasMap.get(key);
+      if (existing !== undefined) return existing;
+
+      if (atlasNextSlot >= ATLAS_COLS * ATLAS_ROWS) {
+        clearGlyphAtlas();
+      }
+      const slot = atlasNextSlot++;
+      atlasMap.set(key, slot);
+      if (!atlasCtx) return slot;
+
+      const ox = (slot % ATLAS_COLS) * TILE_W;
+      const oy = Math.floor(slot / ATLAS_COLS) * TILE_H;
+      const color = palette.colors[colorId] || palette.colors[0];
+      atlasCtx.fillStyle = color;
+
+      const hw = TILE_W >> 1;
+      const hh = TILE_H >> 1;
+
+      // 1. Chafa 2x2 象限像素块：整数矩形零裂缝自绘
+      const quadMask = QUAD_CHAR_MAP.get(ch);
+      if (quadMask !== undefined) {
+        if (quadMask & 1) atlasCtx.fillRect(ox, oy, hw, hh);
+        if (quadMask & 2) atlasCtx.fillRect(ox + hw, oy, TILE_W - hw, hh);
+        if (quadMask & 4) atlasCtx.fillRect(ox, oy + hh, hw, TILE_H - hh);
+        if (quadMask & 8) atlasCtx.fillRect(ox + hw, oy + hh, TILE_W - hw, TILE_H - hh);
+        return slot;
+      }
+
+      // 2. Unicode 2x4 盲文点阵 (U+2800..U+28FF)：自绘精密亚像素晶点
+      const code = ch.charCodeAt(0);
+      if (code >= 0x2800 && code <= 0x28ff) {
+        const mask = code - 0x2800;
+        const dotW = Math.max(2, Math.floor(TILE_W * 0.3));
+        const dotH = Math.max(2, Math.floor(TILE_H * 0.16));
+        const x0 = Math.floor(TILE_W * 0.14);
+        const x1 = Math.floor(TILE_W * 0.58);
+        for (let dx = 0; dx < 2; dx++) {
+          for (let dy = 0; dy < 4; dy++) {
+            if (mask & BRAILLE_BITS[dx][dy]) {
+              const px = ox + (dx === 0 ? x0 : x1);
+              const py = oy + Math.floor((dy + 0.25) * (TILE_H / 4));
+              atlasCtx.fillRect(px, py, dotW, dotH);
+            }
+          }
+        }
+        return slot;
+      }
+
+      // 3. 阶梯阴影密度块 (░ ▒ ▓)：自绘 Bayer 像素网点
+      if (ch === '░' || ch === '▒' || ch === '▓') {
+        const thresh = ch === '░' ? 0.25 : ch === '▒' ? 0.5 : 0.75;
+        const step = Math.max(1, Math.floor(atlasDpr));
+        for (let py = 0; py < TILE_H; py += step) {
+          for (let px = 0; px < TILE_W; px += step) {
+            const bx = Math.floor(px / step) & 7;
+            const by = Math.floor(py / step) & 7;
+            if (BAYER_8X8[by][bx] < thresh) {
+              atlasCtx.fillRect(ox + px, oy + py, step, step);
+            }
+          }
+        }
+        return slot;
+      }
+
+      // 4. 其它 ASCII / 数学符号 / 假名 / 制表符：高锐度等宽字体烘焙
+      atlasCtx.save();
+      atlasCtx.beginPath();
+      atlasCtx.rect(ox, oy, TILE_W, TILE_H);
+      atlasCtx.clip();
+      atlasCtx.font = `700 ${Math.round(TILE_H * 0.82)}px Menlo, Monaco, Consolas, "JetBrains Mono", "SF Mono", monospace`;
+      atlasCtx.textAlign = 'center';
+      atlasCtx.textBaseline = 'middle';
+      atlasCtx.fillText(ch, ox + TILE_W * 0.5, oy + TILE_H * 0.52);
+      atlasCtx.restore();
+      return slot;
     };
 
     const refreshPalette = (realm: string) => {
@@ -145,26 +417,44 @@ const { initialSummits = 1 } = Astro.props;
         const cs = getComputedStyle(document.documentElement);
         const getVar = (name: string, fallback: string) =>
           cs.getPropertyValue(name).trim() || fallback;
+        const bg = getVar('--stage-bg', '#060813');
+        const sky = getVar('--stage-sky', '#fde68a');
+        const aurora = getVar('--stage-aurora', '#38bdf8');
+        const aurora2 = getVar('--stage-aurora-2', '#818cf8');
+        const far = getVar('--stage-far', '#475569');
+        const ridge = getVar('--stage-ridge', '#e2e8f0');
         const earth = getVar('--stage-earth', '#64748b');
+        const hero = getVar('--stage-hero', '#38bdf8');
+        const rock = getVar('--stage-rock', '#cbd5e1');
+        const fire = getVar('--stage-fire', '#f43f5e');
+        const hud = getVar('--text', '#f8fafc');
+
         palette = {
-          bg: getVar('--stage-bg', '#060813'),
+          bg,
           colors: [
-            earth, // 0 default
-            getVar('--stage-sky', '#f8fafc'), // 1 as-sky
-            getVar('--stage-aurora', '#38bdf8'), // 2 as-aurora
-            getVar('--stage-aurora-2', '#818cf8'), // 3 as-aurora2
-            getVar('--stage-far', '#475569'), // 4 as-far
-            getVar('--stage-ridge', '#e2e8f0'), // 5 as-ridge
-            earth, // 6 as-earth
-            getVar('--stage-hero', '#38bdf8'), // 7 as-hero
-            getVar('--stage-rock', '#cbd5e1'), // 8 as-rock
-            getVar('--stage-fire', '#f43f5e'), // 9 as-fire
-            getVar('--text', '#f8fafc'), // 10 as-hud
+            bg, // 0: background / transparent
+            sky, // 1: primary celestial highlight
+            aurora, // 2: secondary cyan/emerald/fremen-blue
+            aurora2, // 3: tertiary violet/magenta/amber
+            far, // 4: distant mountain / structure
+            ridge, // 5: ridge crest highlight
+            earth, // 6: sunlit terrain strata
+            hero, // 7: Sisyphus primary suit/cloak
+            rock, // 8: 3D boulder sunlit facet
+            fire, // 9: HAL red / vermilion seal / sentinel laser / spice fire
+            hud, // 10: crisp HUD text
+            mixColor(earth, bg, 0.72), // 11: deep raycast umbra shadow
+            mixColor(earth, bg, 0.42), // 12: mid geological strata shadow
+            mixColor(rock, bg, 0.52), // 13: 3D boulder dark hemisphere
+            mixColor(hero, bg, 0.48), // 14: Sisyphus back limbs & shadow
+            mixColor(aurora, bg, 0.76), // 15: subtle atmospheric / chamber glow
           ],
         };
+        clearGlyphAtlas();
       } catch {}
     };
 
+    // ================= 4. 8 小时持久化轮回与小游戏状态 =================
     interface CycleSave {
       anchorEpoch: number;
       boostAccum: number;
@@ -223,12 +513,39 @@ const { initialSummits = 1 } = Astro.props;
     let lastBoostSource = '主动助推';
 
     let boulderProg = displayFrac;
-    let sisyphusProg = Math.max(0, displayFrac - 0.062);
+    let sisyphusProg = Math.max(0, displayFrac - 0.056);
     let avalancheVel = 0;
     let continuousRoll = 0;
     let continuousStep = 0;
 
-    // 亚像素级高精度粒子系统 (在 224x128 坐标系中平滑运动)
+    // 小游戏与四大文艺作品专属互动状态
+    let cadenceClock = 0;
+    let comboCount = 0;
+    let comboDecayTimer = 0;
+    let critFlashTimer = 0;
+    let themeSkillTimer = 0;
+    let undergroundPulseTimer = 0;
+
+    let halAlertPhase = 0;
+    let crisisCol = 132;
+    let sentinelX = 160;
+    let sentinelY = 18;
+    let sentinelStunTimer = 0;
+
+    interface InteractiveHotspot {
+      id: 'boulder' | 'sky_anomaly' | 'celestial' | 'sub_core' | 'milestone';
+      col: number;
+      row: number;
+      w: number;
+      h: number;
+      label: string;
+      hint: string;
+    }
+    let pointerCol = -1;
+    let pointerRow = -1;
+    let hoveredHotspot: InteractiveHotspot | null = null;
+    let activeHotspots: InteractiveHotspot[] = [];
+
     interface SubParticle {
       x: number;
       y: number;
@@ -241,42 +558,81 @@ const { initialSummits = 1 } = Astro.props;
     }
     const subParticles: SubParticle[] = [];
 
-    const matrixDrops = Array.from({ length: 24 }, (_, i) => ({
-      col: 4 + i * 4.4 + (i % 2),
-      y: (i * 3.7) % 28,
-      speed: 3.4 + (i % 4) * 1.2,
-      len: 4 + (i % 4),
+    interface FloatingTag {
+      col: number;
+      row: number;
+      text: string;
+      cls: number;
+      life: number;
+      maxLife: number;
+    }
+    const floatingTags: FloatingTag[] = [];
+
+    const spawnFloatingTag = (col: number, row: number, text: string, cls = 9, maxLife = 1.35) => {
+      if (floatingTags.length > 6) floatingTags.shift();
+      floatingTags.push({
+        col: Math.max(2, Math.min(COLS - text.length - 2, Math.round(col))),
+        row: Math.max(2, Math.min(ROWS - 4, row)),
+        text,
+        cls,
+        life: 0,
+        maxLife,
+      });
+    };
+
+    // 三层透视黑客帝国代码雨 (近景、中景、远景)
+    const matrixDrops = Array.from({ length: 48 }, (_, i) => ({
+      col: 6 + i * 4.4 + (i % 3),
+      y: (i * 5.3) % 64,
+      speed: (i % 3 === 0 ? 11.5 : i % 3 === 1 ? 7.8 : 4.8) + (i % 4) * 1.2,
+      len: 5 + (i % 7),
+      layer: i % 3, // 0: near bright, 1: mid emerald, 2: far dim
     }));
 
     let skyStrikeTimer = 0;
-    let skyStrikeCol = 54;
+    let skyStrikeCol = 108;
 
-    // 多地形起伏山脊曲线：
-    // 1. 山麓起点贴近画幅最底部 y=34.2（总高 36 行，底部仅留 1~2 行基岩）
-    // 2. 山峰最高处位于画幅从下往上 2/3 高度处 y=12.2（36 * (1 - 2/3) = 12）
-    // 3. 山坡带有明显的高低起伏（前哨陡坡 -> 第一高冈 -> 马鞍缓谷 -> 绝壁陡坡 -> 高山鞍部 -> 冲顶陡崖 -> 峰顶高原）
+    // ================= 5. 224x72 高精度山脊地形函数与法线坡度 =================
     const terrainY = (c: number): number => {
-      if (c <= 9) return 34.2;
-      if (c >= 99) return 12.2;
-      const u = (c - 9) / 90;
-      const base = 34.2 - u * 22.0; // 34.2 -> 12.2
-      // 复合双频地形波：形成 2 个小山包/马鞍谷与 3 段陡壁的真实高低起伏
+      if (c <= 18) return 68.4;
+      if (c >= 198) return 24.4;
+      const u = (c - 18) / 180;
+      const base = 68.4 - u * 44.0; // 68.4 -> 24.4
       const undulation =
-        -Math.sin(u * Math.PI * 4.0) * 1.65 * Math.sin(u * Math.PI) +
-        Math.sin(u * Math.PI * 8.0) * 0.45 * Math.sin(u * Math.PI);
-      return Math.max(11.8, Math.min(34.4, base + undulation));
+        -Math.sin(u * Math.PI * 4.0) * 3.3 * Math.sin(u * Math.PI) +
+        Math.sin(u * Math.PI * 8.0) * 0.9 * Math.sin(u * Math.PI);
+      return Math.max(23.6, Math.min(68.8, base + undulation));
     };
 
-    // 计算任意列处的局部爬升坡度 (正值越大代表上坡越陡，0 或负值代表平缓台地/鞍部微下坡)
     const getTerrainGrade = (c: number): number => {
-      const c0 = Math.max(0, Math.min(COLS - 2, c - 1));
+      const c0 = Math.max(0, Math.min(COLS - 3, c - 1));
       const c1 = Math.min(COLS - 1, c0 + 2);
       return (terrainY(c0) - terrainY(c1)) / (c1 - c0);
     };
 
     const progToCol = (p: number): number => {
       const clamped = Math.max(0, Math.min(1, p));
-      return 14.0 + clamped * 86.5; // 14.0 -> 100.5
+      return 28.0 + clamped * 173.0; // 28.0 -> 201.0
+    };
+
+    // 2D 快速连续噪声函数 (用于木星云带、沙丘风纹、北斋等高线与地质断层)
+    const hash2D = (x: number, y: number): number => {
+      const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+      return h - Math.floor(h);
+    };
+
+    const valueNoise2D = (x: number, y: number): number => {
+      const ix = Math.floor(x);
+      const iy = Math.floor(y);
+      const fx = x - ix;
+      const fy = y - iy;
+      const ux = fx * fx * (3 - 2 * fx);
+      const uy = fy * fy * (3 - 2 * fy);
+      const a = hash2D(ix, iy);
+      const b = hash2D(ix + 1, iy);
+      const c = hash2D(ix, iy + 1);
+      const d = hash2D(ix + 1, iy + 1);
+      return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
     };
 
     const spawnSubParticles = (
@@ -285,18 +641,18 @@ const { initialSummits = 1 } = Astro.props;
       count: number,
       dirX: number,
       cls: number,
-      gravity = 28.0,
+      gravity = 56.0,
     ) => {
       for (let i = 0; i < count; i++) {
-        if (subParticles.length > 100) subParticles.shift();
+        if (subParticles.length > 180) subParticles.shift();
         subParticles.push({
-          x: colX * 2 + (Math.random() - 0.5) * 3,
-          y: rowY * 4 + (Math.random() - 0.5) * 3,
-          vx: dirX * (6 + Math.random() * 16) + (Math.random() - 0.5) * 6,
-          vy: -(7 + Math.random() * 16),
+          x: colX * 2 + (Math.random() - 0.5) * 5,
+          y: rowY * 4 + (Math.random() - 0.5) * 5,
+          vx: dirX * (12 + Math.random() * 34) + (Math.random() - 0.5) * 14,
+          vy: -(14 + Math.random() * 32),
           gravity,
           life: 0,
-          maxLife: 0.55 + Math.random() * 0.7,
+          maxLife: 0.55 + Math.random() * 0.75,
           cls,
         });
       }
@@ -309,7 +665,7 @@ const { initialSummits = 1 } = Astro.props;
       alreadyPersisted = false,
     ) => {
       if (phase !== 'CLIMB') return;
-      const clamped = Math.max(0.001, Math.min(0.12, amount));
+      const clamped = Math.max(0.001, Math.min(0.14, amount));
       const gainedM = clamped * PEAK_ALT;
       if (alreadyPersisted) {
         try {
@@ -327,43 +683,232 @@ const { initialSummits = 1 } = Astro.props;
       }
       lastBoostGainMeters = gainedM;
       lastBoostSource = source;
-      boostBannerTimer = 2.0;
-      boostVelocity = Math.min(0.45, boostVelocity + clamped * 2.8);
+      boostBannerTimer = 2.2;
+      boostVelocity = Math.min(0.52, boostVelocity + clamped * 3.1);
 
       const bx = progToCol(boulderProg);
       const by = terrainY(bx);
       skyStrikeCol = strikeCol ?? Math.round(bx);
-      skyStrikeTimer = strikeCol !== undefined ? 0.58 : 0.35;
-      spawnSubParticles(bx - 2, by - 1, 14, -1, 9);
+      skyStrikeTimer = strikeCol !== undefined ? 0.62 : 0.38;
+      spawnSubParticles(bx - 3, by - 1, 22, -1, 9);
     };
 
-    pushBtn?.addEventListener('click', () => {
+    const triggerRhythmicPush = (baseLabel = '节拍助推', strikeCol?: number) => {
+      if (phase !== 'CLIMB') return;
+      const distFromCenter = Math.abs(cadenceClock - 0.5);
+      const isPerfect = distFromCenter <= 0.16;
+      const bx = progToCol(boulderProg);
+      const by = terrainY(bx);
+
+      if (isPerfect) {
+        comboCount = Math.min(12, comboCount + 1);
+        comboDecayTimer = 6.5;
+        critFlashTimer = 0.75;
+        const mult = 1 + Math.min(1.2, comboCount * 0.18);
+        const minM = Math.round(34 * mult);
+        const maxM = Math.round(56 * mult);
+        spawnSubParticles(bx, by - 2.5, 32, -1.2, 1, 40);
+        spawnFloatingTag(
+          bx - 8,
+          by - 10,
+          `★PERFECT x${comboCount > 1 ? comboCount : '2'}!`,
+          9,
+          1.4,
+        );
+        window.dispatchEvent(
+          new CustomEvent('sisyphus:boulder-boost', {
+            detail: {
+              minM,
+              maxM,
+              source: comboCount > 1 ? `完美共振 x${comboCount}` : '完美节拍暴击',
+              strikeCol,
+            },
+          }),
+        );
+      } else {
+        comboCount = Math.max(0, comboCount - 1);
+        spawnFloatingTag(bx - 5, by - 9, `+PUSH`, 7, 0.9);
+        window.dispatchEvent(
+          new CustomEvent('sisyphus:boulder-boost', {
+            detail: { minM: 14, maxM: 32, source: baseLabel, strikeCol },
+          }),
+        );
+      }
+    };
+
+    const triggerThemeSkill = (customSource?: string) => {
+      if (phase !== 'CLIMB') return;
+      const realm = document.documentElement.dataset.realm || 'void';
+      const spec = SKILL_SPECS[realm] || SKILL_SPECS.void;
+      themeSkillTimer = 4.0;
+      critFlashTimer = 0.9;
+      comboCount = Math.min(12, comboCount + 1);
+      comboDecayTimer = 7.0;
+
+      const bx = progToCol(boulderProg);
+      const by = terrainY(bx);
+      spawnSubParticles(bx, by - 3, 36, -0.8, 2, 28);
+      spawnSubParticles(bx + 2, by - 2, 24, 1.1, 9, 32);
+
+      const tagMap: Record<string, string> = {
+        void: '◈ [1:4:9 STAR-GATE WARP!]',
+        paper: 'Ψ [SELDON CRISIS SOLVED!]',
+        crt: '⚡ [EMP // 0x00 NO BOULDER!]',
+        amber: '◈ [MAKER HOOK // SHAI-HULUD!]',
+      };
+      spawnFloatingTag(bx - 12, by - 12, tagMap[realm] || tagMap.void, 1, 1.9);
+
+      if (realm === 'crt') {
+        sentinelStunTimer = 4.8;
+      } else if (realm === 'paper') {
+        crisisCol = 70 + Math.floor(Math.random() * 110);
+      }
+
+      if (quoteEl) {
+        quoteEl.textContent = spec.quote;
+      }
+
       window.dispatchEvent(
         new CustomEvent('sisyphus:boulder-boost', {
-          detail: { minM: 14, maxM: 38, source: '主动助推' },
+          detail: {
+            minM: 48,
+            maxM: 82,
+            source: customSource || spec.label.replace(/[\[\]]/g, ''),
+            strikeCol: Math.round(bx),
+          },
         }),
       );
+    };
+
+    pushBtn?.addEventListener('click', () => triggerRhythmicPush('主动助推'));
+    skillBtn?.addEventListener('click', () => triggerThemeSkill());
+    summitBtn?.addEventListener('click', () => {
+      if (phase === 'CLIMB') sprintToSummit = true;
     });
 
-    summitBtn?.addEventListener('click', () => {
-      if (phase === 'CLIMB') {
-        sprintToSummit = true;
+    const updatePointerCell = (e: MouseEvent) => {
+      const target = (canvasEl || viewportEl || stageEl) as HTMLElement;
+      const rect = target.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const rx = (e.clientX - rect.left) / rect.width;
+      const ry = (e.clientY - rect.top) / rect.height;
+      if (rx < 0 || rx > 1 || ry < 0 || ry > 1) {
+        pointerCol = -1;
+        pointerRow = -1;
+        hoveredHotspot = null;
+        return;
+      }
+      pointerCol = Math.max(0, Math.min(COLS - 1, Math.floor(rx * COLS)));
+      pointerRow = Math.max(0, Math.min(ROWS - 1, Math.floor(ry * ROWS)));
+
+      hoveredHotspot = null;
+      for (const hs of activeHotspots) {
+        if (
+          pointerCol >= hs.col - 2 &&
+          pointerCol <= hs.col + hs.w + 1 &&
+          pointerRow >= hs.row - 1 &&
+          pointerRow <= hs.row + hs.h + 1
+        ) {
+          hoveredHotspot = hs;
+          break;
+        }
+      }
+      if (hotspotHintEl) {
+        if (hoveredHotspot) {
+          hotspotHintEl.textContent = `⌖ [${hoveredHotspot.label}] ${hoveredHotspot.hint}`;
+          hotspotHintEl.classList.add('is-locked');
+        } else {
+          const realm = document.documentElement.dataset.realm || 'void';
+          hotspotHintEl.textContent = (SKILL_SPECS[realm] || SKILL_SPECS.void).desc;
+          hotspotHintEl.classList.remove('is-locked');
+        }
+      }
+    };
+
+    viewportEl?.addEventListener('pointermove', updatePointerCell);
+    viewportEl?.addEventListener('pointerleave', () => {
+      pointerCol = -1;
+      pointerRow = -1;
+      hoveredHotspot = null;
+      if (hotspotHintEl) {
+        const realm = document.documentElement.dataset.realm || 'void';
+        hotspotHintEl.textContent = (SKILL_SPECS[realm] || SKILL_SPECS.void).desc;
+        hotspotHintEl.classList.remove('is-locked');
       }
     });
 
     const handleStageClick = (e: MouseEvent) => {
-      const target = (viewportEl || stageEl) as HTMLElement;
-      const rect = target.getBoundingClientRect();
-      const ratioX = Math.max(0.05, Math.min(0.95, (e.clientX - rect.left) / Math.max(1, rect.width)));
-      const clickedCol = Math.round(ratioX * (COLS - 1));
-      window.dispatchEvent(
-        new CustomEvent('sisyphus:boulder-boost', {
-          detail: { minM: 12, maxM: 34, source: '天象共鸣', strikeCol: clickedCol },
-        }),
-      );
+      updatePointerCell(e);
+      const clickedCol = pointerCol >= 0 ? pointerCol : Math.round(progToCol(boulderProg));
+
+      if (hoveredHotspot) {
+        if (hoveredHotspot.id === 'sky_anomaly' || hoveredHotspot.id === 'celestial') {
+          triggerThemeSkill(hoveredHotspot.label);
+          return;
+        }
+        if (hoveredHotspot.id === 'sub_core') {
+          undergroundPulseTimer = 1.7;
+          const bx = progToCol(boulderProg);
+          const by = terrainY(bx);
+          spawnSubParticles(bx, by, 26, -0.5, 2, 30);
+          spawnFloatingTag(
+            hoveredHotspot.col + 4,
+            hoveredHotspot.row - 2,
+            `▲ [${hoveredHotspot.label} 共鸣!]`,
+            2,
+            1.4,
+          );
+          window.dispatchEvent(
+            new CustomEvent('sisyphus:boulder-boost', {
+              detail: {
+                minM: 30,
+                maxM: 54,
+                source: hoveredHotspot.label,
+                strikeCol: Math.round(bx),
+              },
+            }),
+          );
+          return;
+        }
+        if (hoveredHotspot.id === 'milestone') {
+          spawnFloatingTag(
+            hoveredHotspot.col - 3,
+            hoveredHotspot.row - 3,
+            `⚑ ${hoveredHotspot.label}`,
+            1,
+            1.3,
+          );
+          triggerRhythmicPush(hoveredHotspot.label, hoveredHotspot.col);
+          return;
+        }
+      }
+
+      triggerRhythmicPush('天象共鸣', clickedCol);
     };
+
     viewportEl?.addEventListener('click', handleStageClick);
     stageEl.addEventListener('click', handleStageClick);
+    cadenceBoxEl?.addEventListener('click', () => triggerRhythmicPush('节拍共鸣'));
+    milestoneNodes.forEach((node, idx) => {
+      node.addEventListener('click', () => {
+        const realm = document.documentElement.dataset.realm || 'void';
+        const ms = (REALM_MILESTONES[realm] || REALM_MILESTONES.void)[idx];
+        if (ms) {
+          spawnFloatingTag(ms.col - 4, terrainY(ms.col) - 6, `⚑ ${ms.code} BEACON`, 1, 1.3);
+          triggerRhythmicPush(ms.name, ms.col);
+        }
+      });
+    });
+
+    viewportEl?.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault();
+        triggerRhythmicPush('SPACE节拍');
+      } else if (e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        triggerThemeSkill();
+      }
+    });
 
     window.addEventListener('sisyphus:boulder-boost', (ev: Event) => {
       const detail = (
@@ -386,81 +931,39 @@ const { initialSummits = 1 } = Astro.props;
         }
         if (detail) detail.rolledAmount = rawAmt;
       }
-      applyBoost(
-        rawAmt,
-        detail?.strikeCol,
-        detail?.source || '动能共鸣',
-        true,
-      );
+      applyBoost(rawAmt, detail?.strikeCol, detail?.source || '动能共鸣', true);
     });
 
     window.addEventListener('sisyphus:trigger-summit', () => {
-      if (phase === 'CLIMB') {
-        sprintToSummit = true;
-      }
+      if (phase === 'CLIMB') sprintToSummit = true;
     });
 
     const syncStageTitle = () => {
       const r = document.documentElement.dataset.realm || 'void';
-      cachedRealm = ''; // 强制刷新 Canvas 调色板
+      cachedRealm = '';
       refreshPalette(r);
       if (stageTitleEl) {
         stageTitleEl.textContent = STAGE_TITLES[r] || STAGE_TITLES.void;
       }
+      const spec = SKILL_SPECS[r] || SKILL_SPECS.void;
+      if (skillBtn) {
+        skillBtn.textContent = spec.label;
+        skillBtn.title = spec.desc;
+      }
+      if (hotspotHintEl && !hoveredHotspot) {
+        hotspotHintEl.textContent = spec.desc;
+      }
+      const msList = REALM_MILESTONES[r] || REALM_MILESTONES.void;
+      milestoneNodes.forEach((node, idx) => {
+        const ms = msList[idx];
+        if (ms) {
+          node.textContent = idx === 4 ? `▲${ms.code}` : `${idx + 1}:${ms.code}`;
+          node.title = ms.name;
+        }
+      });
     };
     syncStageTitle();
     window.addEventListener('sisyphus:realmchange', syncStageTitle);
-
-    // 5x3 纯 ASCII+Braille 恒定字面巨石（内部只进行盲文纹理流转，外框永远是纯 ASCII 字符，零宽度跳变）
-    const getBoulderSprite = (
-      realm: string,
-      frame: number,
-    ): [string, string, string] => {
-      const f = ((frame % 6) + 6) % 6;
-      if (realm === 'crt') {
-        const cores = ['⣿:#', '#⣿:', ':⣿#', '#:⣿', '⣿#:', ':#⣿'];
-        return [' .===. ', `( ${cores[f].slice(0, 3)} )`, " '===' "];
-      }
-      if (realm === 'void') {
-        const cores = ['⣿*⠿', '⠿+⣿', '*⣿⠿', '⣿#⠿', '⠿*⣿', '+⠿⣿'];
-        return [' .===. ', `[ ${cores[f]} ]`, " '===' "];
-      }
-      if (realm === 'paper') {
-        const cores = ['⠿=:', ':=⠿', '⠿+:', ':⠿=', '=⠿:', '+:⠿'];
-        return [' .===. ', `( ${cores[f]} )`, " '===' "];
-      }
-      const cores = ['⣿~⠿', '~⠿⣿', '⠿*⣿', '⣿:⠿', '*⠿~', '⠿⣿~'];
-      return [' .---. ', `( ${cores[f]} )`, " '---' "];
-    };
-
-    // 针对起伏山坡不同坡度点位的多模态腿部与推石动作库
-    const STEEP_CLIMB_LEGS = ['/>\\', '|/\\', '/>|', '/\\|']; // 陡坡深弓步蹬地
-    const NORMAL_CLIMB_LEGS = ['/ \\', '| /', '> \\', '\\ |']; // 标准斜坡攀登
-    const SADDLE_STRIDE_LEGS = ['/ >', '| \\', '/ |', '> \\']; // 鞍部/缓坡大步推进
-    const WALK_DOWN_LEGS = ['/ \\', '| \\', '/ |', '\\ /'];
-
-    const escapeHtml = (s: string) =>
-      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-    const CLS_NAMES = [
-      '', // 0
-      'as-sky', // 1
-      'as-aurora', // 2
-      'as-aurora2', // 3
-      'as-far', // 4
-      'as-ridge', // 5
-      'as-earth', // 6
-      'as-hero', // 7
-      'as-rock', // 8
-      'as-fire', // 9
-      'as-hud', // 10
-    ];
-
-    // Drawille 2x4 Unicode 盲文位掩码映射表
-    const BRAILLE_BITS = [
-      [0x01, 0x02, 0x04, 0x40],
-      [0x08, 0x10, 0x20, 0x80],
-    ];
 
     const formatEta = (ms: number) => {
       const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -470,8 +973,18 @@ const { initialSummits = 1 } = Astro.props;
       return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
     };
 
+    // ================= 6. 预分配双层高分缓冲区 (零 GC 抖动) =================
+    const cellChar: string[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(' '));
+    const cellFg = new Uint8Array(ROWS * COLS);
+    const cellBg = new Uint8Array(ROWS * COLS);
+    const brailleMask = new Uint8Array(ROWS * COLS);
+    const brailleCls = new Uint8Array(ROWS * COLS);
+    const quadBuf = new Uint8Array(QUAD_H * QUAD_W); // 448x144 Chafa 2x2 像素缓冲
+    const rayShadowCol = new Float32Array(COLS); // rot.js 天体光线投射阴影高度表
+
     let lastTime = performance.now();
     let lastRenderTime = 0;
+    let lastSrSyncTime = 0;
     let nextPebbleTick = 0;
     let nextMeteorTick = 1200;
 
@@ -495,37 +1008,62 @@ const { initialSummits = 1 } = Astro.props;
         p.vy += p.gravity * dt;
       }
 
-      for (const drop of matrixDrops) {
-        drop.y += drop.speed * dt;
-        if (drop.y > ROWS + drop.len) {
-          drop.y = -1;
+      for (let i = floatingTags.length - 1; i >= 0; i--) {
+        const ft = floatingTags[i];
+        ft.life += dt;
+        ft.row -= dt * 4.2;
+        if (ft.life >= ft.maxLife) {
+          floatingTags.splice(i, 1);
         }
       }
 
+      for (const drop of matrixDrops) {
+        drop.y += drop.speed * dt * (themeSkillTimer > 0 && realm === 'crt' ? 0.32 : 1);
+        if (drop.y > ROWS + drop.len) {
+          drop.y = -2;
+        }
+      }
+
+      cadenceClock = (cadenceClock + dt * 0.72) % 1.0;
+      if (comboDecayTimer > 0) {
+        comboDecayTimer = Math.max(0, comboDecayTimer - dt);
+        if (comboDecayTimer <= 0) comboCount = 0;
+      }
+      if (critFlashTimer > 0) critFlashTimer = Math.max(0, critFlashTimer - dt);
+      if (themeSkillTimer > 0) themeSkillTimer = Math.max(0, themeSkillTimer - dt);
+      if (undergroundPulseTimer > 0) undergroundPulseTimer = Math.max(0, undergroundPulseTimer - dt);
+      if (sentinelStunTimer > 0) sentinelStunTimer = Math.max(0, sentinelStunTimer - dt);
+
+      halAlertPhase = (halAlertPhase + dt * 1.05) % (Math.PI * 2);
+      if (sentinelStunTimer <= 0) {
+        sentinelX = 136 + Math.sin(nowPerf * 0.0011) * 44;
+        sentinelY = 17 + Math.cos(nowPerf * 0.0019) * 6.5;
+      }
+
       if (nowPerf > nextMeteorTick) {
-        nextMeteorTick = nowPerf + 1800 + Math.random() * 2000;
+        nextMeteorTick = nowPerf + 1400 + Math.random() * 1700;
         if (realm === 'void') {
           subParticles.push({
-            x: 130 + Math.random() * 50,
-            y: 6 + Math.random() * 14,
-            vx: -42 - Math.random() * 16,
-            vy: 12,
+            x: 260 + Math.random() * 110,
+            y: 10 + Math.random() * 28,
+            vx: -88 - Math.random() * 36,
+            vy: 22,
             gravity: 0,
             life: 0,
-            maxLife: 1.05,
+            maxLife: 1.1,
             cls: 1,
           });
         } else if (realm === 'amber') {
-          for (let k = 0; k < 6; k++) {
+          for (let k = 0; k < 9; k++) {
             subParticles.push({
-              x: 170 + Math.random() * 30,
-              y: 12 + Math.random() * 34,
-              vx: -30 - Math.random() * 14,
-              vy: 2.5,
+              x: 340 + Math.random() * 75,
+              y: 22 + Math.random() * 78,
+              vx: -64 - Math.random() * 32,
+              vy: 4.5,
               gravity: 0,
               life: 0,
-              maxLife: 1.5,
-              cls: k === 0 ? 2 : 1,
+              maxLife: 1.6,
+              cls: k === 0 ? 9 : k % 2 === 0 ? 2 : 1,
             });
           }
         }
@@ -537,22 +1075,23 @@ const { initialSummits = 1 } = Astro.props;
       if (phase === 'CLIMB') {
         const curCol = progToCol(boulderProg);
         const curGrade = getTerrainGrade(curCol);
-        // 陡坡处步频沉重扎实、碎石飞溅更频繁；缓坡/鞍部处步频轻快
-        const slopeTempo = curGrade > 0.36 ? 0.76 : curGrade < 0.12 ? 1.28 : 1.0;
-        const speedMult = (sprintToSummit ? 6.5 : 1 + boostVelocity * 11) * slopeTempo;
-        continuousStep += dt * 2.6 * speedMult;
-        continuousRoll += dt * 2.1 * speedMult;
+        const slopeTempo = curGrade > 0.36 ? 0.78 : curGrade < 0.12 ? 1.28 : 1.0;
+        const skillMult = themeSkillTimer > 0 ? 2.5 : 1.0;
+        const speedMult = (sprintToSummit ? 6.5 : (1 + boostVelocity * 11) * skillMult) * slopeTempo;
+        continuousStep += dt * 3.0 * speedMult;
+        continuousRoll += dt * 2.4 * speedMult;
 
         if (nowPerf > nextPebbleTick) {
-          const baseInterval = curGrade > 0.36 ? 360 : 580;
-          nextPebbleTick = nowPerf + (boostVelocity > 0.02 || sprintToSummit ? 120 : baseInterval);
+          const baseInterval = curGrade > 0.36 ? 320 : 520;
+          nextPebbleTick =
+            nowPerf + (boostVelocity > 0.02 || sprintToSummit || themeSkillTimer > 0 ? 100 : baseInterval);
           const sx = progToCol(sisyphusProg);
           spawnSubParticles(
-            sx - 1.4,
-            terrainY(sx) - 0.4,
-            curGrade > 0.36 ? 3 : 2,
+            sx - 2.4,
+            terrainY(sx) - 0.5,
+            curGrade > 0.36 || themeSkillTimer > 0 ? 5 : 3,
             -0.9,
-            boostVelocity > 0.02 || curGrade > 0.38 ? 9 : 5,
+            boostVelocity > 0.02 || curGrade > 0.38 || themeSkillTimer > 0 ? 9 : 5,
           );
         }
 
@@ -566,7 +1105,7 @@ const { initialSummits = 1 } = Astro.props;
             phase = 'SUMMIT_BREATH';
             phaseElapsed = 0;
             boulderProg = 1.0;
-            sisyphusProg = 0.938;
+            sisyphusProg = 0.944;
           }
         } else {
           const targetCycle = Math.floor(totalRaw);
@@ -576,7 +1115,7 @@ const { initialSummits = 1 } = Astro.props;
               phase = 'SUMMIT_BREATH';
               phaseElapsed = 0;
               boulderProg = 1.0;
-              sisyphusProg = 0.938;
+              sisyphusProg = 0.944;
             }
           } else {
             const targetFrac = totalRaw - activeCycleIndex;
@@ -590,16 +1129,17 @@ const { initialSummits = 1 } = Astro.props;
           }
         }
 
-        const heaveBob = Math.sin(continuousStep * Math.PI) * 0.0022;
+        const rhythmPulse = Math.sin(cadenceClock * Math.PI * 2);
+        const heaveBob = rhythmPulse * 0.0032 + Math.sin(continuousStep * Math.PI) * 0.0018;
         boulderProg = Math.min(1, Math.max(0.02, displayFrac + heaveBob));
-        sisyphusProg = Math.max(0, boulderProg - 0.062);
+        sisyphusProg = Math.max(0, boulderProg - 0.056);
       } else if (phase === 'SUMMIT_BREATH') {
         phaseElapsed += dt;
         boulderProg = 1.0;
-        sisyphusProg = 0.938;
-        if (phaseElapsed > 2.2 && Math.random() < 0.45) {
+        sisyphusProg = 0.944;
+        if (phaseElapsed > 2.2 && Math.random() < 0.48) {
           const bx = progToCol(boulderProg);
-          spawnSubParticles(bx - 1.8, terrainY(bx) - 0.2, 2, -0.7, 9);
+          spawnSubParticles(bx - 3, terrainY(bx) - 0.4, 3, -0.7, 9);
         }
         if (phaseElapsed >= 3.3) {
           phase = 'AVALANCHE';
@@ -610,11 +1150,11 @@ const { initialSummits = 1 } = Astro.props;
         phaseElapsed += dt;
         avalancheVel = Math.min(0.48, avalancheVel + dt * 0.25);
         boulderProg = Math.max(0.02, boulderProg - avalancheVel * dt);
-        continuousRoll -= avalancheVel * dt * 36;
+        continuousRoll -= avalancheVel * dt * 38;
 
         const bx = progToCol(boulderProg);
-        if (boulderProg > 0.025 && Math.random() < 0.75) {
-          spawnSubParticles(bx + 1.8, terrainY(bx) - 0.6, 3, 0.9, 9);
+        if (boulderProg > 0.025 && Math.random() < 0.8) {
+          spawnSubParticles(bx + 3.2, terrainY(bx) - 1.0, 4, 0.9, 9);
         }
 
         if (phaseElapsed > 1.3) {
@@ -624,7 +1164,7 @@ const { initialSummits = 1 } = Astro.props;
 
         if (boulderProg <= 0.022) {
           boulderProg = 0.02;
-          spawnSubParticles(progToCol(0.02) + 1.5, terrainY(12) - 0.6, 16, 0.4, 9);
+          spawnSubParticles(progToCol(0.02) + 2.5, terrainY(24) - 1.0, 24, 0.4, 9);
           phase = 'DESCENT_WALK';
           phaseElapsed = 0;
         }
@@ -643,14 +1183,14 @@ const { initialSummits = 1 } = Astro.props;
             activeCycleIndex = Math.floor(latestTotal);
             displayFrac = Math.min(0.05, latestTotal - activeCycleIndex);
             boulderProg = displayFrac;
-            sisyphusProg = Math.max(0, displayFrac - 0.062);
+            sisyphusProg = Math.max(0, displayFrac - 0.056);
             phase = 'CLIMB';
             phaseElapsed = 0;
           }
         }
       }
 
-      if (nowPerf - lastRenderTime >= 42) {
+      if (nowPerf - lastRenderTime >= 32) {
         lastRenderTime = nowPerf;
         renderFrame(nowPerf, realm);
       }
@@ -658,34 +1198,58 @@ const { initialSummits = 1 } = Astro.props;
       requestAnimationFrame(tick);
     };
 
+    // ================= 7. 五合一高分混合渲染管线 (renderFrame) =================
     const renderFrame = (nowPerf: number, realm: string) => {
       refreshPalette(realm);
 
-      const chars: string[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(' '));
-      const cls: number[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      // 清空缓冲
+      for (let r = 0; r < ROWS; r++) {
+        cellChar[r].fill(' ');
+      }
+      cellFg.fill(0);
+      cellBg.fill(0);
+      brailleMask.fill(0);
+      brailleCls.fill(0);
+      quadBuf.fill(0);
+      activeHotspots = [];
 
-      // Drawille 224x128 亚像素点阵缓冲区
-      const brailleMask: number[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
-      const brailleCls: number[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      const sec = nowPerf * 0.001;
+      const bCol = progToCol(boulderProg);
+      let bGroundY = terrainY(bCol);
+      if (phase === 'AVALANCHE') {
+        bGroundY -= Math.abs(Math.sin(boulderProg * Math.PI * 7.0)) * 3.0;
+      } else if (themeSkillTimer > 0 && realm === 'amber') {
+        bGroundY -= 1.5;
+      }
+      const sCol = progToCol(sisyphusProg);
 
-      const setSubPixel = (px: number, py: number, colorCls: number) => {
+      // --- 工具函数 A: 448x288 Drawille 盲文亚像素画笔 ---
+      const setSubPixel = (px: number, py: number, colorCls: number, allowUnderground = false) => {
         const xi = Math.round(px);
         const yi = Math.round(py);
         if (xi < 0 || xi >= SUB_W || yi < 0 || yi >= SUB_H) return;
         const col = xi >> 1;
         const row = yi >> 2;
-        if (yi >= terrainY(col) * 4 - 1) return; // 不覆盖主山坡以下岩层
-        brailleMask[row][col] |= BRAILLE_BITS[xi & 1][yi & 3];
-        if (colorCls > brailleCls[row][col]) {
-          brailleCls[row][col] = colorCls;
+        if (!allowUnderground && yi >= terrainY(col) * 4 - 2) return;
+        const idx = row * COLS + col;
+        brailleMask[idx] |= BRAILLE_BITS[xi & 1][yi & 3];
+        if (colorCls > brailleCls[idx]) {
+          brailleCls[idx] = colorCls;
         }
       };
 
-      const drawSubLine = (x0: number, y0: number, x1: number, y1: number, colorCls: number) => {
+      const drawSubLine = (
+        x0: number,
+        y0: number,
+        x1: number,
+        y1: number,
+        colorCls: number,
+        allowUnderground = false,
+      ) => {
         const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0)));
         for (let i = 0; i <= steps; i++) {
           const u = i / steps;
-          setSubPixel(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, colorCls);
+          setSubPixel(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, colorCls, allowUnderground);
         }
       };
 
@@ -701,7 +1265,7 @@ const { initialSummits = 1 } = Astro.props;
         for (let dy = -Math.ceil(r); dy <= Math.ceil(r); dy++) {
           for (let dx = -Math.ceil(r); dx <= Math.ceil(r); dx++) {
             const d2 = dx * dx + dy * dy;
-            if (fill ? d2 <= r2 : Math.abs(Math.sqrt(d2) - r) < 0.72) {
+            if (fill ? d2 <= r2 : Math.abs(Math.sqrt(d2) - r) < 0.78) {
               if (crescentCutX !== 0) {
                 const cd2 = (dx - crescentCutX) * (dx - crescentCutX) + dy * dy;
                 if (cd2 < r2 * 0.78) continue;
@@ -720,298 +1284,1015 @@ const { initialSummits = 1 } = Astro.props;
         tiltRad: number,
         colorCls: number,
       ) => {
-        const steps = Math.ceil(rx * 5.2);
+        const steps = Math.ceil(rx * 5.8);
         const cosT = Math.cos(tiltRad);
         const sinT = Math.sin(tiltRad);
         for (let i = 0; i < steps; i++) {
           const a = (i / steps) * Math.PI * 2;
           const ex = Math.cos(a) * rx;
           const ey = Math.sin(a) * ry;
-          const px = cx + ex * cosT - ey * sinT;
-          const py = cy + ex * sinT + ey * cosT;
-          setSubPixel(px, py, colorCls);
+          setSubPixel(cx + ex * cosT - ey * sinT, cy + ex * sinT + ey * cosT, colorCls);
         }
       };
 
-      const put = (r: number, c: number, ch: string, colorCls = 0) => {
+      // --- 工具函数 B: 448x144 Chafa 2x2 双色象限像素画笔 ---
+      const setQuadPixel = (qx: number, qy: number, colorCls: number) => {
+        const xi = Math.round(qx);
+        const yi = Math.round(qy);
+        if (xi >= 0 && xi < QUAD_W && yi >= 0 && yi < QUAD_H) {
+          quadBuf[yi * QUAD_W + xi] = colorCls;
+        }
+      };
+
+      const drawQuadLine = (x0: number, y0: number, x1: number, y1: number, colorCls: number, thick = 1) => {
+        const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0)));
+        for (let i = 0; i <= steps; i++) {
+          const u = i / steps;
+          const px = x0 + (x1 - x0) * u;
+          const py = y0 + (y1 - y0) * u;
+          setQuadPixel(px, py, colorCls);
+          if (thick > 1) {
+            setQuadPixel(px + 1, py, colorCls);
+            setQuadPixel(px, py + 1, colorCls);
+          }
+        }
+      };
+
+      const drawQuadRect = (qx: number, qy: number, w: number, h: number, colorCls: number) => {
+        const x0 = Math.round(qx);
+        const y0 = Math.round(qy);
+        for (let dy = 0; dy < h; dy++) {
+          for (let dx = 0; dx < w; dx++) {
+            setQuadPixel(x0 + dx, y0 + dy, colorCls);
+          }
+        }
+      };
+
+      // --- 工具函数 C: 224x72 字符直接写入 ---
+      const put = (r: number, c: number, ch: string, fg = 10, bg?: number) => {
         const ri = Math.round(r);
         const ci = Math.round(c);
         if (ri >= 0 && ri < ROWS && ci >= 0 && ci < COLS && ch.length === 1) {
-          chars[ri][ci] = ch;
-          cls[ri][ci] = colorCls;
+          const idx = ri * COLS + ci;
+          cellChar[ri][ci] = ch;
+          cellFg[idx] = fg;
+          if (bg !== undefined) cellBg[idx] = bg;
         }
       };
 
-      const putStr = (r: number, c: number, text: string, colorCls = 0, keepSpace = false) => {
+      const putStr = (r: number, c: number, text: string, fg = 10, keepSpace = false, bg?: number) => {
         const ri = Math.round(r);
         const ciStart = Math.round(c);
         for (let i = 0; i < text.length; i++) {
           const ci = ciStart + i;
           if (ri >= 0 && ri < ROWS && ci >= 0 && ci < COLS) {
             if (text[i] !== ' ' || keepSpace) {
-              chars[ri][ci] = text[i];
-              cls[ri][ci] = colorCls;
+              const idx = ri * COLS + ci;
+              cellChar[ri][ci] = text[i];
+              cellFg[idx] = fg;
+              if (bg !== undefined) cellBg[idx] = bg;
             }
           }
         }
       };
 
-      const sec = nowPerf * 0.001;
-
-      // ================= 1. Drawille 224x144 宏大深空天象与三层地平线远山奇观层 =================
-      // 第一重极远山脉（高空薄雾连绵主峰群，px: 12..172）
-      for (let px = 12; px < 172; px++) {
-        const p1 = 44 + Math.abs(px - 48) * 0.44 + Math.sin(px * 0.25) * 1.4;
-        const p2 = 38 + Math.abs(px - 98) * 0.38 + Math.cos(px * 0.21) * 1.6;
-        const p3 = 46 + Math.abs(px - 144) * 0.42 + Math.sin(px * 0.28) * 1.3;
+      // ================= LAYER 1: 448x288 远景三层视差山脉与 Bayer 抖动阴影 =================
+      for (let px = 20; px < 356; px++) {
+        const p1 = 84 + Math.abs(px - 92) * 0.43 + Math.sin(px * 0.13) * 2.8;
+        const p2 = 70 + Math.abs(px - 196) * 0.37 + Math.cos(px * 0.11) * 3.2;
+        const p3 = 88 + Math.abs(px - 292) * 0.41 + Math.sin(px * 0.15) * 2.6;
         const py = Math.min(p1, p2, p3);
-        const groundLim = terrainY(px * 0.5) * 4 - 6;
+        const groundLim = terrainY(px * 0.5) * 4 - 10;
         if (py < groundLim) {
           setSubPixel(px, py, 4);
-          if (px % 4 === 0 && py + 9 < groundLim) {
-            drawSubLine(px, py + 2, px - 5, py + 9, 4);
+          setSubPixel(px, py + 1, 4);
+          // 远山向阳面与背阴面 Bayer 抖动立体体积排线
+          const isSunlitSide = (px < 92) || (px >= 145 && px < 196) || (px >= 248 && px < 292);
+          for (let dy = 2; dy < 32 && py + dy < groundLim; dy += 2) {
+            const fade = 1 - dy / 34;
+            const bVal = BAYER_8X8[(Math.floor(py + dy)) & 7][px & 7];
+            if (bVal < (isSunlitSide ? 0.48 : 0.22) * fade) {
+              setSubPixel(px, py + dy, isSunlitSide ? 4 : 12);
+            }
           }
         }
       }
 
-      // 第二重中景障壁山脉与峡谷脊线（px: 6..148）
-      for (let px = 6; px < 148; px++) {
-        const m1 = 66 + Math.abs(px - 32) * 0.42 + Math.cos(px * 0.31) * 1.2;
-        const m2 = 58 + Math.abs(px - 74) * 0.36 + Math.sin(px * 0.24) * 1.4;
-        const m3 = 54 + Math.abs(px - 118) * 0.34 + Math.cos(px * 0.19) * 1.2;
+      for (let px = 10; px < 308; px++) {
+        const m1 = 128 + Math.abs(px - 64) * 0.42 + Math.cos(px * 0.16) * 2.4;
+        const m2 = 112 + Math.abs(px - 148) * 0.35 + Math.sin(px * 0.12) * 2.8;
+        const m3 = 104 + Math.abs(px - 236) * 0.33 + Math.cos(px * 0.09) * 2.4;
         const my = Math.min(m1, m2, m3);
-        const groundLim = terrainY(px * 0.5) * 4 - 3;
+        const groundLim = terrainY(px * 0.5) * 4 - 5;
         if (my < groundLim) {
-          setSubPixel(px, my, 4);
-          if (px % 2 === 0) setSubPixel(px, my + 1, 4);
-          if (px % 6 === 0 && my + 10 < groundLim) {
-            drawSubLine(px, my + 2, px + 4, my + 10, 4);
+          setSubPixel(px, my, 5);
+          setSubPixel(px, my + 1, 4);
+          if (px % 7 === 0 && my + 18 < groundLim) {
+            drawSubLine(px, my + 2, px + 8, my + 18, 4);
           }
         }
       }
 
-      // 高空深空星场与星座几何连线（28 颗闪烁星辰 + 星座导航折线）
+      // 高空深空星图与 65 颗动态闪烁星辰
       const constellations = [
-        [82, 10, 96, 14],
-        [96, 14, 112, 9],
-        [112, 9, 124, 17],
-        [148, 12, 164, 8],
-        [164, 8, 178, 15],
+        [164, 20, 192, 28],
+        [192, 28, 224, 18],
+        [224, 18, 248, 34],
+        [296, 24, 328, 16],
+        [328, 16, 356, 30],
       ] as const;
       for (const [x0, y0, x1, y1] of constellations) {
         drawSubLine(x0, y0, x1, y1, 4);
-        drawSubCircle(x0, y0, 1.1, 2, true);
-        drawSubCircle(x1, y1, 1.1, 2, true);
+        drawSubCircle(x0, y0, 1.8, 2, true);
+        drawSubCircle(x1, y1, 1.8, 2, true);
       }
-      for (let sIdx = 0; sIdx < 28; sIdx++) {
-        const sx = ((sIdx * 43 + 17) % (SUB_W - 14)) + 7;
-        const sy = ((sIdx * 29 + 5) % 44) + 4;
-        if (Math.sin(sec * 1.7 + sIdx * 1.9) > -0.3) {
-          setSubPixel(sx, sy, sIdx % 4 === 0 ? 1 : sIdx % 2 === 0 ? 2 : 4);
+      for (let sIdx = 0; sIdx < 65; sIdx++) {
+        const sx = ((sIdx * 73 + 29) % (SUB_W - 24)) + 12;
+        const sy = ((sIdx * 53 + 11) % 92) + 8;
+        if (Math.sin(sec * 1.8 + sIdx * 1.7) > -0.25) {
+          setSubPixel(sx, sy, sIdx % 5 === 0 ? 1 : sIdx % 2 === 0 ? 2 : 4);
         }
       }
+
+      // ================= LAYER 2: 四大科幻名著高分辨率微缩名场面 (448x288 + Chafa 2x2) =================
+      // 定义主天体光源坐标 (用于 rot.js 实时光线投射阴影与 3D 巨石球面法线光照)
+      let lightCol = 40;
+      let lightRow = 11;
 
       if (realm === 'void') {
-        // 《2001：太空漫游》：巨型木星圆盘 + 风暴云带 + 双层倾斜公转卫星轨道 + 亚像素发现号飞船 + TMA-1 球面谐波
-        const jx = 40;
-        const jy = 20;
-        drawSubCircle(jx, jy, 13.5, 1, false);
-        for (let bandY = -10; bandY <= 10; bandY += 3) {
-          const halfW = Math.sqrt(Math.max(0, 178 - bandY * bandY));
-          drawSubLine(jx - halfW + 1, jy + bandY, jx + halfW - 1, jy + bandY, 1);
-        }
-        drawSubEllipseRing(jx, jy, 28, 6.2, -0.18, 2);
-        drawSubEllipseRing(jx, jy, 35, 8.0, -0.18, 4);
-
-        // 发现号深空飞船 (XD-1 Discovery One)：纯亚像素精细球形乘员舱 + 长桁架脊柱 + 尾部核热推进器尾焰
-        const shipPx = 76 + ((sec * 9.5) % 96);
-        const shipPy = 24 + Math.sin(sec * 1.4) * 1.8;
-        drawSubCircle(shipPx + 14, shipPy, 3.2, 5, false); // 前部球形乘员舱
-        drawSubLine(shipPx, shipPy, shipPx + 11, shipPy, 5); // 主桁架脊柱
-        drawSubLine(shipPx + 4, shipPy - 2, shipPx + 4, shipPy + 2, 2); // 中段天线阵
-        drawSubLine(shipPx - 5, shipPy - 1, shipPx, shipPy, 9); // 离子尾焰
-        drawSubLine(shipPx - 5, shipPy + 1, shipPx, shipPy, 2);
-
-        // TMA-1 黑石碑发射的同心亚像素球面谐波弧
-        for (let wIdx = 0; wIdx < 4; wIdx++) {
-          const rad = ((sec * 10 + wIdx * 7.5) % 30) + 4;
-          for (let a = -1.4; a <= 0.15; a += 0.08) {
-            setSubPixel(13 + Math.cos(a) * rad, 118 + Math.sin(a) * rad, 2);
+        // 《2001：太空漫游》：3D 湍流云带木星 + 大红斑气旋 + 旋转离心环发现号 XD-1 + 1:4:9 透视黑石碑 + HAL-9000 扫描扇区
+        lightCol = 40;
+        lightRow = 10;
+        const jx = 80;
+        const jy = 42;
+        const jR = 27.5;
+        // 3D 球面投影木星云带与大红斑
+        for (let dy = -Math.ceil(jR); dy <= Math.ceil(jR); dy++) {
+          for (let dx = -Math.ceil(jR); dx <= Math.ceil(jR); dx++) {
+            const d2 = dx * dx + dy * dy;
+            if (d2 > jR * jR) continue;
+            const nz = Math.sqrt(1 - d2 / (jR * jR));
+            const lon = Math.atan2(dx, nz * jR) + sec * 0.35;
+            const lat = dy / jR;
+            const band = Math.sin(lat * 16 + Math.sin(lon * 3) * 0.45);
+            // 大红斑气旋涡流
+            const grsDist = Math.hypot((dx - 7) / 6.5, (dy - 6) / 4.2);
+            if (grsDist < 1.0) {
+              setSubPixel(jx + dx, jy + dy, grsDist < 0.55 ? 9 : 1);
+            } else if (Math.abs( Math.sqrt(d2) - jR ) < 1.1) {
+              setSubPixel(jx + dx, jy + dy, 1);
+            } else if (band > 0.15 && (dx + dy) % 2 === 0) {
+              setSubPixel(jx + dx, jy + dy, lat > 0.25 ? 3 : 1);
+            }
           }
         }
+        drawSubEllipseRing(jx, jy, 56, 12.5, -0.18, 2);
+        drawSubEllipseRing(jx, jy, 70, 16.0, -0.18, 4);
+
+        // 发现号深空飞船 (XD-1 Discovery One) —— Chafa 2x2 像素级球形乘员舱 + 旋转离心机重力环 + 长桁架脊柱 + 核热尾焰
+        const shipQx = Math.round(152 + ((sec * 18) % 188));
+        const shipQy = Math.round(24 + Math.sin(sec * 1.4) * 3.5);
+        // 尾部核热推进器与双色离子尾焰
+        drawQuadLine(shipQx - 12, shipQy, shipQx - 2, shipQy, 9);
+        drawQuadLine(shipQx - 9, shipQy - 1, shipQx - 2, shipQy - 1, 2);
+        drawQuadLine(shipQx - 9, shipQy + 1, shipQx - 2, shipQy + 1, 2);
+        drawQuadRect(shipQx - 2, shipQy - 1, 4, 3, 4);
+        // 主桁架脊柱与核燃料荚舱
+        drawQuadLine(shipQx + 2, shipQy, shipQx + 24, shipQy, 5);
+        for (let pod = 4; pod <= 20; pod += 4) {
+          setQuadPixel(shipQx + pod, shipQy - 1, 4);
+          setQuadPixel(shipQx + pod, shipQy + 1, 12);
+        }
+        // 中段高增益通信天线与旋转离心机重力环 (Rotating Centrifuge)
+        const centH = Math.round(Math.abs(Math.sin(sec * 3.5)) * 4) + 1;
+        drawQuadLine(shipQx + 18, shipQy - centH, shipQx + 18, shipQy + centH, 2);
+        // 前部球形一号乘员舱与舷窗
+        for (let dy = -3; dy <= 3; dy++) {
+          for (let dx = -3; dx <= 3; dx++) {
+            if (dx * dx + dy * dy <= 11) {
+              setQuadPixel(shipQx + 28 + dx, shipQy + dy, dx > 0 && dy < 0 ? 5 : 8);
+            }
+          }
+        }
+        setQuadPixel(shipQx + 30, shipQy - 1, 9); // HAL 主控舱红光舷窗
+
+        // 第谷环形山 1:4:9 黑色方尖碑 (3D 透视屹立于山麓 + 球面谐波)
+        drawQuadRect(10, 110, 8, 24, 11);
+        drawQuadLine(10, 110, 10, 133, 5);
+        drawQuadLine(10, 110, 17, 110, 2);
+        for (let wIdx = 0; wIdx < 5; wIdx++) {
+          const rad = ((sec * 20 + wIdx * 14) % 62) + 8;
+          for (let a = -1.45; a <= 0.15; a += 0.05) {
+            setSubPixel(28 + Math.cos(a) * rad, 236 + Math.sin(a) * rad, 2);
+          }
+        }
+
+        // 右上角高分 HAL-9000 巨型红眼镜头与周期性红色扫描扇区
+        const halCx = 398;
+        const halCy = 26;
+        const isHalScanning = Math.sin(halAlertPhase) > 0.35 && themeSkillTimer <= 0;
+        drawSubCircle(halCx, halCy, 11, 4, false);
+        drawSubCircle(halCx, halCy, 7, 9, false);
+        drawSubCircle(halCx, halCy, 3.2, themeSkillTimer > 0 ? 2 : 9, true);
+        if (isHalScanning) {
+          drawSubLine(halCx, halCy, bCol * 2, (bGroundY - 3) * 4, 9);
+          drawSubLine(halCx, halCy, bCol * 2 - 12, (bGroundY - 1) * 4, 9);
+        }
+
+        // 1:4:9 星门引力走廊特技
+        if (themeSkillTimer > 0) {
+          const bxPx = bCol * 2;
+          const byPy = (bGroundY - 3) * 4;
+          for (let k = -3; k <= 3; k++) {
+            drawSubLine(jx + k * 9, jy, bxPx + k * 4, byPy, k === 0 ? 1 : 2);
+          }
+          for (let ring = 0; ring < 6; ring++) {
+            const u = (sec * 1.9 + ring * 0.16) % 1;
+            drawSubEllipseRing(
+              jx + (bxPx - jx) * u,
+              jy + (byPy - jy) * u,
+              8 + u * 16,
+              3 + u * 6,
+              -0.4,
+              ring % 2 === 0 ? 9 : 2,
+            );
+          }
+        }
+
+        activeHotspots.push(
+          {
+            id: 'celestial',
+            col: 26,
+            row: 3,
+            w: 28,
+            h: 15,
+            label: 'JUPITER // 3D木星与大红斑',
+            hint: '点击引爆 1:4:9 星门引力弹弓 (+65m)',
+          },
+          {
+            id: 'sky_anomaly',
+            col: 190,
+            row: 2,
+            w: 22,
+            h: 9,
+            label: 'HAL-9000 // 逻辑主脑红眼',
+            hint: '点击红眼镜头拔除 HAL 逻辑模块，消除重力扫描锁！',
+          },
+        );
       } else if (realm === 'paper') {
-        // 《银河帝国》：川陀带环双星系统 + 谢顿“第一辐光”三维双螺旋心理史学流形 + 亚像素帝国巡洋舰编队
-        drawSubCircle(38, 20, 8.8, 1, true);
-        drawSubEllipseRing(38, 20, 23, 5.4, -0.26, 3);
-        drawSubEllipseRing(38, 20, 29, 7.0, -0.26, 4);
+        // 《银河帝国：基地》：北斋版画朱砂红日/川陀星环 + 3D 洛伦兹/黎曼“第一辐光”流形 + 端点星全息谢顿穹顶
+        lightCol = 38;
+        lightRow = 10;
+        const tx = 76;
+        const ty = 40;
+        drawSubCircle(tx, ty, 19.5, 1, true);
+        drawSubEllipseRing(tx, ty, 48, 11.0, -0.26, 3);
+        drawSubEllipseRing(tx, ty, 60, 14.5, -0.26, 4);
 
-        // 第一辐光 (Prime Radiant) 亚像素相位流形与积分网格
-        for (let px = 68; px < 194; px++) {
-          const u = (px - 68) * 0.075;
-          const yA = 20 + Math.sin(u + sec * 2.0) * 8.2;
-          const yB = 20 + Math.cos(u * 0.85 - sec * 1.6) * 7.4;
+        // 第一辐光 (Prime Radiant) 3D 旋转心理史学相位流形
+        for (let px = 132; px < 396; px++) {
+          const u = (px - 132) * 0.042;
+          const amp = themeSkillTimer > 0 ? 24 : 17;
+          const yA = 42 + Math.sin(u + sec * 2.2) * amp + Math.cos(u * 2.3 - sec) * 4;
+          const yB = 42 + Math.cos(u * 0.85 - sec * 1.7) * (amp * 0.88);
           setSubPixel(px, yA, 3);
+          setSubPixel(px, yA + 1, 3);
           setSubPixel(px, yB, 1);
-          if (px % 7 === 0) {
-            drawSubLine(px, yA, px, yB, 4);
+          setSubPixel(px, yB - 1, 1);
+          if (px % 10 === 0) {
+            drawSubLine(px, yA, px, yB, themeSkillTimer > 0 ? 9 : 4);
           }
         }
 
-        // 亚像素银河基地巡洋舰双机编队
-        const fleetPx = 64 + ((sec * 11) % 104);
-        drawSubLine(fleetPx, 36, fleetPx + 9, 36, 1);
-        drawSubLine(fleetPx + 5, 34, fleetPx + 9, 36, 1);
-        drawSubLine(fleetPx + 5, 38, fleetPx + 9, 36, 1);
-        drawSubLine(fleetPx - 12, 41, fleetPx - 5, 41, 3);
-        drawSubLine(fleetPx - 8, 39, fleetPx - 5, 41, 3);
+        // 谢顿危机微分奇点靶标
+        const cPx = crisisCol * 2;
+        const cPy = 42 + Math.sin((cPx - 132) * 0.042 + sec * 2.2) * 17;
+        drawSubCircle(cPx, cPy, 9 + Math.sin(sec * 6) * 2.5, 9, false);
+        drawSubCircle(cPx, cPy, 4, 1, true);
+
+        if (themeSkillTimer > 0) {
+          drawSubLine(cPx, cPy, bCol * 2, (bGroundY - 3) * 4, 1);
+          drawSubCircle(bCol * 2, (bGroundY - 3) * 4, 22, 9, false);
+        }
+
+        // 端点星谢顿全息穹顶 (Seldon Vault) Chafa 2x2 像素建筑
+        for (let dy = 0; dy < 14; dy++) {
+          const halfW = Math.round(Math.sqrt(Math.max(0, 14 * 14 - (14 - dy) * (14 - dy))));
+          drawQuadLine(22 - halfW, 114 + dy, 22 + halfW, 114 + dy, dy < 3 ? 1 : 4);
+        }
+        drawQuadRect(10, 128, 25, 6, 5);
+
+        activeHotspots.push(
+          {
+            id: 'sky_anomaly',
+            col: crisisCol - 7,
+            row: Math.max(2, Math.round(cPy / 4) - 3),
+            w: 15,
+            h: 7,
+            label: 'SELDON CRISIS // 谢顿危机奇点',
+            hint: '点击用第一辐光配平心理史学方程，钤盖【基地纪元】朱砂官印！',
+          },
+          {
+            id: 'celestial',
+            col: 24,
+            row: 4,
+            w: 26,
+            h: 14,
+            label: 'TRANTOR // 川陀帝国星环',
+            hint: '点击调阅银河百科全书星图助推巨石',
+          },
+        );
       } else if (realm === 'crt') {
-        // 《黑客帝国》：锡安主机多层电磁脉冲云层 + 劈向山谷的分叉闪电树 + 亚像素尼布甲尼撒号气垫船
-        for (let px = 36; px < 196; px += 2) {
-          const py = 18 + Math.sin(px * 0.11 - sec * 5) * 4.5;
-          const py2 = 24 + Math.cos(px * 0.08 + sec * 3.8) * 3.5;
+        // 《黑客帝国》：锡安电磁风暴云 + 分叉闪电 + 6 触手 IK 机械乌贼哨兵 + 尼布甲尼撒号气垫船
+        lightCol = 112;
+        lightRow = 6;
+        for (let px = 64; px < 404; px += 2) {
+          const py = 32 + Math.sin(px * 0.06 - sec * 5) * 8.5;
+          const py2 = 44 + Math.cos(px * 0.045 + sec * 3.8) * 6.5;
           setSubPixel(px, py, 2);
           if (px % 4 === 0) setSubPixel(px, py2, 4);
         }
-        if (sec % 2.2 < 0.5) {
-          let lx = 112 + Math.sin(sec * 17) * 24;
-          let ly = 3;
-          for (let seg = 0; seg < 11; seg++) {
-            const nx = lx + Math.sin(seg * 3.7 + sec * 31) * 9;
-            const ny = ly + 6;
+        if (sec % 2.1 < 0.55 || themeSkillTimer > 0) {
+          let lx = 224 + Math.sin(sec * 17) * 52;
+          let ly = 4;
+          for (let seg = 0; seg < 14; seg++) {
+            const nx = lx + Math.sin(seg * 3.7 + sec * 31) * 16;
+            const ny = ly + 10;
             drawSubLine(lx, ly, nx, ny, 9);
-            if (seg === 3 || seg === 6) {
-              drawSubLine(lx, ly, lx - 15, ly + 12, 3);
+            if (seg === 4 || seg === 8) {
+              drawSubLine(lx, ly, lx - 28, ly + 22, 3);
             }
             lx = nx;
             ly = ny;
           }
         }
 
-        // 亚像素尼布甲尼撒号气垫船（椭圆船体 + 四组电磁反重力悬浮喷口）
-        const hovPx = 102 + Math.sin(sec * 1.3) * 26;
-        const hovPy = 32 + Math.cos(sec * 2.2) * 3.5;
-        drawSubEllipseRing(hovPx, hovPy, 9, 2.8, 0, 3);
-        drawSubLine(hovPx - 6, hovPy + 3, hovPx - 8, hovPy + 6, 2);
-        drawSubLine(hovPx + 6, hovPy + 3, hovPx + 8, hovPy + 6, 2);
-      } else {
-        // 《沙丘》：厄拉科斯精密亚像素新月双星 + 蜻蜓四翼高频振翅扑翼机 + 巨型沙虫夏胡鲁 + 沙槌地震波
-        drawSubCircle(32, 16, 10.2, 1, true, 4.4); // 穆阿迪布主弯月
-        drawSubCircle(62, 22, 5.2, 2, true, 2.5); // 弗雷曼手印伴月
-
-        // 厄拉科斯高空平行香料风沙流线
-        for (let wLine = 0; wLine < 4; wLine++) {
-          const wy0 = 14 + wLine * 11;
-          const wx0 = ((sec * 24 + wLine * 47) % 160) + 20;
-          drawSubLine(wx0, wy0, wx0 + 18, wy0 + 2, 4);
+        // 尼布甲尼撒号气垫船 (Nebuchadnezzar Hovercraft) Chafa 2x2 像素船体与反重力喷口
+        const hovQx = Math.round(196 + Math.sin(sec * 1.3) * 48);
+        const hovQy = Math.round(32 + Math.cos(sec * 2.2) * 5);
+        drawQuadRect(hovQx - 10, hovQy - 2, 20, 4, 4);
+        drawQuadRect(hovQx - 6, hovQy - 4, 12, 2, 5);
+        // 四组蓝光电磁反重力悬浮垫
+        for (const padOff of [-9, -3, 3, 8]) {
+          drawQuadRect(hovQx + padOff, hovQy + 2, 2, 2, 3);
+          drawSubLine((hovQx + padOff) * 1, (hovQy + 4) * 2, (hovQx + padOff - 2) * 1, (hovQy + 9) * 2, 2);
         }
 
-        // 阿崔迪蜻蜓扑翼机 (Atreides Ornithopter)：100% 在 224x128 亚像素层绘制机身、驾驶舱、修长尾翼与四片高频连续扇动机翼（彻底消除 ASCII 字符宽度跳变！）
-        const thopPx = 68 + ((sec * 13.5) % 112);
-        const thopPy = 24 + Math.sin(sec * 2.8) * 3.2;
-        const wingAngle = Math.sin(sec * 22) * 6.5;
-        const wingAngle2 = Math.cos(sec * 22) * 5.2;
-        // 机身与尾梁
-        drawSubLine(thopPx - 8, thopPy, thopPx + 7, thopPy, 1);
-        drawSubLine(thopPx - 8, thopPy, thopPx - 11, thopPy - 3, 1);
-        drawSubCircle(thopPx + 5, thopPy, 1.8, 9, true); // 驾驶舱高光
-        // 前后两对蜻蜓扑翼（连续平滑正弦角度扇动）
-        drawSubLine(thopPx + 2, thopPy, thopPx - 5, thopPy - 2 + wingAngle, 1);
-        drawSubLine(thopPx + 2, thopPy, thopPx + 11, thopPy - 2 - wingAngle, 1);
-        drawSubLine(thopPx - 1, thopPy, thopPx - 7, thopPy + 1 + wingAngle2, 2);
-        drawSubLine(thopPx - 1, thopPy, thopPx + 8, thopPy + 1 - wingAngle2, 2);
+        // 6 触手逆向动力学 (IK Sinusoidal) 机械乌贼哨兵 (Sentinel Squid)
+        const sentPx = sentinelX * 2;
+        const sentPy = sentinelY * 4;
+        const sentQx = Math.round(sentinelX);
+        const sentQy = Math.round(sentinelY * 0.5);
+        // 乌贼装甲头部与复眼阵列
+        drawQuadRect(sentQx - 3, sentQy - 2, 7, 5, sentinelStunTimer > 0 ? 4 : 12);
+        setQuadPixel(sentQx + 2, sentQy - 1, sentinelStunTimer > 0 ? 3 : 9);
+        setQuadPixel(sentQx + 3, sentQy, sentinelStunTimer > 0 ? 3 : 9);
+        setQuadPixel(sentQx + 2, sentQy + 1, sentinelStunTimer > 0 ? 3 : 9);
 
-        // 巨型沙虫夏胡鲁 (Shai-Hulud) 224x128 亚像素厚重拱起躯干与体节环纹
-        const wormPhase = sec * 3.6;
-        for (let wx = 34; wx < 138; wx++) {
-          const arch = Math.sin((wx - 34) * 0.1 - wormPhase) * 11.5;
-          const groundPy = terrainY(wx * 0.5) * 4;
-          const wy = groundPy - 4 - arch;
-          if (wy < groundPy - 2) {
-            for (let thick = 0; thick < 6; thick++) {
-              const isRing = wx % 4 === 0 && thick > 0;
-              setSubPixel(wx, wy + thick, thick === 0 ? 1 : isRing ? 9 : 4);
+        if (sentinelStunTimer <= 0) {
+          // 6 条多关节正弦摆动触手
+          for (let t = 0; t < 6; t++) {
+            let tx0 = sentPx - 6;
+            let ty0 = sentPy - 10 + t * 4;
+            for (let j = 1; j <= 4; j++) {
+              const wave = Math.sin(sec * 11 - j * 0.9 + t * 0.8) * (4 + j * 1.5);
+              const tx1 = tx0 - 8;
+              const ty1 = ty0 + (t - 2.5) * 1.4 + wave;
+              drawSubLine(tx0, ty0, tx1, ty1, t % 2 === 0 ? 9 : 4);
+              tx0 = tx1;
+              ty0 = ty1;
             }
+          }
+          // 哨兵红色锁定激光束
+          if (Math.sin(sec * 2.5) > 0.25) {
+            drawSubLine(sentPx + 6, sentPy, bCol * 2, (bGroundY - 3) * 4, 9);
           }
         }
 
+        // EMP 特技双环电磁冲击波
+        if (themeSkillTimer > 0) {
+          const empR = (4.0 - themeSkillTimer) * 105;
+          drawSubCircle(bCol * 2, (bGroundY - 3) * 4, empR, 3, false);
+          drawSubCircle(bCol * 2, (bGroundY - 3) * 4, empR * 0.65, 2, false);
+        }
+
+        activeHotspots.push(
+          {
+            id: 'sky_anomaly',
+            col: Math.round(sentinelX) - 10,
+            row: Math.round(sentinelY) - 4,
+            w: 18,
+            h: 9,
+            label: 'SENTINEL // 6触手IK机械乌贼',
+            hint: '点击引爆尼布甲尼撒号 EMP 瘫痪乌贼，令巨石进入 0x00 线框减重态！',
+          },
+          {
+            id: 'celestial',
+            col: Math.round(hovQx / 2) - 8,
+            row: Math.round(hovQy / 2) - 3,
+            w: 16,
+            h: 7,
+            label: 'NEBUCHADNEZZAR // 锡安气垫船',
+            hint: '点击请求 Operator 载入母体重力覆写程序',
+          },
+        );
+      } else {
+        // 《沙丘》：穆阿迪布双弯月 + 阿崔迪四翼扑翼机 + 环形晶齿巨型沙虫夏胡鲁破沙
+        lightCol = 32;
+        lightRow = 8;
+        drawSubCircle(64, 32, 21.0, 1, true, 8.8);
+        drawSubCircle(124, 44, 11.0, 2, true, 5.2);
+
+        for (let wLine = 0; wLine < 7; wLine++) {
+          const wy0 = 24 + wLine * 16;
+          const wx0 = ((sec * 52 + wLine * 83) % 330) + 32;
+          drawSubLine(wx0, wy0, wx0 + 38, wy0 + 4, 4);
+        }
+
+        // 高分阿崔迪蜻蜓扑翼机 (Atreides Ornithopter) Chafa 机身 + 4 翼高频残影
+        const thopPx = 136 + ((sec * 27) % 224);
+        const thopPy = 48 + Math.sin(sec * 2.8) * 6.5;
+        const thopQx = Math.round(thopPx * 0.5);
+        const thopQy = Math.round(thopPy * 0.5);
+        drawQuadRect(thopQx - 4, thopQy, 9, 2, 1);
+        setQuadPixel(thopQx + 4, thopQy, 9); // 驾驶舱高光
+        drawQuadLine(thopQx - 4, thopQy, thopQx - 9, thopQy - 2, 5); // 修长尾梁
+        const wingA = Math.sin(sec * 26) * 13;
+        const wingB = Math.cos(sec * 26) * 11;
+        drawSubLine(thopPx + 4, thopPy, thopPx - 12, thopPy - 4 + wingA, 1);
+        drawSubLine(thopPx + 4, thopPy, thopPx + 22, thopPy - 4 - wingA, 1);
+        drawSubLine(thopPx - 2, thopPy, thopPx - 16, thopPy + 2 + wingB, 2);
+        drawSubLine(thopPx - 2, thopPy, thopPx + 18, thopPy + 2 - wingB, 2);
+
+        // 巨型沙虫夏胡鲁 (Shai-Hulud)：Chafa 双色体节鳞片 + 环形晶齿巨口破沙！
+        const wormPhase = sec * (themeSkillTimer > 0 ? 7.5 : 3.8);
+        const wormStartQx = themeSkillTimer > 0 ? Math.max(36, Math.round(bCol) - 44) : 54;
+        const wormEndQx = themeSkillTimer > 0 ? Math.min(206, Math.round(bCol) + 28) : 148;
+        const wormAmp = themeSkillTimer > 0 ? 15.0 : 10.5;
+
+        for (let qx = wormStartQx; qx < wormEndQx; qx++) {
+          const arch = Math.sin((qx - wormStartQx) * 0.11 - wormPhase) * wormAmp;
+          const groundQy = terrainY(qx) * 2;
+          const wy = Math.round(groundQy - 3 - arch);
+          if (wy < groundQy - 1) {
+            const thick = themeSkillTimer > 0 ? 9 : 6;
+            for (let dy = 0; dy < thick && wy + dy < groundQy; dy++) {
+              const isRing = qx % 3 === 0;
+              const colId = dy === 0 ? 1 : isRing ? 9 : dy > thick - 3 ? 11 : 4;
+              setQuadPixel(qx, wy + dy, colId);
+            }
+          }
+        }
+        // 沙虫前端环形晶齿巨口 (Crystalline Maw)
+        const mawPx = wormEndQx * 2;
+        const mawPy = (terrainY(wormEndQx) - 5) * 4;
+        drawSubCircle(mawPx, mawPy, themeSkillTimer > 0 ? 12 : 8, 9, false);
+        drawSubCircle(mawPx, mawPy, themeSkillTimer > 0 ? 6 : 4, 1, false);
+
         // 塔布尔穴地沙槌同心地震波
-        const thumpR = ((sec * 13) % 26) + 2;
-        drawSubEllipseRing(12, 128, thumpR * 1.5, thumpR * 0.48, 0, 2);
+        const thumpR = ((sec * 28) % 54) + 4;
+        drawSubEllipseRing(24, 256, thumpR * 1.6, thumpR * 0.5, 0, 2);
+
+        activeHotspots.push(
+          {
+            id: 'sky_anomaly',
+            col: 6,
+            row: 57,
+            w: 14,
+            h: 10,
+            label: 'THUMPER // 弗雷曼沙槌',
+            hint: '点击敲击沙槌并抛出沙钩，驾驭巨型沙虫夏胡鲁破沙冲顶！',
+          },
+          {
+            id: 'celestial',
+            col: Math.round(thopPx / 2) - 8,
+            row: Math.round(thopPy / 4) - 4,
+            w: 18,
+            h: 8,
+            label: 'ORNITHOPTER // 阿崔迪四翼扑翼机',
+            hint: '点击投下香料矿脉高能助推信标',
+          },
+        );
       }
 
-      // 将所有亚像素火花/流星/香料粒子光栅化至 224x128 盲文缓冲区
+      // 光栅化亚像素火花与天象集束流
       for (const sp of subParticles) {
         setSubPixel(sp.x, sp.y, sp.cls);
         setSubPixel(sp.x - sp.vx * 0.018, sp.y - sp.vy * 0.018, sp.cls);
       }
 
-      // 点击画布触发的 224x128 亚像素高能天象集束流
       if (skyStrikeTimer > 0) {
-        const bTargetPx = progToCol(boulderProg) * 2;
-        const bTargetPy = (terrainY(progToCol(boulderProg)) - 2) * 4;
-        drawSubLine(skyStrikeCol * 2, 2, bTargetPx, bTargetPy, 9);
-        drawSubLine(skyStrikeCol * 2 + 2, 2, bTargetPx - 1, bTargetPy, 2);
-        drawSubCircle(bTargetPx, bTargetPy, (0.6 - skyStrikeTimer) * 22, 9, false);
+        const bTargetPx = bCol * 2;
+        const bTargetPy = (bGroundY - 3) * 4;
+        drawSubLine(skyStrikeCol * 2, 4, bTargetPx, bTargetPy, 9);
+        drawSubLine(skyStrikeCol * 2 + 3, 4, bTargetPx - 2, bTargetPy, 2);
+        drawSubCircle(bTargetPx, bTargetPy, (0.65 - skyStrikeTimer) * 46, 9, false);
       }
 
-      // 将 224x128 盲文缓冲区合成为 112x32 的 Unicode 盲文字符 (U+2800..U+28FF)
-      for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-          const mask = brailleMask[r][c];
-          if (mask !== 0) {
-            chars[r][c] = String.fromCharCode(0x2800 | mask);
-            cls[r][c] = brailleCls[r][c] || 2;
+      if (undergroundPulseTimer > 0) {
+        const bTargetPx = bCol * 2;
+        const bTargetPy = bGroundY * 4;
+        for (let k = -2; k <= 2; k++) {
+          drawSubLine(310 + k * 12, 240, bTargetPx + k * 3, bTargetPy, k === 0 ? 2 : 9, true);
+        }
+      }
+
+      // ================= LAYER 3: rot.js 实时天体光线投射阴影 + 山体多层地质噪声光栅化 =================
+      // 计算从主天体 (lightCol, lightRow) 投向山脊的实时阴影包络线
+      for (let c = 0; c < COLS; c++) {
+        rayShadowCol[c] = -1;
+      }
+      for (let c = 0; c < COLS; c++) {
+        const ridgeR = terrainY(c);
+        const dx = c - lightCol;
+        const dy = ridgeR - lightRow;
+        const dist = Math.abs(dx);
+        if (dist < 1) continue;
+        const stepDir = dx >= 0 ? 1 : -1;
+        const slopeRay = dy / dist;
+        for (let step = 1; step <= 38; step++) {
+          const tc = c + step * stepDir;
+          if (tc < 0 || tc >= COLS) break;
+          const rayY = ridgeR + step * Math.max(0.18, slopeRay * 0.45);
+          if (rayY > terrainY(tc)) {
+            rayShadowCol[tc] = Math.max(rayShadowCol[tc], rayY);
           }
         }
       }
 
-      // ================= 2. 四大科幻原著标志性地面建筑与天体核心标记（全部使用纯 ASCII 字符，零宽度漂移） =================
-      if (realm === 'void') {
-        put(5, 20, 'o', 9); // 木星大红斑核心
-        const m1x = Math.round(20 + Math.cos(sec * 0.9) * 14);
-        const m2x = Math.round(20 + Math.sin(sec * 0.55) * 17);
-        put(5, m1x, '*', 2);
-        put(4, m2x, '+', 3);
+      // 绘制山体地质断面与受光/背光抖动层
+      const treadShift = Math.floor(continuousRoll * 3.5);
+      for (let c = 0; c < COLS; c++) {
+        const yExact = terrainY(c);
+        const sr = Math.round(yExact);
+        const nextY = terrainY(Math.min(COLS - 1, c + 1));
+        const diff = nextY - yExact;
+        const inBoulderShadow = c < bCol && c >= bCol - 18;
 
-        const halPulse = Math.floor(sec * 2) % 2 === 0 ? '(o)' : '(O)';
-        putStr(0, 96, '[HAL:9000 ', 10);
-        putStr(0, 106, halPulse, 9);
-        put(0, 109, ']', 10);
+        let ridgeChar = '═';
+        if (c >= 198) ridgeChar = '═';
+        else if (diff < -0.22) ridgeChar = '/';
+        else if (diff < -0.04) ridgeChar = '~';
+        else if (diff > 0.08) ridgeChar = '\\';
+        else ridgeChar = '─';
 
-        // 第谷环形山 TMA-1 1:4:9 黑色方尖碑
-        for (let r = 28; r <= 33; r++) {
-          putStr(r, 4, '###', 5);
+        if (sr >= 0 && sr < ROWS) {
+          put(sr, c, ridgeChar, inBoulderShadow ? 4 : 5, inBoulderShadow ? 11 : 12);
         }
-      } else if (realm === 'paper') {
-        put(5, 19, 'O', 1);
-        putStr(0, 85, '[PRIME_RADIANT // SELDON]', 1);
 
-        // 端点星谢顿全息穹顶 (Seldon Vault)
-        putStr(30, 2, ' .===. ', 4);
-        putStr(31, 2, '/| | |\\', 4);
-        putStr(32, 2, '|| | ||', 4);
-        putStr(33, 2, '=======', 4);
+        for (let r = sr + 1; r < ROWS; r++) {
+          const depth = r - sr;
+          const isRayShadowed = r <= rayShadowCol[c] || inBoulderShadow;
+          const nVal = valueNoise2D(c * 0.08, r * 0.14 + (realm === 'amber' ? sec * 0.4 : 0));
+          const bayer = BAYER_8X8[r & 7][c & 7];
+
+          let fill = ':';
+          let fgId = isRayShadowed ? 4 : 6;
+          let bgId = depth <= 2 ? 12 : depth <= 7 ? 11 : 0;
+
+          if (realm === 'crt') {
+            const pulseWave = Math.abs(((c - Math.floor(sec * 28)) % 44 + 44) % 44) < 3;
+            fill =
+              depth === 1
+                ? (c + r + treadShift) % 2 === 0
+                  ? '1'
+                  : '0'
+                : depth <= 4
+                  ? (c + depth) % 5 === 0
+                    ? '╬'
+                    : '▒'
+                  : nVal + bayer * 0.35 > 0.62
+                    ? '▓'
+                    : '·';
+            if (pulseWave && depth <= 4) {
+              fgId = 3;
+              bgId = 15;
+            }
+          } else if (realm === 'paper') {
+            // 北斋《赤富士》木版画刀刻等高线与皴法
+            const contourBand = Math.abs(Math.sin(depth * 0.55 + nVal * 3.2)) < 0.22;
+            fill =
+              depth === 1
+                ? '/'
+                : contourBand
+                  ? diff < 0
+                    ? '╱'
+                    : '─'
+                  : depth <= 5
+                    ? '▒'
+                    : '░';
+            if (contourBand && !isRayShadowed) fgId = 1;
+          } else if (realm === 'amber') {
+            // Simplex 实时流动沙丘风成波纹
+            const ripple = Math.sin(c * 0.22 + r * 0.45 - sec * 3.2 + nVal * 4.0);
+            fill =
+              depth === 1
+                ? '~'
+                : ripple > 0.45
+                  ? '≈'
+                  : depth <= 5
+                    ? '▒'
+                    : (c + r) % 9 === 0
+                      ? '◈'
+                      : '░';
+            if (ripple > 0.55 && depth <= 5 && !isRayShadowed) fgId = 1;
+          } else {
+            const harmonic = (c * 2 + r + Math.floor(sec * 6)) % 23 === 0;
+            fill =
+              depth === 1
+                ? '▀'
+                : nVal + (1 - depth / 48) * 0.4 > bayer
+                  ? depth <= 5
+                    ? '▓'
+                    : '▒'
+                  : '·';
+            if (harmonic) fgId = 2;
+          }
+          put(r, c, fill, fgId, bgId);
+        }
+      }
+
+      // ================= LAYER 4: 真·3D 法线球面/多面体光照巨石 (Chafa 2x2 + Sobel 轮廓) =================
+      // 巨石半径: 在 448x144 Chafa 象限坐标系中为 rx=11, ry=8 (对应 11列 x 8行 字符格的高分立体球体)
+      const bCenterQx = bCol * 2;
+      const bCenterQy = (bGroundY - 3.9) * 2;
+      const bRx = 10.5;
+      const bRy = 7.8;
+
+      // 归一化三维光源方向向量 (指向当前主题的主天体)
+      const lDx = lightCol - bCol;
+      const lDy = (lightRow - (bGroundY - 4)) * 1.6;
+      const lDz = 65;
+      const lLen = Math.hypot(lDx, lDy, lDz) || 1;
+      const Lx = lDx / lLen;
+      const Ly = lDy / lLen;
+      const Lz = lDz / lLen;
+
+      const rollRad = continuousRoll * 0.85;
+      const cosR = Math.cos(rollRad);
+      const sinR = Math.sin(rollRad);
+      const isWireframeMatrix = realm === 'crt' && themeSkillTimer > 0;
+
+      for (let dy = -Math.ceil(bRy); dy <= Math.ceil(bRy); dy++) {
+        for (let dx = -Math.ceil(bRx); dx <= Math.ceil(bRx); dx++) {
+          const nx = dx / bRx;
+          const ny = dy / bRy;
+          const r2 = nx * nx + ny * ny;
+          if (r2 > 1.0) continue;
+
+          const nz = Math.sqrt(Math.max(0, 1.0 - r2));
+          // 绕 Z 轴与 X 轴三维滚动旋转后的球面局部纹理坐标 (u, v, w)
+          const u = nx * cosR - ny * sinR;
+          const v = nx * sinR + ny * cosR;
+          const w = nz;
+
+          // Lambertian 漫反射 + Blinn-Phong 高光
+          const ndotl = Math.max(0, nx * Lx + ny * Ly + nz * Lz);
+          const spec = Math.pow(Math.max(0, nx * Lx * 0.5 + ny * Ly * 0.5 + nz * 0.86), 8);
+          let lum = ndotl * 0.82 + spec * 0.45;
+
+          // 四大文艺作品各自的 3D 巨石表面几何雕刻
+          let facetColor = 0;
+          if (realm === 'void') {
+            // 1:4:9 黑石碑晶体测地线凹槽
+            const isMonolithSlab = Math.abs(u) < 0.22 && Math.abs(v) < 0.68;
+            const isMeridian = Math.abs(Math.abs(u) - 0.55) < 0.1 || Math.abs(v) < 0.09;
+            if (isMonolithSlab) {
+              facetColor = themeSkillTimer > 0 ? 2 : 11;
+            } else if (isMeridian) {
+              facetColor = 2;
+            }
+          } else if (realm === 'paper') {
+            // 第一辐光三维正交浑天仪黄铜星环
+            const onRing =
+              Math.abs(u) < 0.15 || Math.abs(v) < 0.15 || Math.abs(u * u + v * v - 0.48) < 0.11;
+            if (onRing) facetColor = themeSkillTimer > 0 ? 9 : 1;
+          } else if (realm === 'crt') {
+            // 锡安十六进制矩阵魔方网格
+            const gridLine =
+              Math.abs((u * 4) - Math.round(u * 4)) < 0.16 ||
+              Math.abs((v * 4) - Math.round(v * 4)) < 0.16;
+            if (isWireframeMatrix) {
+              if (!gridLine && r2 < 0.82) continue; // 0x00 NO BOULDER 透明线框态！
+              facetColor = 2;
+            } else if (gridLine) {
+              facetColor = 2;
+            }
+          } else {
+            // 沙丘风蚀陨石坑与发光香料晶脉
+            const spiceVein = Math.abs(Math.sin(u * 7 + v * 5)) < 0.16;
+            if (spiceVein) facetColor = 9;
+          }
+
+          const qx = Math.round(bCenterQx + dx);
+          const qy = Math.round(bCenterQy + dy);
+          const bayer = BAYER_8X8[qy & 7][qx & 7];
+
+          let finalColor = 8;
+          if (facetColor !== 0) {
+            finalColor = facetColor;
+          } else if (lum > 0.78) {
+            finalColor = 1; // 镜面高光
+          } else if (lum > 0.42 + (bayer - 0.5) * 0.22) {
+            finalColor = 8; // 受光半球
+          } else if (lum > 0.18 + (bayer - 0.5) * 0.18) {
+            finalColor = 13; // 明暗交界线 (Terminator)
+          } else {
+            finalColor = 11; // 背光本影半球
+          }
+
+          setQuadPixel(qx, qy, finalColor);
+        }
+      }
+
+      // ================= LAYER 5: 16x22 亚像素骨骼动画西西弗斯 (Chafa 2x2 双色像素角色) =================
+      const localGrade = getTerrainGrade(bCol);
+      const sCenterCol =
+        phase === 'CLIMB' ? Math.max(4, bCol - 8.2) : sCol;
+      const sFootGroundY = terrainY(sCenterCol);
+      const sGroundY =
+        phase === 'CLIMB'
+          ? Math.max(bGroundY + 0.5, Math.min(bGroundY + 2.5, sFootGroundY))
+          : sFootGroundY;
+
+      const footQx = Math.round(sCenterCol * 2);
+      const footQy = Math.round(sGroundY * 2);
+      const isSweetSpot = Math.abs(cadenceClock - 0.5) <= 0.16;
+      const isBoosted = boostVelocity > 0.02 || sprintToSummit || themeSkillTimer > 0;
+
+      // 渲染像素骨骼小人的函数 (支持黑客帝国子弹时间残影重绘)
+      const drawArticulatedSisyphus = (
+        baseQx: number,
+        baseQy: number,
+        cPrimary: number,
+        cSecondary: number,
+        cAccent: number,
+      ) => {
+        const stride = continuousStep * Math.PI;
+        const leanX =
+          phase === 'CLIMB'
+            ? localGrade > 0.34
+              ? 4
+              : 2
+            : phase === 'DESCENT_WALK'
+              ? -1
+              : 0;
+        const heavePush =
+          phase === 'CLIMB' ? Math.round(Math.sin(cadenceClock * Math.PI * 2) * 1.5) : 0;
+
+        // 骨盆与肩部关节坐标
+        const hipX = baseQx + leanX * 0.4;
+        const hipY = baseQy - 7;
+        const shX = baseQx + leanX + heavePush;
+        const shY = baseQy - 13 + (localGrade > 0.34 && phase === 'CLIMB' ? 1 : 0);
+
+        // 1. 后腿与前腿 (大腿 -> 膝盖 -> 小腿 -> 战靴)
+        const legA = Math.sin(stride) * 3.2;
+        const legB = Math.sin(stride + Math.PI) * 3.2;
+        // 后腿 (暗色)
+        const kneeBackX = hipX - 1 + legB * 0.5;
+        const kneeBackY = hipY + 3.5;
+        const footBackX = baseQx - 2 + legB;
+        drawQuadLine(hipX, hipY, kneeBackX, kneeBackY, cSecondary, 2);
+        drawQuadLine(kneeBackX, kneeBackY, footBackX, baseQy, cSecondary, 1);
+        // 前腿 (亮色)
+        const kneeFrontX = hipX + 2 + legA * 0.6;
+        const kneeFrontY = hipY + 3.5;
+        const footFrontX = baseQx + 1 + legA;
+        drawQuadLine(hipX, hipY, kneeFrontX, kneeFrontY, cPrimary, 2);
+        drawQuadLine(kneeFrontX, kneeFrontY, footFrontX, baseQy, cPrimary, 2);
+        setQuadPixel(footFrontX + 1, baseQy, cAccent);
+
+        // 2. 主题专属披风 / 宇航服背包 (随山风与推进速度飘动)
+        if (realm === 'void') {
+          // 宇航员 PLSS 生命维持背包与姿态推进器喷焰
+          drawQuadRect(shX - 4, shY, 3, 5, 5);
+          setQuadPixel(shX - 4, shY + 1, 9);
+          if (isBoosted || isSweetSpot) {
+            drawQuadLine(shX - 5, shY + 3, shX - 9, shY + 5, 2);
+            drawQuadLine(shX - 5, shY + 4, shX - 8, shY + 6, 9);
+          }
+        } else {
+          // 学者长袍 / 尼奥黑风衣 / 弗雷曼沙漠披风 (6 节流体波动)
+          const cloakLen = realm === 'crt' ? 8 : 9;
+          for (let seg = 1; seg <= cloakLen; seg++) {
+            const wave = Math.sin(sec * 9 - seg * 0.7) * (1.2 + seg * 0.25);
+            const cx = shX - 2 - seg * 1.1;
+            const cy = shY + 1 + seg * 0.65 + wave;
+            setQuadPixel(cx, cy, seg % 2 === 0 ? cSecondary : cAccent);
+            setQuadPixel(cx, cy + 1, cSecondary);
+          }
+        }
+
+        // 3. 躯干脊柱与胸甲
+        drawQuadLine(hipX, hipY, shX, shY, cPrimary, 2);
+        drawQuadLine(hipX - 1, hipY, shX - 1, shY + 1, cSecondary, 1);
+
+        // 4. 双臂 (上臂 -> 肘关节 -> 前臂 -> 抵住 3D 巨石的手掌)
+        if (phase === 'CLIMB') {
+          const handX = Math.round(bCenterQx - bRx + 1);
+          const handY = Math.round(bCenterQy + 1);
+          const elbowY = shY + (isSweetSpot ? 1 : 3);
+          const elbowX = (shX + handX) * 0.5 - 1;
+          // 后臂
+          drawQuadLine(shX, shY + 1, elbowX, elbowY + 1, cSecondary, 1);
+          drawQuadLine(elbowX, elbowY + 1, handX, handY + 1, cSecondary, 1);
+          // 前臂
+          drawQuadLine(shX + 1, shY, elbowX + 1, elbowY, cPrimary, 2);
+          drawQuadLine(elbowX + 1, elbowY, handX, handY, cPrimary, 2);
+          setQuadPixel(handX, handY, isSweetSpot ? 9 : cAccent);
+        } else if (phase === 'SUMMIT_BREATH' && phaseElapsed < 1.3) {
+          // 登顶振臂高呼
+          drawQuadLine(shX, shY, shX - 3, shY - 5, cPrimary, 1);
+          drawQuadLine(shX + 1, shY, shX + 4, shY - 5, cPrimary, 1);
+        } else {
+          // 下山自然摆臂
+          const armSwing = Math.sin(stride) * 3;
+          drawQuadLine(shX, shY, shX + armSwing, shY + 5, cPrimary, 2);
+        }
+
+        // 5. 头部与四大主题特征头饰 (4x4 象限像素)
+        const headX = shX + (phase === 'CLIMB' ? 1 : 0);
+        const headY = shY - 4;
+        drawQuadRect(headX - 1, headY, 4, 4, cPrimary);
+        if (realm === 'void') {
+          // 宇航员透明发光球形面罩
+          drawQuadRect(headX + 1, headY + 1, 2, 2, 2);
+          setQuadPixel(headX + 2, headY + 1, 1);
+        } else if (realm === 'paper') {
+          // 银河百科学者冠冕
+          drawQuadLine(headX - 1, headY - 1, headX + 2, headY - 1, 1);
+          setQuadPixel(headX + 2, headY + 1, 10);
+        } else if (realm === 'crt') {
+          // 黑客帝国墨镜 Visor
+          drawQuadLine(headX, headY + 1, headX + 3, headY + 1, 2);
+        } else {
+          // 沙丘弗雷曼蒸馏服与蓝中之蓝眼睛 (Eyes of Ibad)
+          drawQuadLine(headX - 2, headY, headX + 2, headY, 1);
+          setQuadPixel(headX + 2, headY + 1, 2);
+          setQuadPixel(headX + 2, headY + 2, 14);
+        }
+      };
+
+      // 黑客帝国子弹时间特技：绘制 2 道青绿残影分身
+      if (themeSkillTimer > 0 && realm === 'crt' && phase === 'CLIMB') {
+        drawArticulatedSisyphus(footQx - 12, footQy + 3, 14, 11, 2);
+        drawArticulatedSisyphus(footQx - 6, footQy + 1, 2, 14, 3);
+      }
+
+      // 绘制主西西弗斯骨骼角色
+      drawArticulatedSisyphus(
+        footQx,
+        footQy,
+        critFlashTimer > 0 ? 1 : 7,
+        14,
+        realm === 'void' ? 2 : realm === 'paper' ? 1 : realm === 'crt' ? 3 : 9,
+      );
+
+      activeHotspots.unshift({
+        id: 'boulder',
+        col: Math.max(0, Math.round(sCenterCol) - 4),
+        row: Math.max(0, Math.round(bGroundY) - 10),
+        w: 22,
+        h: 12,
+        label: '3D BOULDER & SISYPHUS',
+        hint: '卡准下方 CADENCE 节拍槽点击（或按 Space），触发 2.2x 完美发力暴击！',
+      });
+
+      // ================= LAYER 6: Chafa 2x2 双色象限缓冲与 2x4 盲文缓冲合成为 224x72 字符格 =================
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const idx = r * COLS + c;
+
+          // A. 先合成天空/远山的 2x4 盲文微点阵
+          const bMask = brailleMask[idx];
+          if (bMask !== 0 && cellChar[r][c] === ' ') {
+            cellChar[r][c] = String.fromCharCode(0x2800 | bMask);
+            cellFg[idx] = brailleCls[idx] || 2;
+          }
+
+          // B. 再执行 Chafa 2x2 双色象限块量化 (覆盖前景角色、3D 巨石、飞船、乌贼与沙虫)
+          const qy0 = r * 2;
+          const qx0 = c * 2;
+          const tl = quadBuf[qy0 * QUAD_W + qx0];
+          const tr = quadBuf[qy0 * QUAD_W + qx0 + 1];
+          const bl = quadBuf[(qy0 + 1) * QUAD_W + qx0];
+          const br = quadBuf[(qy0 + 1) * QUAD_W + qx0 + 1];
+
+          if (tl !== 0 || tr !== 0 || bl !== 0 || br !== 0) {
+            // 统计 2x2 象限内出现频率最高的前景色 fg 与次高频背景色 bg
+            const samples = [tl, tr, bl, br];
+            let fgColor = 0;
+            let maxCnt = 0;
+            for (let i = 0; i < 4; i++) {
+              const col = samples[i];
+              if (col === 0) continue;
+              let cnt = 0;
+              for (let j = 0; j < 4; j++) {
+                if (samples[j] === col) cnt++;
+              }
+              if (cnt > maxCnt) {
+                maxCnt = cnt;
+                fgColor = col;
+              }
+            }
+
+            let bgColor = cellBg[idx];
+            for (let i = 0; i < 4; i++) {
+              const col = samples[i];
+              if (col !== 0 && col !== fgColor) {
+                bgColor = col;
+                break;
+              }
+            }
+
+            let mask = 0;
+            if (tl === fgColor) mask |= 1;
+            if (tr === fgColor) mask |= 2;
+            if (bl === fgColor) mask |= 4;
+            if (br === fgColor) mask |= 8;
+
+            cellChar[r][c] = QUAD_CHARS[mask];
+            cellFg[idx] = fgColor;
+            if (bgColor !== 0) {
+              cellBg[idx] = bgColor;
+            }
+          }
+        }
+      }
+
+      // ================= LAYER 7: 锐利 ASCII 轮廓叠加层 (Sobel Edge / 建筑 / 代码雨 / 地下奇观室) =================
+      // 3D 巨石中心与发力火花字符点缀
+      const bRowI = Math.round(bGroundY - 3.9);
+      const bColI = Math.round(bCol);
+      if (isSweetSpot && phase === 'CLIMB') {
+        put(bRowI - 4, bColI, '✦', 9);
+        put(bRowI, bColI - 6, '⚡', 9);
+      }
+      if (realm === 'void') {
+        putStr(bRowI, bColI - 2, '1:4:9', themeSkillTimer > 0 ? 1 : 2, false, 11);
+      } else if (realm === 'paper') {
+        put(bRowI, bColI, 'Ψ', 1, 13);
       } else if (realm === 'crt') {
-        const rainChars = ['0', '1', ':', '|', '+', '#', '7', '9'];
+        putStr(bRowI, bColI - 1, themeSkillTimer > 0 ? '0x0' : '101', 2, false, 11);
+      } else {
+        put(bRowI, bColI, '◈', 9, 13);
+      }
+
+      // 主题专属高分 ASCII 地面与天象叠层
+      if (realm === 'void') {
+        const isHalLocked = Math.sin(halAlertPhase) > 0.35 && themeSkillTimer <= 0;
+        putStr(1, 188, '╔══[HAL:9000 // LOGIC_CORE]══╗', 10);
+        putStr(
+          2,
+          188,
+          isHalLocked ? '║ STATUS: GRAVITY_LOCK (O)   ║' : '║ STATUS: EVA_NOMINAL  (o)   ║',
+          isHalLocked ? 9 : 2,
+        );
+        putStr(3, 188, '╚════════════════════════════╝', 10);
+      } else if (realm === 'paper') {
+        putStr(1, 182, '┏━━〘 PRIME_RADIANT // SELDON 〙━━┓', 1);
+        putStr(2, 182, '┃ ∂Ψ/∂t = ∫ Ω(S)dS · PLAN:99.8%  ┃', 3);
+        putStr(3, 182, '┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛', 1);
+
+        const cPy = 42 + Math.sin((crisisCol * 2 - 132) * 0.042 + sec * 2.2) * 17;
+        const cRow = Math.max(3, Math.min(28, Math.round(cPy / 4)));
+        putStr(cRow, crisisCol - 5, '〘Ψ*CRISIS〙', Math.floor(sec * 5) % 2 === 0 ? 9 : 1);
+
+        // 浮世绘多色木版画朱砂大印
+        if (themeSkillTimer > 0) {
+          putStr(5, 96, '┏━━━━━━━━━━┓', 9, true, 1);
+          putStr(6, 96, '┃ 银河百科 ┃', 9, true, 1);
+          putStr(7, 96, '┃ 基地纪元 ┃', 9, true, 1);
+          putStr(8, 96, '┗━━━━━━━━━━┛', 9, true, 1);
+        }
+      } else if (realm === 'crt') {
+        const rainChars = ['0', '1', 'ﾊ', 'ﾐ', 'ﾋ', 'ｰ', 'ｳ', 'ｼ', '7', '9', ':', '#'];
         for (const drop of matrixDrops) {
           const colI = Math.round(drop.col);
           const maxY = terrainY(colI) - 1;
           for (let k = 0; k < drop.len; k++) {
             const ry = Math.round(drop.y - k);
-            if (ry >= 0 && ry < maxY) {
-              const g = rainChars[(Math.floor(sec * 9) + colI + k) % rainChars.length];
-              put(ry, colI, g, k === 0 ? 3 : 2);
+            if (ry >= 1 && ry < maxY) {
+              const g = rainChars[(Math.floor(sec * 11) + colI + k) % rainChars.length];
+              const colorId = k === 0 ? 10 : drop.layer === 0 ? 3 : drop.layer === 1 ? 2 : 15;
+              put(ry, colI, g, colorId);
             }
+          }
+          // 代码雨撞击山脊溅起绿色代码水花
+          const hitR = Math.round(maxY);
+          if (Math.abs(drop.y - hitR) < 0.8 && hitR > 4 && hitR < ROWS - 2) {
+            put(hitR - 1, colI, '溅' in rainChars ? '*' : '·', 3);
           }
         }
 
-        // 远景机器城能量塔群
+        // 远景 01 机械城巨型能量塔阵列
         const towers = [
-          [12, 23, 4],
-          [20, 19, 5],
-          [29, 20, 4],
-          [38, 19, 5],
-          [48, 18, 4],
+          [24, 44, 8],
+          [40, 36, 10],
+          [58, 38, 8],
+          [76, 35, 10],
+          [96, 34, 8],
         ] as const;
         towers.forEach(([tc, topR, tw], idx) => {
           const botR = Math.round(terrainY(tc)) - 1;
@@ -1019,216 +2300,190 @@ const { initialSummits = 1 } = Astro.props;
             for (let xOff = 0; xOff < tw; xOff++) {
               const isEdge = xOff === 0 || xOff === tw - 1 || r === topR;
               if (isEdge) {
-                put(r, tc + xOff, r === topR ? '=' : '|', 4);
-              } else if ((r + xOff + Math.floor(sec * 2 + idx)) % 3 === 0) {
-                put(r, tc + xOff, ':', idx % 2 === 0 ? 9 : 1);
+                put(r, tc + xOff, r === topR ? '▀' : '│', 4);
+              } else if ((r + xOff + Math.floor(sec * 3 + idx)) % 4 === 0) {
+                put(r, tc + xOff, '▪', idx % 2 === 0 ? 9 : 2);
               }
             }
           }
         });
-        putStr(0, 84, '[ZION_MAINFRAME // 0x5F37]', 2);
+        putStr(1, 184, '▛▀▀[ZION_MAINFRAME // 0x5F37]▀▀▜', 2);
+        putStr(
+          2,
+          184,
+          sentinelStunTimer > 0
+            ? '▌ SENTINEL: EMP_DISABLED [OK]  ▐'
+            : '▌ SENTINEL_SQUID: LOCKING...   ▐',
+          sentinelStunTimer > 0 ? 3 : 9,
+        );
+        putStr(3, 184, '▙▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▟', 2);
       } else {
-        // 弗雷曼沙槌 (Thumper)
-        const thumpBeat = sec % 2.2;
-        put(30, 5, thumpBeat < 0.25 ? '=' : 'T', 9);
-        put(31, 5, '|', 1);
-        put(32, 5, '|', 1);
-        put(33, 5, '^', 1);
-        putStr(0, 86, '[ARRAKIS // SHIELD_WALL]', 1);
+        // 弗雷曼高分沙槌 (Thumper)
+        const thumpBeat = sec % 1.6;
+        putStr(59, 8, thumpBeat < 0.35 ? '(((◈)))' : ' ╔═╦═╗ ', 9);
+        for (let r = 60; r <= 65; r++) {
+          putStr(r, 10, '║█║', 1);
+        }
+        putStr(66, 10, '╚▼╝', 5);
+
+        putStr(1, 184, '╭──◈ [ARRAKIS // SHIELD_WALL] ◈──╮', 1);
+        putStr(
+          2,
+          184,
+          themeSkillTimer > 0
+            ? '│ SHAI-HULUD: MAKER_HOOK LOCKED! │'
+            : '│ SPICE_WIND: 64KT · WALK_RHYTHM │',
+          themeSkillTimer > 0 ? 9 : 2,
+        );
+        putStr(3, 184, '╰────────────────────────────────╯', 1);
       }
 
-      // ================= 3. 起伏主山脊线与纯 ASCII/Braille 地质岩层 =================
-      const treadShift = Math.floor(continuousRoll * 2.2);
-      for (let c = 0; c < COLS; c++) {
-        const yExact = terrainY(c);
-        const sr = Math.round(yExact);
-        const nextY = terrainY(Math.min(COLS - 1, c + 1));
-        const diff = nextY - yExact;
-
-        let ridgeChar = '=';
-        if (c >= 99) ridgeChar = '=';
-        else if (diff < -0.22) ridgeChar = '/';
-        else if (diff < -0.05) ridgeChar = '~';
-        else if (diff > 0.08) ridgeChar = '\\';
-        else ridgeChar = '_';
-
-        if (sr >= 0 && sr < ROWS) {
-          put(sr, c, ridgeChar, 5);
+      // 沿途五大文学主题营地路标
+      const curAltM = boulderProg * PEAK_ALT;
+      const msList = REALM_MILESTONES[realm] || REALM_MILESTONES.void;
+      msList.forEach((ms, idx) => {
+        const mr = Math.round(terrainY(ms.col));
+        const reached = curAltM >= ms.alt - 5;
+        if (idx < 4) {
+          const poleCls = reached ? 2 : 4;
+          const flagCls = reached ? 1 : 4;
+          put(mr - 1, ms.col, '║', poleCls);
+          put(mr - 2, ms.col, '║', poleCls);
+          putStr(mr - 3, ms.col - 1, reached ? `⚑[${ms.code}]` : `·[${ms.code}]`, flagCls);
+          activeHotspots.push({
+            id: 'milestone',
+            col: ms.col - 2,
+            row: mr - 3,
+            w: 7,
+            h: 3,
+            label: ms.name,
+            hint: reached ? '已点亮营地 · 点击触发信标共鸣助推' : `目标海拔 ${ms.alt}m · 点击蓄力冲刺`,
+          });
         }
-
-        for (let r = sr + 1; r < ROWS; r++) {
-          const depth = r - sr;
-          let fill = ':';
-          let colorId = 6;
-
-          if (realm === 'crt') {
-            const pulseWave = Math.abs(((c - Math.floor(sec * 16)) % 28 + 28) % 28) < 2;
-            fill =
-              depth === 1
-                ? (c + r + treadShift) % 2 === 0
-                  ? '1'
-                  : '0'
-                : depth === 2
-                  ? '+'
-                  : (c + r) % 3 === 0
-                    ? '#'
-                    : ':';
-            if (pulseWave && depth <= 3) colorId = 3;
-          } else if (realm === 'paper') {
-            fill =
-              depth === 1
-                ? '/'
-                : depth === 2
-                  ? (c + treadShift) % 3 === 0
-                    ? ':'
-                    : ','
-                  : (r + c) % 4 === 0
-                    ? '+'
-                    : '.';
-          } else if (realm === 'amber') {
-            const sandDrift = (c + r + Math.floor(sec * 3)) % 5;
-            fill = depth === 1 ? '~' : sandDrift === 0 ? '-' : depth <= 3 ? ':' : '.';
-            if (sandDrift === 0 && depth === 2) colorId = 1;
-          } else {
-            const harmonic = (c * 2 + r + Math.floor(sec * 4)) % 17 === 0;
-            fill = depth === 1 ? '#' : depth <= 3 ? '+' : (r + c) % 2 === 0 ? ':' : '.';
-            if (harmonic) colorId = 2;
-          }
-          put(r, c, fill, colorId);
+        if (milestoneNodes[idx]) {
+          milestoneNodes[idx].classList.toggle('is-reached', reached);
         }
+      });
+
+      // 884.8m 峰顶圣殿与迎风旗帜
+      const peakR = Math.round(terrainY(206));
+      const flagWave = Math.floor(sec * 5) % 2 === 0 ? '╔═[~> 884.8M' : '╔═[=> 884.8M';
+      for (let r = peakR - 4; r < peakR; r++) {
+        put(r, 206, '║', 5);
       }
+      putStr(peakR - 4, 206, flagWave, 9);
+      putStr(peakR - 1, 211, '/▲\\', 1);
 
-      // 峰顶信标红旗与山巅界碑（位于缓坡尽头高原，绝不错位）
-      const peakR = Math.round(terrainY(103));
-      const flagWave = Math.floor(sec * 5) % 2 === 0 ? '[~>' : '[=>';
-      put(peakR - 2, 103, '|', 5);
-      put(peakR - 1, 103, '+', 5);
-      putStr(peakR - 2, 104, flagWave, 9);
-      putStr(peakR - 1, 108, '/\\', 4);
+      // ================= LAYER 8: 224x72 高细节山体横截面地下奇观室 (Subterranean Cutaway Diorama) =================
+      const subLeft = 122;
+      const subTop = 51;
+      const subW = 94;
+      const subH = 16;
+      const subPulseCls = undergroundPulseTimer > 0 ? 9 : 2;
 
-      // ================= 4. 绘制滚动巨石精灵 =================
-      const bCol = progToCol(boulderProg);
-      let bGroundY = terrainY(bCol);
-
-      if (phase === 'AVALANCHE') {
-        const bounce = Math.abs(Math.sin(boulderProg * Math.PI * 7.0)) * 1.5;
-        bGroundY -= bounce;
-      } else if (phase === 'SUMMIT_BREATH' && phaseElapsed > 2.2) {
-        bGroundY -= (Math.random() - 0.5) * 0.2;
-      }
-
-      const rockSprite = getBoulderSprite(realm, Math.floor(continuousRoll));
-      const rockTopRow = Math.round(bGroundY) - 3;
-      const rockLeftCol = Math.round(bCol) - 3;
-      putStr(rockTopRow, rockLeftCol, rockSprite[0], 8);
-      putStr(rockTopRow + 1, rockLeftCol, rockSprite[1], 8);
-      putStr(rockTopRow + 2, rockLeftCol, rockSprite[2], 8);
-
-      // ================= 5. 绘制随地形坡度自适应切换姿态的关节化西西弗斯小人 =================
-      const sCol = progToCol(sisyphusProg);
-      const localGrade = getTerrainGrade(bCol);
-      // 陡坡时身体前倾压低紧贴巨石，鞍部微下坡时向后拉拽控石
-      const sLeft =
-        phase === 'CLIMB'
-          ? Math.max(1, rockLeftCol - 3)
-          : Math.round(sCol) - 1;
-      const sFootGroundRow = Math.round(terrainY(sLeft + 1));
-      const bContactRow = Math.round(bGroundY);
-      // 限制小人与巨石的垂直落差不超过 1 行，确保双手始终稳稳抵住巨石腰部！
-      const sGroundRow =
-        phase === 'CLIMB'
-          ? Math.max(bContactRow, Math.min(bContactRow + 1, sFootGroundRow))
-          : sFootGroundRow;
-
-      if (phase === 'CLIMB') {
-        let headPose = ' o_';
-        let armPush = '/|=';
-        let legPose = '/ \\';
-
-        if (localGrade > 0.35) {
-          // 1. 绝壁陡坡点位 (STEEP_HEAVE)：极度压低重心埋头以肩背死顶巨石，双腿深弓步蹬地，背后冒出汗珠/火星
-          headPose = boostVelocity > 0.02 || sprintToSummit ? '_o/' : '_o_';
-          armPush = Math.floor(continuousStep * 0.5) % 2 === 0 ? '//=\\' : '/|==';
-          legPose = STEEP_CLIMB_LEGS[Math.floor(continuousStep) % STEEP_CLIMB_LEGS.length];
-          if (Math.floor(sec * 4) % 2 === 0) {
-            put(sGroundRow - 3, Math.max(0, sLeft - 1), "'", 2);
-          }
-        } else if (localGrade < 0.03) {
-          // 2. 山脊马鞍谷 / 微下坡点位 (SADDLE_BRAKE)：身体微后仰稳住巨石防止前溜，稳步调节呼吸
-          headPose = ' o ';
-          armPush = Math.floor(continuousStep * 0.5) % 2 === 0 ? '\\|-' : '\\|=';
-          legPose = SADDLE_STRIDE_LEGS[Math.floor(continuousStep) % SADDLE_STRIDE_LEGS.length];
-        } else if (localGrade < 0.16) {
-          // 3. 缓坡台地点位 (PLATEAU_STRIDE)：昂首挺胸大步平推
-          headPose = boostVelocity > 0.02 || sprintToSummit ? ' o/' : ' o ';
-          armPush = Math.floor(continuousStep * 0.5) % 2 === 0 ? '-|=' : '/|-';
-          legPose = SADDLE_STRIDE_LEGS[Math.floor(continuousStep) % SADDLE_STRIDE_LEGS.length];
-        } else {
-          // 4. 标准斜坡点位 (NORMAL_CLIMB)：经典前倾发力推石
-          headPose = boostVelocity > 0.02 || sprintToSummit ? ' o/' : ' o_';
-          armPush = Math.floor(continuousStep * 0.5) % 2 === 0 ? '/|=' : '/|-';
-          legPose = NORMAL_CLIMB_LEGS[Math.floor(continuousStep) % NORMAL_CLIMB_LEGS.length];
-        }
-
-        putStr(sGroundRow - 3, sLeft, headPose, 7);
-        putStr(sGroundRow - 2, sLeft, armPush.slice(0, 3), 7);
-        putStr(sGroundRow - 1, sLeft, legPose, 7);
-
-        if (boostVelocity > 0.025 || sprintToSummit || localGrade > 0.38) {
-          put(sGroundRow - 2, Math.max(0, sLeft - 1), '*', 9);
-          put(sGroundRow - 1, Math.max(0, sLeft - 2), ':', 9);
-        }
-
-        const bubbleCycle = sec % 7.5;
-        if (bubbleCycle < 2.8 && boostBannerTimer <= 0) {
-          const lines = BUBBLE_LINES[realm] || BUBBLE_LINES.void;
-          const baseMsg = lines[Math.floor(sec / 7.5) % lines.length];
-          const msg =
-            localGrade > 0.36
-              ? '(heave...!!)'
-              : localGrade < 0.04
-                ? '(steady...)'
-                : baseMsg;
-          const bubbleCol = Math.max(1, Math.min(COLS - msg.length - 1, sLeft - 4));
-          putStr(Math.max(1, Math.min(rockTopRow - 1, sGroundRow - 5)), bubbleCol, msg, 7);
-        }
-      } else if (phase === 'SUMMIT_BREATH') {
-        if (phaseElapsed < 1.2) {
-          putStr(sGroundRow - 3, sLeft, '\\o/', 7);
-          putStr(sGroundRow - 2, sLeft, ' | ', 7);
-          putStr(Math.max(0, sGroundRow - 5), Math.max(1, sLeft - 4), '(884.8m!)', 1);
-        } else {
-          putStr(sGroundRow - 3, sLeft, ' o ', 7);
-          putStr(sGroundRow - 2, sLeft, '/|\\', 7);
-        }
-        putStr(sGroundRow - 1, sLeft, '/ \\', 7);
-      } else if (phase === 'AVALANCHE') {
-        if (phaseElapsed <= 1.3) {
-          putStr(sGroundRow - 3, sLeft, 'o  ', 7);
-          putStr(sGroundRow - 2, sLeft, '|\\ ', 7);
-          putStr(sGroundRow - 1, sLeft, '/ \\', 7);
-        } else {
-          const legIdx = Math.floor(continuousStep) % WALK_DOWN_LEGS.length;
-          putStr(sGroundRow - 3, sLeft, ' o ', 7);
-          putStr(sGroundRow - 2, sLeft, '/|\\', 7);
-          putStr(sGroundRow - 1, sLeft, WALK_DOWN_LEGS[legIdx], 7);
-        }
-      } else if (phase === 'DESCENT_WALK') {
-        if (sisyphusProg > 0.008) {
-          const legIdx = Math.floor(continuousStep) % WALK_DOWN_LEGS.length;
-          const armSwing = Math.floor(continuousStep) % 2 === 0 ? '/|\\' : ' | ';
-          putStr(sGroundRow - 3, sLeft, ' o ', 7);
-          putStr(sGroundRow - 2, sLeft, armSwing, 7);
-          putStr(sGroundRow - 1, sLeft, WALK_DOWN_LEGS[legIdx], 7);
-          putStr(Math.max(1, sGroundRow - 5), Math.max(1, sLeft - 3), '(happy.)', 7);
-        } else {
-          putStr(sGroundRow - 3, sLeft, ' o_', 7);
-          putStr(sGroundRow - 2, sLeft, '/|=', 7);
-          putStr(sGroundRow - 1, sLeft, '/ \\', 7);
+      // 清空地下奇观室内部背景色为深邃内舱
+      for (let r = subTop; r < subTop + subH && r < ROWS; r++) {
+        for (let c = subLeft; c < subLeft + subW && c < COLS; c++) {
+          const idx = r * COLS + c;
+          cellChar[r][c] = ' ';
+          cellBg[idx] = undergroundPulseTimer > 0 && r > subTop && r < subTop + subH - 1 ? 15 : 0;
         }
       }
 
-      // ================= 6. 左上角内嵌 TUI 遥测角标 =================
+      if (realm === 'void') {
+        putStr(subTop, subLeft, '╔══════[ TMA-1 LUNAR EXCAVATION PIT // TYCHO CRATER -42.0M // MAGNETIC ANOMALY ]═══════╗', 5, true);
+        putStr(subTop + 1, subLeft, '║  [FLOODLIGHT_A]            [FLOODLIGHT_B]                 [SEISMIC_TELEMETRY_ARRAY]  ║', 4, true);
+        putStr(subTop + 2, subLeft, '║      \\|||/                     \\|||/                      FREQ : 1.4900 GHz (1:4:9)  ║', 2, true);
+        putStr(subTop + 3, subLeft, '║                 . · : * ╔═══════════════╗ * : · .         FIELD: +480.2 nT HARMONIC  ║', subPulseCls, true);
+        putStr(subTop + 4, subLeft, '║              . · : *    ║ █████████████ ║    * : · .      WAVE : [∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿]   ║', subPulseCls, true);
+        putStr(subTop + 5, subLeft, '║            (((  1:4:9   ║ ██ TMA-1 ██ ║   1:4:9  )))    CORE : CLAVIUS_UPLINK_OK   ║', 1, true);
+        putStr(subTop + 6, subLeft, '║            (((          ║ █████████████ ║          )))    EVA  : BOWMAN / POOLE      ║', 5, true);
+        putStr(subTop + 7, subLeft, '║         ═══════╦════════╩═══════════════╩════════╦═══════                            ║', 4, true);
+        putStr(subTop + 8, subLeft, '║        /▲\\  _o/║   LUNAR REGOLITH TRENCH LEVEL 4 ║ \\o_   |::| [CLICK TO RESONATE]    ║', 7, true);
+        putStr(subTop + 9, subLeft, '╚════════════════╩═════════════════════════════════╩═══════════════════════════════════╝', 5, true);
+      } else if (realm === 'paper') {
+        putStr(subTop, subLeft, '┏━━━━━━〘 ENCYCLOPEDIA GALACTICA // TERMINUS TIME VAULT 01 // SELDON ARCHIVE 〙━━━━━━━━┓', 5, true);
+        putStr(subTop + 1, subLeft, '┃  |≡|≡|≡|≡|≡|≡|   [GALACTIC ARCHIVE STACKS]     ╭──────Ψ──────╮   PSYCHOHISTORY TENSOR ┃', 4, true);
+        putStr(subTop + 2, subLeft, '┃  |≡|≡|≡|≡|≡|≡|   VOL. I - XIV : COMPILED       │  ∂S/∂t = 0  │   P(FOUNDATION) = 0.994┃', 1, true);
+        putStr(subTop + 3, subLeft, '┃  |≡|≡|≡|≡|≡|≡|                                 │   \\ ^o^ /   │   CRISIS_EPOCH : #03   ┃', subPulseCls, true);
+        putStr(subTop + 4, subLeft, '┃  |≡|≡|≡|≡|≡|≡|      "To shorten the thirty     │    │ │ │    │   TRANTOR_FALL : DONE  ┃', 3, true);
+        putStr(subTop + 5, subLeft, '┃  |≡|≡|≡|≡|≡|≡|       thousand years of dark    ╰═══╦═════╦═══╯   SECOND_FND   : HIDDEN┃', 4, true);
+        putStr(subTop + 6, subLeft, '┃  |≡|≡|≡|≡|≡|≡|       into a single millennium." ═══╩═════╩═══    ERA: 1054 F.E.       ┃', 1, true);
+        putStr(subTop + 7, subLeft, '┃  ╞═══════════╡      —— HARI SELDON HOLO-CAST    [PRIME_RADIANT_PROJECTOR // ACTIVE]  ┃', 2, true);
+        putStr(subTop + 8, subLeft, '┃  [SEAL: 基地]                                                    [CLICK TO SOLVE]    ┃', 9, true);
+        putStr(subTop + 9, subLeft, '┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛', 5, true);
+      } else if (realm === 'crt') {
+        putStr(subTop, subLeft, '▛▀▀▀▀▀▀[ ZION SUBTERRANEAN GEOTHERMAL CORE // DEPTH -4.2KM // MAINFRAME UPLINK ]▀▀▀▀▀▀▀▜', 5, true);
+        putStr(subTop + 1, subLeft, '▌  [RACK_01] [RACK_02]   ╔══════╦══════╦══════╗    NEBUCHADNEZZAR BROADCAST_FREQ: 0x5F ▐', 4, true);
+        putStr(subTop + 2, subLeft, '▌  [▪:▪:▪:▪] [▪:▪:▪:▪] ══╬══►   ║  ⚡  ║   ◄══╬══  EMP_CAPACITOR : [██████████] 100%   ▐', subPulseCls, true);
+        putStr(subTop + 3, subLeft, '▌  [▪:▪:▪:▪] [▪:▪:▪:▪]   ║   ╔══╩══════╩══╗   ║    CONSTRUCT_SIM : GRAVITY_OVERRIDE    ▐', 2, true);
+        putStr(subTop + 4, subLeft, '▌  [▪:▪:▪:▪] [▪:▪:▪:▪] ══╬══►║ 0x5F3759DF ║◄══╬══  OPERATOR_LINK : TANK // LOGGED_IN   ▐', 3, true);
+        putStr(subTop + 5, subLeft, '▌  [▪:▪:▪:▪] [▪:▪:▪:▪]   ║   ╚══╦══════╦══╝   ║    REDPILL_NODES : 4,096 ONLINE        ▐', 2, true);
+        putStr(subTop + 6, subLeft, '▌  [▪:▪:▪:▪] [▪:▪:▪:▪] ══╩══════╩══════╩══════╩══  "Remember... all I\'m offering       ▐', 4, true);
+        putStr(subTop + 7, subLeft, '▌  ══════════════════════════════════════════════   is the truth, nothing more."       ▐', 2, true);
+        putStr(subTop + 8, subLeft, '▌  [GEOTHERMAL TURBINE: 420MW]                                     [CLICK TO OVERCLOCK]▐', 3, true);
+        putStr(subTop + 9, subLeft, '▙▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▟', 5, true);
+      } else {
+        putStr(subTop, subLeft, '╭──────◈ [ SIETCH TABR SUBTERRANEAN CISTERN // WINDTRAP & SACRED WATER 38,400L ] ◈─────╮', 5, true);
+        putStr(subTop + 1, subLeft, '│   ║║   ║║   [WINDTRAP CONDENSER DUCTS]          ╭───────────────────────────────╮    │', 4, true);
+        putStr(subTop + 2, subLeft, '│   ║║   ║║   HUMIDITY_RECOVERY : 99.4%           │ SPICE_MELANGE_RESERVE : 840KG │    │', 1, true);
+        putStr(subTop + 3, subLeft, '│   ╚╩═══╩╝   STILLSUIT_SEALS   : LOCKED          │ ECOLOGICAL_TARGET     : +14%  │    │', 9, true);
+        putStr(subTop + 4, subLeft, '│      💧                                         ╰───────────────────────────────╯    │', 2, true);
+        putStr(subTop + 5, subLeft, '│  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  │', subPulseCls, true);
+        putStr(subTop + 6, subLeft, '│  ≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈  ◈  [THE TRIBE\'S WATER // LIET-KYNES SANCTUARY]  ◈  ≈≈≈≈≈≈≈≈≈≈≈≈≈  │', 2, true);
+        putStr(subTop + 7, subLeft, '│  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  │', 2, true);
+        putStr(subTop + 8, subLeft, '│  "A man\'s flesh is his own; the water belongs to the tribe."     [CLICK FOR BLESSING]│', 1, true);
+        putStr(subTop + 9, subLeft, '╰──────────────────────────────────────────────────────────────────────────────────────╯', 5, true);
+      }
+
+      activeHotspots.push({
+        id: 'sub_core',
+        col: subLeft,
+        row: subTop,
+        w: 88,
+        h: 10,
+        label:
+          realm === 'void'
+            ? 'TMA-1 地底磁异常发掘坑'
+            : realm === 'paper'
+              ? '端点星百科全书时间穹顶'
+              : realm === 'crt'
+                ? '锡安 -4.2km 地热主机核心'
+                : '塔布尔穴地 38,400L 圣水蓄水池',
+        hint: '点击激发地下奇观室能量谐波，向上直冲巨石！',
+      });
+
+      // 角色气泡与浮动暴击标签
+      if (phase === 'CLIMB' && boostBannerTimer <= 0 && floatingTags.length === 0 && (sec % 7.5) < 2.8) {
+        const lines = BUBBLE_LINES[realm] || BUBBLE_LINES.void;
+        const baseMsg = lines[Math.floor(sec / 7.5) % lines.length];
+        const msg =
+          localGrade > 0.36
+            ? '(heave...!!)'
+            : localGrade < 0.04
+              ? '(steady...)'
+              : baseMsg;
+        const bubbleCol = Math.max(2, Math.min(COLS - msg.length - 2, Math.round(sCenterCol) - 6));
+        putStr(Math.max(2, Math.round(sGroundY) - 10), bubbleCol, msg, 7);
+      }
+
+      for (const ft of floatingTags) {
+        putStr(Math.round(ft.row), ft.col, ft.text, ft.cls, false, 0);
+      }
+
+      // 悬停目标锁定准星框
+      if (hoveredHotspot) {
+        const hc0 = Math.max(0, hoveredHotspot.col - 1);
+        const hc1 = Math.min(COLS - 1, hoveredHotspot.col + hoveredHotspot.w);
+        const hr0 = Math.max(1, hoveredHotspot.row - 1);
+        const hr1 = Math.min(ROWS - 1, hoveredHotspot.row + hoveredHotspot.h);
+        put(hr0, hc0, '╔', 9);
+        put(hr0, hc1, '╗', 9);
+        put(hr1, hc0, '╚', 9);
+        put(hr1, hc1, '╝', 9);
+      }
+
+      // 左上角 TUI 实时遥测角标
       const latestTotalNow = getTotalRawCycles(Date.now());
       const unifiedCycleIdx = Math.floor(latestTotalNow);
       const unifiedFrac =
@@ -1238,69 +2493,112 @@ const { initialSummits = 1 } = Astro.props;
       const shownCycle = baseSummits + unifiedCycleIdx;
       const altNow = (unifiedFrac * PEAK_ALT).toFixed(1);
       const phaseTag =
-        phase === 'CLIMB'
-          ? sprintToSummit
-            ? 'SPRINT'
-            : 'ASCENT'
-          : phase === 'SUMMIT_BREATH'
-            ? 'SUMMIT'
-            : phase === 'AVALANCHE'
-              ? 'TUMBLE'
-              : 'RETURN';
+        themeSkillTimer > 0
+          ? 'OVERDRIVE'
+          : phase === 'CLIMB'
+            ? sprintToSummit
+              ? 'SPRINT'
+              : 'ASCENT'
+            : phase === 'SUMMIT_BREATH'
+              ? 'SUMMIT'
+              : phase === 'AVALANCHE'
+                ? 'TUMBLE'
+                : 'RETURN';
 
-      putStr(0, 1, `[${phaseTag}] ${altNow}m`, 10);
+      putStr(0, 1, `[${phaseTag}] ${altNow}m / 884.8m · 224x72 ATLAS`, 10);
+      if (comboCount > 1) {
+        putStr(0, 42, `[COMBO x${comboCount}]`, 9);
+      }
       if (boostBannerTimer > 0) {
-        putStr(0, 18, `>> +${lastBoostGainMeters.toFixed(1)}m [${lastBoostSource}] <<`, 9);
+        putStr(
+          0,
+          comboCount > 1 ? 56 : 42,
+          `>> +${lastBoostGainMeters.toFixed(1)}m [${lastBoostSource}] <<`,
+          9,
+        );
+      } else if (hoveredHotspot) {
+        putStr(0, comboCount > 1 ? 56 : 42, `[TARGET: ${hoveredHotspot.label}]`, 2);
       }
 
-      // ================= 7. Canvas 固定格点字符光栅渲染（借鉴 ROT.Display / Xterm.js，彻底根除行宽抖动！） =================
+      // ================= LAYER 9: xterm.js Offscreen Glyph Atlas GPU 位块传输渲染 =================
       if (ctx) {
-        const totalW = COLS * CELL_W;
-        const totalH = ROWS * CELL_H;
+        const totalPhysW = COLS * TILE_W;
+        const totalPhysH = ROWS * TILE_H;
         ctx.fillStyle = palette.bg;
-        ctx.fillRect(0, 0, totalW, totalH);
-        ctx.textBaseline = 'top';
-        ctx.font = '600 11.5px Menlo, Monaco, Consolas, "JetBrains Mono", "SF Mono", monospace';
+        ctx.fillRect(0, 0, totalPhysW, totalPhysH);
 
+        // Pass 1: 水平游程合并绘制每格背景色 (Run-Length Encoded BG Pass)
         for (let r = 0; r < ROWS; r++) {
-          const yPx = r * CELL_H + 1;
+          const rowOff = r * COLS;
+          const yPx = r * TILE_H;
+          let c = 0;
+          while (c < COLS) {
+            const bgId = cellBg[rowOff + c];
+            if (bgId === 0) {
+              c++;
+              continue;
+            }
+            let endC = c + 1;
+            while (endC < COLS && cellBg[rowOff + endC] === bgId) {
+              endC++;
+            }
+            ctx.fillStyle = palette.colors[bgId] || palette.bg;
+            ctx.fillRect(c * TILE_W, yPx, (endC - c) * TILE_W, TILE_H);
+            c = endC;
+          }
+        }
+
+        // Pass 2: 从 xterm.js 透明纹理图集 (atlasCanvas) 极速位块贴图所有前景字符
+        for (let r = 0; r < ROWS; r++) {
+          const rowOff = r * COLS;
+          const yPx = r * TILE_H;
           for (let c = 0; c < COLS; c++) {
-            const ch = chars[r][c];
+            const ch = cellChar[r][c];
             if (ch === ' ') continue;
-            const colorId = cls[r][c];
-            ctx.fillStyle = palette.colors[colorId] || palette.colors[0];
-            ctx.fillText(ch, c * CELL_W, yPx);
+            const fgId = cellFg[rowOff + c] || 6;
+            const slot = getOrBakeGlyphSlot(ch, fgId);
+            const sx = (slot % ATLAS_COLS) * TILE_W;
+            const sy = Math.floor(slot / ATLAS_COLS) * TILE_H;
+            ctx.drawImage(atlasCanvas, sx, sy, TILE_W, TILE_H, c * TILE_W, yPx, TILE_W, TILE_H);
           }
         }
       }
 
-      // 同步无障碍与测试镜面 `<pre>`
-      const htmlLines: string[] = [];
-      for (let r = 0; r < ROWS; r++) {
-        let lineHtml = '';
-        let runCls = cls[r][0];
-        let runText = chars[r][0];
-
-        for (let c = 1; c < COLS; c++) {
-          if (cls[r][c] === runCls) {
-            runText += chars[r][c];
-          } else {
-            const escaped = escapeHtml(runText);
-            lineHtml += runCls
-              ? `<span class="${CLS_NAMES[runCls]}">${escaped}</span>`
-              : escaped;
-            runCls = cls[r][c];
-            runText = chars[r][c];
-          }
+      // ================= LAYER 10: 同步更新节拍共鸣槽 UI 与节流无障碍镜面 =================
+      if (cadenceMeterEl) {
+        const trackLen = 11;
+        const cursorIdx = Math.max(0, Math.min(trackLen - 1, Math.floor(cadenceClock * trackLen)));
+        const baseGlyphs = ['░', '░', '▒', '▒', '▓', '█', '▓', '▒', '▒', '░', '░'];
+        baseGlyphs[cursorIdx] = isSweetSpot ? '◈' : '▲';
+        cadenceMeterEl.textContent = baseGlyphs.join('');
+        cadenceMeterEl.classList.toggle('is-sweet', isSweetSpot);
+      }
+      if (comboBadgeEl) {
+        if (comboCount > 1) {
+          comboBadgeEl.textContent = `COMBO x${comboCount}`;
+          comboBadgeEl.classList.add('is-hot');
+        } else if (isSweetSpot) {
+          comboBadgeEl.textContent = '★HIT NOW!';
+          comboBadgeEl.classList.add('is-hot');
+        } else {
+          comboBadgeEl.textContent = 'SYNC';
+          comboBadgeEl.classList.remove('is-hot');
         }
-        const escaped = escapeHtml(runText);
-        lineHtml += runCls
-          ? `<span class="${CLS_NAMES[runCls]}">${escaped}</span>`
-          : escaped;
-        htmlLines.push(lineHtml);
       }
 
-      stageEl.innerHTML = htmlLines.join('\n');
+      // 每 360ms 节流同步一次隐藏的无障碍 `<pre>` 镜面，确保零主线程 DOM 开销
+      if (nowPerf - lastSrSyncTime > 360) {
+        lastSrSyncTime = nowPerf;
+        const srLines: string[] = [];
+        for (let r = 0; r < ROWS; r += 2) {
+          let line = '';
+          for (let c = 0; c < COLS; c += 2) {
+            line += cellChar[r][c];
+          }
+          srLines.push(line);
+        }
+        stageEl.textContent = srLines.join('\n');
+      }
 
       const filled = Math.max(0, Math.min(10, Math.round(unifiedFrac * 10)));
       const bar = '▪'.repeat(filled) + '▫'.repeat(10 - filled);
@@ -1310,7 +2608,7 @@ const { initialSummits = 1 } = Astro.props;
 
       telemetryEl.textContent = `ALT ${altNow}m [${bar}] ETA ${formatEta(remainMs)} · #${shownCycle}${boostNote}`;
 
-      if (quoteEl) {
+      if (quoteEl && themeSkillTimer <= 0) {
         if (phase === 'SUMMIT_BREATH') {
           quoteEl.textContent = '"登顶的片刻停驻，星风正掠过山脊。"';
         } else if (phase === 'AVALANCHE') {

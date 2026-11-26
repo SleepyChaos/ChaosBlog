@@ -885,8 +885,43 @@ main.page-main {
   margin-bottom: 0.4rem;
 }
 
+.sisyphus-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.32rem;
+  flex-wrap: wrap;
+}
+
+.sisyphus-res-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.36rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 12%, var(--bg-code));
+  border: 1px solid color-mix(in srgb, var(--accent-2) 55%, var(--border));
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.term-btn.is-theme-skill {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 10%, var(--bg-code));
+  font-weight: 700;
+}
+
+.term-btn.is-theme-skill:hover {
+  background: var(--accent-2);
+  color: var(--accent-fg);
+  border-color: var(--accent-2);
+}
+
 .sisyphus-stage-card .bento-foot {
-  margin-top: 0.45rem;
+  margin-top: 0.38rem;
 }
 
 .ascii-slope-viewport {
@@ -899,14 +934,136 @@ main.page-main {
   border: 1px solid var(--border-strong);
   border-radius: 2px;
   padding: 0.25rem 0.3rem;
-  cursor: pointer;
+  cursor: crosshair;
   user-select: none;
   box-shadow: inset 0 0 32px rgba(0, 0, 0, 0.22);
   overflow: hidden;
+  outline: none;
 }
 
-.ascii-slope-viewport:hover {
+.ascii-slope-viewport:hover,
+.ascii-slope-viewport:focus-visible {
   border-color: var(--accent);
+}
+
+/* 终端互动小游戏状态栏：节拍共鸣器 + 沿途文学营地 + 悬停准星提示 */
+.sisyphus-minigame-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-top: 0.38rem;
+  padding: 0.26rem 0.5rem;
+  background: var(--surface-inner);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 0.69rem;
+  line-height: 1.25;
+}
+
+.minigame-cadence-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.1rem 0.38rem;
+  background: var(--bg-code);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.minigame-cadence-box:hover {
+  border-color: var(--accent);
+}
+
+.cadence-label {
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.cadence-track {
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.cadence-track.is-sweet {
+  color: var(--stage-fire);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--stage-fire) 45%, transparent);
+}
+
+.cadence-combo {
+  padding: 0.05rem 0.28rem;
+  border-radius: 1px;
+  font-size: 0.63rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--border) 35%, transparent);
+}
+
+.cadence-combo.is-hot {
+  color: var(--accent-fg);
+  background: var(--stage-fire);
+}
+
+.minigame-milestones {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.16rem;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.ms-node {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.3rem;
+  border-radius: 1px;
+  border: 1px solid var(--border);
+  background: var(--bg-code);
+  color: var(--text-muted);
+  font-size: 0.63rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s steps(2), color 0.12s steps(2), background-color 0.12s steps(2);
+}
+
+.ms-node:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ms-node.is-reached {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.ms-sep {
+  color: var(--border-strong);
+  font-size: 0.6rem;
+}
+
+.minigame-hotspot-hint {
+  flex: 1;
+  min-width: 11rem;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 0.67rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.minigame-hotspot-hint.is-locked {
+  color: var(--accent-2);
+  font-weight: 700;
 }
 
 .ascii-slope-canvas {
