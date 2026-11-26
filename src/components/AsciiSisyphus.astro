@@ -34,11 +34,21 @@ const { initialSummits = 1 } = Astro.props;
     </div>
   </div>
 
-  <pre
-    class="ascii-slope-pre"
-    id="sisyphus-ascii-stage"
+  <!-- 固定格点终端光栅渲染容器：Canvas 绝对定宽网格渲染（借鉴 ROT.Display / Xterm.js Canvas Renderer，彻底根除行宽抖动与错位）+ 隐藏无障碍文本镜面 -->
+  <div
+    class="ascii-slope-viewport"
+    id="sisyphus-stage-viewport"
     title="点击画布任意位置召唤天象助推西西弗斯！"
-    aria-label="216x120 亚像素点阵与 ASCII 混合渲染的四大科幻主题西西弗斯推石剧场"></pre>
+  >
+    <canvas
+      id="sisyphus-ascii-canvas"
+      class="ascii-slope-canvas"
+      aria-label="224x128 亚像素点阵与固定格点 ASCII 混合渲染的四大科幻主题西西弗斯推石剧场"></canvas>
+    <pre
+      class="ascii-slope-pre is-sr-mirror"
+      id="sisyphus-ascii-stage"
+      aria-hidden="true"></pre>
+  </div>
 
   <div class="bento-foot">
     <span id="sisyphus-telemetry" data-summits={initialSummits}>
@@ -50,6 +60,8 @@ const { initialSummits = 1 } = Astro.props;
 
 <script>
   const stageEl = document.getElementById('sisyphus-ascii-stage');
+  const canvasEl = document.getElementById('sisyphus-ascii-canvas') as HTMLCanvasElement | null;
+  const viewportEl = document.getElementById('sisyphus-stage-viewport');
   const stageTitleEl = document.getElementById('sisyphus-stage-title');
   const telemetryEl = document.getElementById('sisyphus-telemetry');
   const quoteEl = document.getElementById('sisyphus-phase-quote');
@@ -57,19 +69,31 @@ const { initialSummits = 1 } = Astro.props;
   const summitBtn = document.getElementById('sisyphus-summit-btn');
 
   if (stageEl && telemetryEl) {
-    // 98x30 字符网格 + Drawille 2x4 亚像素盲文光栅化层 = 196x120 (23,520 亚像素高分辨率，严格贴合卡片不溢出！)
-    const COLS = 98;
-    const ROWS = 30;
-    const SUB_W = COLS * 2; // 196 水平亚像素
-    const SUB_H = ROWS * 4; // 120 垂直亚像素
+    // 112x32 固定格点矩阵 + Drawille 2x4 亚像素盲文光栅化层 = 224x128 (28,672 亚像素分辨率，0.0px 行宽抖动！)
+    const COLS = 112;
+    const ROWS = 32;
+    const SUB_W = COLS * 2; // 224 水平亚像素
+    const SUB_H = ROWS * 4; // 128 垂直亚像素
+    const CELL_W = 8; // 严格锁定每列像素宽度
+    const CELL_H = 14; // 严格锁定每行像素高度
     const CYCLE_MS = 8 * 60 * 60 * 1000;
     const PEAK_ALT = 884.8;
     const STORAGE_KEY = 'sisyphus_8h_cycle_v2';
     const baseSummits = Number(telemetryEl.dataset.summits || '1');
 
-    const hdSubpixelMode = true;
+    // 初始化高分 DPR 定宽格点 Canvas（借鉴 ROT.Display / Xterm.js Canvas Renderer）
+    const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+    let ctx: CanvasRenderingContext2D | null = null;
+    if (canvasEl && typeof canvasEl.getContext === 'function') {
+      canvasEl.width = Math.round(COLS * CELL_W * dpr);
+      canvasEl.height = Math.round(ROWS * CELL_H * dpr);
+      ctx = canvasEl.getContext('2d');
+      if (ctx && typeof ctx.scale === 'function') {
+        ctx.scale(dpr, dpr);
+      }
+    }
 
-    // 严格对照四部科幻原著的经典地点，采用 `·` 分隔，不使用括号
+    // 严格对照四部科幻原著的经典地点，采用 `·` 分隔
     const STAGE_TITLES: Record<string, string> = {
       void: '01 // TMA-1 · 第谷环形山',
       paper: '01 // TERMINUS · 端点星穹顶',
@@ -89,6 +113,56 @@ const { initialSummits = 1 } = Astro.props;
       paper: ['(dS/dt > 0)', '(for Terminus)', '(Seldon Vault)', '(Prime Radiant)', '(Encyclopedia)'],
       crt: ['(no spoon...)', '(Zion uplink)', '(Nebuchadnezzar)', '(Construct ok)', '(still happy)'],
       amber: ['(Sietch Tabr)', '(Shield Wall)', '(walk without)', '(Shai-Hulud!)', '(Kull Wahad!)'],
+    };
+
+    // 从 CSS 变量读取当前主题调色板，保证 Canvas 渲染与全站四大科幻主题 100% 同步
+    interface StagePalette {
+      bg: string;
+      colors: string[];
+    }
+    let cachedRealm = '';
+    let palette: StagePalette = {
+      bg: '#060813',
+      colors: [
+        '#64748b',
+        '#f8fafc',
+        '#38bdf8',
+        '#818cf8',
+        '#475569',
+        '#e2e8f0',
+        '#475569',
+        '#38bdf8',
+        '#cbd5e1',
+        '#f43f5e',
+        '#f8fafc',
+      ],
+    };
+
+    const refreshPalette = (realm: string) => {
+      if (realm === cachedRealm) return;
+      cachedRealm = realm;
+      try {
+        const cs = getComputedStyle(document.documentElement);
+        const getVar = (name: string, fallback: string) =>
+          cs.getPropertyValue(name).trim() || fallback;
+        const earth = getVar('--stage-earth', '#64748b');
+        palette = {
+          bg: getVar('--stage-bg', '#060813'),
+          colors: [
+            earth, // 0 default
+            getVar('--stage-sky', '#f8fafc'), // 1 as-sky
+            getVar('--stage-aurora', '#38bdf8'), // 2 as-aurora
+            getVar('--stage-aurora-2', '#818cf8'), // 3 as-aurora2
+            getVar('--stage-far', '#475569'), // 4 as-far
+            getVar('--stage-ridge', '#e2e8f0'), // 5 as-ridge
+            earth, // 6 as-earth
+            getVar('--stage-hero', '#38bdf8'), // 7 as-hero
+            getVar('--stage-rock', '#cbd5e1'), // 8 as-rock
+            getVar('--stage-fire', '#f43f5e'), // 9 as-fire
+            getVar('--text', '#f8fafc'), // 10 as-hud
+          ],
+        };
+      } catch {}
     };
 
     interface CycleSave {
@@ -149,12 +223,12 @@ const { initialSummits = 1 } = Astro.props;
     let lastBoostSource = '主动助推';
 
     let boulderProg = displayFrac;
-    let sisyphusProg = Math.max(0, displayFrac - 0.068);
+    let sisyphusProg = Math.max(0, displayFrac - 0.062);
     let avalancheVel = 0;
     let continuousRoll = 0;
     let continuousStep = 0;
 
-    // 亚像素级高精度粒子系统 (在 168x72 坐标系中平滑运动！)
+    // 亚像素级高精度粒子系统 (在 224x128 坐标系中平滑运动)
     interface SubParticle {
       x: number;
       y: number;
@@ -164,35 +238,34 @@ const { initialSummits = 1 } = Astro.props;
       life: number;
       maxLife: number;
       cls: number;
-      asciiFallback: string;
     }
     const subParticles: SubParticle[] = [];
 
-    const matrixDrops = Array.from({ length: 20 }, (_, i) => ({
-      col: 4 + i * 4.5 + (i % 2),
+    const matrixDrops = Array.from({ length: 24 }, (_, i) => ({
+      col: 4 + i * 4.4 + (i % 2),
       y: (i * 3.7) % 24,
       speed: 3.4 + (i % 4) * 1.2,
       len: 4 + (i % 4),
     }));
 
     let skyStrikeTimer = 0;
-    let skyStrikeCol = 48;
+    let skyStrikeCol = 54;
 
-    // 半山构图山脊地形曲线（无右侧陡崖，山顶高原自然延展至画幅最右边缘）：c ∈ [0, 97] -> y ∈ [5.5, 26.5]
+    // 低缓开阔山坡曲线：山麓在 y=27.0，缓坡爬升至右侧山顶平台 y=14.0（释放出上方 75% 的宏大星空与远景视野！）
     const terrainY = (c: number): number => {
-      if (c <= 9) return 26.5;
-      if (c >= 87) return 5.5;
-      const u = (c - 9) / 78;
-      const base = 26.5 - u * 21.0;
+      if (c <= 10) return 27.0;
+      if (c >= 99) return 14.0;
+      const u = (c - 10) / 89;
+      const base = 27.0 - u * 13.0;
       const crag =
-        Math.sin(u * Math.PI * 3.0) * 0.46 * Math.sin(u * Math.PI) +
-        Math.sin(u * Math.PI * 7.0) * 0.17 * Math.sin(u * Math.PI);
+        Math.sin(u * Math.PI * 3.0) * 0.36 * Math.sin(u * Math.PI) +
+        Math.sin(u * Math.PI * 7.0) * 0.14 * Math.sin(u * Math.PI);
       return base + crag;
     };
 
     const progToCol = (p: number): number => {
       const clamped = Math.max(0, Math.min(1, p));
-      return 12.5 + clamped * 76.0; // 12.5 -> 88.5
+      return 14.0 + clamped * 86.5; // 14.0 -> 100.5
     };
 
     const spawnSubParticles = (
@@ -203,9 +276,8 @@ const { initialSummits = 1 } = Astro.props;
       cls: number,
       gravity = 28.0,
     ) => {
-      const glyphs = ['*', '.', ':', "'", '+'];
       for (let i = 0; i < count; i++) {
-        if (subParticles.length > 90) subParticles.shift();
+        if (subParticles.length > 100) subParticles.shift();
         subParticles.push({
           x: colX * 2 + (Math.random() - 0.5) * 3,
           y: rowY * 4 + (Math.random() - 0.5) * 3,
@@ -215,7 +287,6 @@ const { initialSummits = 1 } = Astro.props;
           life: 0,
           maxLife: 0.55 + Math.random() * 0.7,
           cls,
-          asciiFallback: glyphs[i % glyphs.length],
         });
       }
     };
@@ -252,7 +323,7 @@ const { initialSummits = 1 } = Astro.props;
       const by = terrainY(bx);
       skyStrikeCol = strikeCol ?? Math.round(bx);
       skyStrikeTimer = strikeCol !== undefined ? 0.58 : 0.35;
-      spawnSubParticles(bx - 2, by - 1, 12, -1, 9);
+      spawnSubParticles(bx - 2, by - 1, 14, -1, 9);
     };
 
     pushBtn?.addEventListener('click', () => {
@@ -269,8 +340,9 @@ const { initialSummits = 1 } = Astro.props;
       }
     });
 
-    stageEl.addEventListener('click', (e) => {
-      const rect = stageEl.getBoundingClientRect();
+    const handleStageClick = (e: MouseEvent) => {
+      const target = (viewportEl || stageEl) as HTMLElement;
+      const rect = target.getBoundingClientRect();
       const ratioX = Math.max(0.05, Math.min(0.95, (e.clientX - rect.left) / Math.max(1, rect.width)));
       const clickedCol = Math.round(ratioX * (COLS - 1));
       window.dispatchEvent(
@@ -278,7 +350,9 @@ const { initialSummits = 1 } = Astro.props;
           detail: { minM: 12, maxM: 34, source: '天象共鸣', strikeCol: clickedCol },
         }),
       );
-    });
+    };
+    viewportEl?.addEventListener('click', handleStageClick);
+    stageEl.addEventListener('click', handleStageClick);
 
     window.addEventListener('sisyphus:boulder-boost', (ev: Event) => {
       const detail = (
@@ -317,6 +391,8 @@ const { initialSummits = 1 } = Astro.props;
 
     const syncStageTitle = () => {
       const r = document.documentElement.dataset.realm || 'void';
+      cachedRealm = ''; // 强制刷新 Canvas 调色板
+      refreshPalette(r);
       if (stageTitleEl) {
         stageTitleEl.textContent = STAGE_TITLES[r] || STAGE_TITLES.void;
       }
@@ -324,43 +400,26 @@ const { initialSummits = 1 } = Astro.props;
     syncStageTitle();
     window.addEventListener('sisyphus:realmchange', syncStageTitle);
 
-    // 6x4 超清立体多面巨石（在 216x120 亚像素模式下拥有双层装甲刻面与动态盲文旋转核心！）
+    // 5x3 纯 ASCII+Braille 恒定字面巨石（内部只进行盲文纹理流转，外框永远是纯 ASCII 字符，零宽度跳变）
     const getBoulderSprite = (
       realm: string,
       frame: number,
-      hd: boolean,
-    ): [string, string, string, string] => {
+    ): [string, string, string] => {
       const f = ((frame % 6) + 6) % 6;
       if (realm === 'crt') {
-        const topRow = ['▓⣿░▒', '░▓⣿▒', '⣿░▓░', '▒⣿▒▓', '▓░⣿░', '⣿▒░▓'];
-        const botRow = ['░▒⣿▓', '▒⣿▓░', '░▓░⣿', '▓▒⣿▒', '░⣿░▓', '▓░▒⣿'];
-        return ['┌─▀▀─┐', `│${topRow[f]}│`, `│${botRow[f]}│`, '└─▄▄─┘'];
+        const cores = ['⣿:#', '#⣿:', ':⣿#', '#:⣿', '⣿#:', ':#⣿'];
+        return [' .===. ', `( ${cores[f].slice(0, 3)} )`, " '===' "];
       }
       if (realm === 'void') {
-        const topRow = hd
-          ? ['▒⣿*░', '░⠿▒+', '▒*⣿░', '░⣿▒#', '▒+⠿░', '░#▒⣿']
-          : ['▒*+░', '░+#▒', '▒#*░', '░*+▒', '▒+#░', '░#*▒'];
-        const botRow = hd
-          ? ['░+⠿▒', '▒░⣿*', '░⣿*▒', '#▒⣿░', '░⠿+▒', '⣿▒#░']
-          : ['░+#▒', '▒*+░', '░*#▒', '▒#*░', '░#+▒', '▒*#░'];
-        return ['╔═▀▀═╗', `║${topRow[f]}║`, `║${botRow[f]}║`, '╚═▄▄═╝'];
+        const cores = ['⣿*⠿', '⠿+⣿', '*⣿⠿', '⣿#⠿', '⠿*⣿', '+⠿⣿'];
+        return [' .===. ', `[ ${cores[f]} ]`, " '===' "];
       }
       if (realm === 'paper') {
-        const topRow = hd
-          ? ['░⠿=▒', '▒=⠿░', '░+⠿▒', '▒⠿#░', '░#⠿▒', '▒:⠿░']
-          : ['░#=▒', '▒=+░', '░+#▒', '▒#:░', '░:+▒', '▒+#░'];
-        const botRow = hd
-          ? ['▒:⠿░', '░⠿=▒', '▒⠿+░', '░#⠿▒', '▒⠿#░', '░=⠿▒']
-          : ['▒:#░', '░=#▒', '▒+░#', '░:#▒', '▒+#░', '░#=▒'];
-        return ['╔═▀▀═╗', `║${topRow[f]}║`, `║${botRow[f]}║`, '╚═▄▄═╝'];
+        const cores = ['⠿=:', ':=⠿', '⠿+:', ':⠿=', '=⠿:', '+:⠿'];
+        return [' .===. ', `( ${cores[f]} )`, " '===' "];
       }
-      const topRow = hd
-        ? ['▒⣿~░', '░~⠿▒', '▒⠿*░', '░:⣿▒', '▒*⠿░', '░⠿~▒']
-        : ['▒*~░', '░~o▒', '▒o:░', '░:*▒', '▒~*░', '░*~▒'];
-      const botRow = hd
-        ? ['░~⣿▒', '▒⠿~░', '░*⠿▒', '▒⣿:░', '░⠿*▒', '▒~⠿░']
-        : ['░~*▒', '▒o~░', '░:o▒', '▒*:░', '░*~▒', '▒~*░'];
-      return ['/─▀▀─\\', `│${topRow[f]}│`, `│${botRow[f]}│`, '\\─▄▄─/'];
+      const cores = ['⣿~⠿', '~⠿⣿', '⠿*⣿', '⣿:⠿', '*⠿~', '⠿⣿~'];
+      return [' .---. ', `( ${cores[f]} )`, " '---' "];
     };
 
     const CLIMB_LEGS = ['/ \\', '| /', '> \\', '\\ |'];
@@ -383,9 +442,7 @@ const { initialSummits = 1 } = Astro.props;
       'as-hud', // 10
     ];
 
-    // Drawille 2x4 Unicode 盲文位掩码映射表:
-    // (dx=0, dy=0..3) -> 0x01, 0x02, 0x04, 0x40
-    // (dx=1, dy=0..3) -> 0x08, 0x10, 0x20, 0x80
+    // Drawille 2x4 Unicode 盲文位掩码映射表
     const BRAILLE_BITS = [
       [0x01, 0x02, 0x04, 0x40],
       [0x08, 0x10, 0x20, 0x80],
@@ -432,31 +489,29 @@ const { initialSummits = 1 } = Astro.props;
       }
 
       if (nowPerf > nextMeteorTick) {
-        nextMeteorTick = nowPerf + 2100 + Math.random() * 2200;
+        nextMeteorTick = nowPerf + 1800 + Math.random() * 2000;
         if (realm === 'void') {
           subParticles.push({
-            x: 110 + Math.random() * 32,
-            y: 4 + Math.random() * 8,
-            vx: -38 - Math.random() * 14,
-            vy: 11,
+            x: 130 + Math.random() * 50,
+            y: 6 + Math.random() * 14,
+            vx: -42 - Math.random() * 16,
+            vy: 12,
             gravity: 0,
             life: 0,
-            maxLife: 0.95,
+            maxLife: 1.05,
             cls: 1,
-            asciiFallback: '*',
           });
         } else if (realm === 'amber') {
-          for (let k = 0; k < 5; k++) {
+          for (let k = 0; k < 6; k++) {
             subParticles.push({
-              x: 136 + Math.random() * 18,
-              y: 8 + Math.random() * 20,
-              vx: -26 - Math.random() * 12,
-              vy: 2.2,
+              x: 170 + Math.random() * 30,
+              y: 12 + Math.random() * 34,
+              vx: -30 - Math.random() * 14,
+              vy: 2.5,
               gravity: 0,
               life: 0,
-              maxLife: 1.4,
+              maxLife: 1.5,
               cls: k === 0 ? 2 : 1,
-              asciiFallback: '~',
             });
           }
         }
@@ -486,7 +541,7 @@ const { initialSummits = 1 } = Astro.props;
             phase = 'SUMMIT_BREATH';
             phaseElapsed = 0;
             boulderProg = 1.0;
-            sisyphusProg = 0.935;
+            sisyphusProg = 0.938;
           }
         } else {
           const targetCycle = Math.floor(totalRaw);
@@ -496,7 +551,7 @@ const { initialSummits = 1 } = Astro.props;
               phase = 'SUMMIT_BREATH';
               phaseElapsed = 0;
               boulderProg = 1.0;
-              sisyphusProg = 0.935;
+              sisyphusProg = 0.938;
             }
           } else {
             const targetFrac = totalRaw - activeCycleIndex;
@@ -510,13 +565,13 @@ const { initialSummits = 1 } = Astro.props;
           }
         }
 
-        const heaveBob = Math.sin(continuousStep * Math.PI) * 0.0025;
+        const heaveBob = Math.sin(continuousStep * Math.PI) * 0.0022;
         boulderProg = Math.min(1, Math.max(0.02, displayFrac + heaveBob));
-        sisyphusProg = Math.max(0, boulderProg - 0.068);
+        sisyphusProg = Math.max(0, boulderProg - 0.062);
       } else if (phase === 'SUMMIT_BREATH') {
         phaseElapsed += dt;
         boulderProg = 1.0;
-        sisyphusProg = 0.935;
+        sisyphusProg = 0.938;
         if (phaseElapsed > 2.2 && Math.random() < 0.45) {
           const bx = progToCol(boulderProg);
           spawnSubParticles(bx - 1.8, terrainY(bx) - 0.2, 2, -0.7, 9);
@@ -544,7 +599,7 @@ const { initialSummits = 1 } = Astro.props;
 
         if (boulderProg <= 0.022) {
           boulderProg = 0.02;
-          spawnSubParticles(progToCol(0.02) + 1.5, terrainY(10) - 0.6, 16, 0.4, 9);
+          spawnSubParticles(progToCol(0.02) + 1.5, terrainY(12) - 0.6, 16, 0.4, 9);
           phase = 'DESCENT_WALK';
           phaseElapsed = 0;
         }
@@ -563,7 +618,7 @@ const { initialSummits = 1 } = Astro.props;
             activeCycleIndex = Math.floor(latestTotal);
             displayFrac = Math.min(0.05, latestTotal - activeCycleIndex);
             boulderProg = displayFrac;
-            sisyphusProg = Math.max(0, displayFrac - 0.068);
+            sisyphusProg = Math.max(0, displayFrac - 0.062);
             phase = 'CLIMB';
             phaseElapsed = 0;
           }
@@ -579,10 +634,12 @@ const { initialSummits = 1 } = Astro.props;
     };
 
     const renderFrame = (nowPerf: number, realm: string) => {
+      refreshPalette(realm);
+
       const chars: string[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(' '));
       const cls: number[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
 
-      // Drawille 168x72 亚像素点阵缓冲区（每个字符格存储 8-bit 盲文掩码与主导颜色通道）
+      // Drawille 224x128 亚像素点阵缓冲区
       const brailleMask: number[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
       const brailleCls: number[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
 
@@ -592,7 +649,7 @@ const { initialSummits = 1 } = Astro.props;
         if (xi < 0 || xi >= SUB_W || yi < 0 || yi >= SUB_H) return;
         const col = xi >> 1;
         const row = yi >> 2;
-        if (yi >= terrainY(col) * 4 - 1) return; // 不覆盖主山脊以下前景
+        if (yi >= terrainY(col) * 4 - 1) return; // 不覆盖主山坡以下岩层
         brailleMask[row][col] |= BRAILLE_BITS[xi & 1][yi & 3];
         if (colorCls > brailleCls[row][col]) {
           brailleCls[row][col] = colorCls;
@@ -676,191 +733,239 @@ const { initialSummits = 1 } = Astro.props;
 
       const sec = nowPerf * 0.001;
 
-      // ================= 1. Drawille 196x120 亚像素天体与双层远山科幻奇观层 =================
-      if (hdSubpixelMode) {
-        // 远景双层立体山脉的 196x120 亚像素精密等高轮廓线与山脊阴影线
-        for (let px = 22; px < 134; px++) {
-          const p1 = 30 + Math.abs(px - 50) * 0.52 + Math.sin(px * 0.32) * 1.4;
-          const p2 = 34 + Math.abs(px - 84) * 0.48 + Math.cos(px * 0.25) * 1.3;
-          const p3 = 40 + Math.abs(px - 112) * 0.55 + Math.sin(px * 0.29) * 1.1;
-          const py = Math.min(p1, p2, p3);
+      // ================= 1. Drawille 224x128 宏大深空天象与三层地平线远山奇观层 =================
+      // 第一重极远山脉（高空薄雾连绵主峰群，px: 14..210）
+      for (let px = 14; px < 210; px++) {
+        const p1 = 44 + Math.abs(px - 52) * 0.44 + Math.sin(px * 0.25) * 1.4;
+        const p2 = 38 + Math.abs(px - 106) * 0.38 + Math.cos(px * 0.21) * 1.6;
+        const p3 = 46 + Math.abs(px - 162) * 0.42 + Math.sin(px * 0.28) * 1.3;
+        const py = Math.min(p1, p2, p3);
+        const groundLim = terrainY(px * 0.5) * 4 - 8;
+        if (py < groundLim) {
           setSubPixel(px, py, 4);
-          if (px % 2 === 0) setSubPixel(px, py + 2, 4);
-          // 山体内部斜向构造线
-          if (px % 5 === 0) {
-            drawSubLine(px, py + 3, px - 4, py + 11, 4);
-          }
-        }
-
-        // 高空细微星尘点阵
-        for (let sIdx = 0; sIdx < 16; sIdx++) {
-          const sx = (sIdx * 37 + 19) % (SUB_W - 16) + 8;
-          const sy = (sIdx * 23 + 7) % 34 + 4;
-          if (Math.sin(sec * 1.8 + sIdx * 1.7) > -0.25) {
-            setSubPixel(sx, sy, sIdx % 3 === 0 ? 2 : 4);
-          }
-        }
-
-        if (realm === 'void') {
-          // 《2001：太空漫游》：196x120 亚像素精密木星圆盘 + 多层风暴云带 + 双倾斜卫星轨道 + TMA-1 球面谐波
-          const jx = 34;
-          const jy = 16;
-          drawSubCircle(jx, jy, 11.0, 1, false);
-          for (let bandY = -8; bandY <= 8; bandY += 3) {
-            const halfW = Math.sqrt(Math.max(0, 118 - bandY * bandY));
-            drawSubLine(jx - halfW + 1, jy + bandY, jx + halfW - 1, jy + bandY, 1);
-          }
-          // 环木星双层椭圆卫星轨道
-          drawSubEllipseRing(jx, jy, 23, 5.4, -0.18, 2);
-          drawSubEllipseRing(jx, jy, 28, 6.8, -0.18, 4);
-
-          // TMA-1 黑石碑发射的同心亚像素球面谐波弧
-          for (let wIdx = 0; wIdx < 4; wIdx++) {
-            const rad = ((sec * 10 + wIdx * 7) % 28) + 3;
-            for (let a = -1.35; a <= 0.15; a += 0.09) {
-              setSubPixel(11 + Math.cos(a) * rad, 84 + Math.sin(a) * rad, 2);
-            }
-          }
-        } else if (realm === 'paper') {
-          // 《银河帝国》：川陀带环恒星 + 谢顿“第一辐光”三维双螺旋心理史学流形曲面！
-          drawSubCircle(34, 16, 7.2, 1, true);
-          drawSubEllipseRing(34, 16, 19, 4.6, -0.26, 3);
-          drawSubEllipseRing(34, 16, 24, 6.0, -0.26, 4);
-
-          // 第一辐光 (Prime Radiant) 196x120 亚像素相位流形与积分网格
-          for (let px = 56; px < 156; px++) {
-            const u = (px - 56) * 0.085;
-            const yA = 18 + Math.sin(u + sec * 2.0) * 7.0;
-            const yB = 18 + Math.cos(u * 0.85 - sec * 1.6) * 6.3;
-            setSubPixel(px, yA, 3);
-            setSubPixel(px, yB, 1);
-            if (px % 7 === 0) {
-              drawSubLine(px, yA, px, yB, 4);
-            }
-          }
-        } else if (realm === 'crt') {
-          // 《黑客帝国》：锡安主机双层电磁脉冲场线 + 劈向构造层的亚像素分叉闪电树
-          for (let px = 44; px < 152; px += 2) {
-            const py = 18 + Math.sin(px * 0.12 - sec * 5) * 4.2;
-            const py2 = 22 + Math.cos(px * 0.09 + sec * 3.8) * 3.2;
-            setSubPixel(px, py, 2);
-            if (px % 4 === 0) setSubPixel(px, py2, 4);
-          }
-          if (sec % 2.4 < 0.48) {
-            let lx = 94 + Math.sin(sec * 17) * 16;
-            let ly = 2;
-            for (let seg = 0; seg < 9; seg++) {
-              const nx = lx + (Math.sin(seg * 3.7 + sec * 31) * 8);
-              const ny = ly + 6;
-              drawSubLine(lx, ly, nx, ny, 9);
-              if (seg === 3 || seg === 6) {
-                drawSubLine(lx, ly, lx - 14, ly + 11, 3);
-              }
-              lx = nx;
-              ly = ny;
-            }
-          }
-        } else {
-          // 《沙丘》：厄拉科斯精密亚像素新月双星 + 巨型沙虫夏胡鲁蜿蜒亚像素环状躯干 + 沙槌地震波
-          drawSubCircle(26, 14, 8.6, 1, true, 3.9); // 穆阿迪布弯月
-          drawSubCircle(50, 19, 4.4, 2, true, 2.1); // 弗雷曼蓝光伴月
-
-          // 巨型沙虫夏胡鲁 (Shai-Hulud) 196x120 亚像素厚重拱起躯干与体节环纹
-          const wormPhase = sec * 3.6;
-          for (let wx = 28; wx < 104; wx++) {
-            const arch = Math.sin((wx - 28) * 0.125 - wormPhase) * 8.8;
-            const groundPy = terrainY(wx * 0.5) * 4;
-            const wy = groundPy - 4 - arch;
-            if (wy < groundPy - 2) {
-              for (let thick = 0; thick < 5; thick++) {
-                const isRing = wx % 4 === 0 && thick > 0;
-                setSubPixel(wx, wy + thick, thick === 0 ? 1 : isRing ? 9 : 4);
-              }
-            }
-          }
-
-          // 塔布尔穴地沙槌同心地震波
-          const thumpR = ((sec * 13) % 24) + 2;
-          drawSubEllipseRing(12, 96, thumpR * 1.5, thumpR * 0.48, 0, 2);
-        }
-
-        // 将所有亚像素火花/流星/香料粒子光栅化至 196x120 盲文缓冲区
-        for (const sp of subParticles) {
-          setSubPixel(sp.x, sp.y, sp.cls);
-          setSubPixel(sp.x - sp.vx * 0.018, sp.y - sp.vy * 0.018, sp.cls);
-        }
-
-        // 点击画布触发的 196x120 亚像素高能天象集束流
-        if (skyStrikeTimer > 0) {
-          const bTargetPx = progToCol(boulderProg) * 2;
-          const bTargetPy = (terrainY(progToCol(boulderProg)) - 2) * 4;
-          drawSubLine(skyStrikeCol * 2, 2, bTargetPx, bTargetPy, 9);
-          drawSubLine(skyStrikeCol * 2 + 2, 2, bTargetPx - 1, bTargetPy, 2);
-          drawSubCircle(bTargetPx, bTargetPy, (0.6 - skyStrikeTimer) * 20, 9, false);
-        }
-
-        // 将 196x120 盲文缓冲区合成为 98x30 的 Unicode 盲文字符 (U+2800..U+28FF，严格 1ch 宽度)
-        for (let r = 0; r < ROWS; r++) {
-          for (let c = 0; c < COLS; c++) {
-            const mask = brailleMask[r][c];
-            if (mask !== 0) {
-              chars[r][c] = String.fromCharCode(0x2800 | mask);
-              cls[r][c] = brailleCls[r][c] || 2;
-            }
+          if (px % 4 === 0 && py + 9 < groundLim) {
+            drawSubLine(px, py + 2, px - 5, py + 9, 4);
           }
         }
       }
 
-      // ================= 2. 四大科幻原著标志性前景器物与舰船层 =================
+      // 第二重中景障壁山脉与峡谷脊线（px: 6..182）
+      for (let px = 6; px < 182; px++) {
+        const m1 = 62 + Math.abs(px - 34) * 0.42 + Math.cos(px * 0.31) * 1.2;
+        const m2 = 56 + Math.abs(px - 78) * 0.36 + Math.sin(px * 0.24) * 1.4;
+        const m3 = 52 + Math.abs(px - 134) * 0.34 + Math.cos(px * 0.19) * 1.2;
+        const my = Math.min(m1, m2, m3);
+        const groundLim = terrainY(px * 0.5) * 4 - 3;
+        if (my < groundLim) {
+          setSubPixel(px, my, 4);
+          if (px % 2 === 0) setSubPixel(px, my + 1, 4);
+          if (px % 6 === 0 && my + 10 < groundLim) {
+            drawSubLine(px, my + 2, px + 4, my + 10, 4);
+          }
+        }
+      }
+
+      // 高空深空星场与星座几何连线（28 颗闪烁星辰 + 星座导航折线）
+      const constellations = [
+        [82, 10, 96, 14],
+        [96, 14, 112, 9],
+        [112, 9, 124, 17],
+        [148, 12, 164, 8],
+        [164, 8, 178, 15],
+      ] as const;
+      for (const [x0, y0, x1, y1] of constellations) {
+        drawSubLine(x0, y0, x1, y1, 4);
+        drawSubCircle(x0, y0, 1.1, 2, true);
+        drawSubCircle(x1, y1, 1.1, 2, true);
+      }
+      for (let sIdx = 0; sIdx < 28; sIdx++) {
+        const sx = ((sIdx * 43 + 17) % (SUB_W - 14)) + 7;
+        const sy = ((sIdx * 29 + 5) % 44) + 4;
+        if (Math.sin(sec * 1.7 + sIdx * 1.9) > -0.3) {
+          setSubPixel(sx, sy, sIdx % 4 === 0 ? 1 : sIdx % 2 === 0 ? 2 : 4);
+        }
+      }
+
       if (realm === 'void') {
-        if (!hdSubpixelMode) {
-          putStr(1, 12, '.─~═══~─.', 1);
-          putStr(2, 12, '│▒▒(o)░░│', 1);
-          putStr(3, 12, "'─~═══~─'", 1);
+        // 《2001：太空漫游》：巨型木星圆盘 + 风暴云带 + 双层倾斜公转卫星轨道 + 亚像素发现号飞船 + TMA-1 球面谐波
+        const jx = 40;
+        const jy = 20;
+        drawSubCircle(jx, jy, 13.5, 1, false);
+        for (let bandY = -10; bandY <= 10; bandY += 3) {
+          const halfW = Math.sqrt(Math.max(0, 178 - bandY * bandY));
+          drawSubLine(jx - halfW + 1, jy + bandY, jx + halfW - 1, jy + bandY, 1);
         }
-        put(4, 17, 'o', 9); // 木星大红斑核心
-        const m1x = Math.round(17 + Math.cos(sec * 0.9) * 11);
-        const m2x = Math.round(17 + Math.sin(sec * 0.55) * 13);
-        put(4, m1x, '*', 2);
-        put(3, m2x, '+', 3);
+        drawSubEllipseRing(jx, jy, 28, 6.2, -0.18, 2);
+        drawSubEllipseRing(jx, jy, 35, 8.0, -0.18, 4);
 
-        // 发现号深空飞船 (XD-1 Discovery One) 加长精密舰体
-        const shipX = 28 + (Math.floor(sec * 3.5) % 42);
-        if (shipX + 12 < 82) {
-          putStr(5, shipX, ':::', sec % 0.4 < 0.2 ? 2 : 3);
-          putStr(5, shipX + 3, 'O═══╤══>', 5);
-        }
+        // 发现号深空飞船 (XD-1 Discovery One)：纯亚像素精细球形乘员舱 + 长桁架脊柱 + 尾部核热推进器尾焰
+        const shipPx = 76 + ((sec * 9.5) % 96);
+        const shipPy = 24 + Math.sin(sec * 1.4) * 1.8;
+        drawSubCircle(shipPx + 14, shipPy, 3.2, 5, false); // 前部球形乘员舱
+        drawSubLine(shipPx, shipPy, shipPx + 11, shipPy, 5); // 主桁架脊柱
+        drawSubLine(shipPx + 4, shipPy - 2, shipPx + 4, shipPy + 2, 2); // 中段天线阵
+        drawSubLine(shipPx - 5, shipPy - 1, shipPx, shipPy, 9); // 离子尾焰
+        drawSubLine(shipPx - 5, shipPy + 1, shipPx, shipPy, 2);
 
-        const halPulse = Math.floor(sec * 2) % 2 === 0 ? '(o)' : '(O)';
-        putStr(0, 83, '[HAL:9000 ', 10);
-        putStr(0, 93, halPulse, 9);
-        put(0, 96, ']', 10);
-
-        // 第谷环形山 TMA-1 1:4:9 黑色方尖碑
-        for (let r = 20; r <= 25; r++) {
-          putStr(r, 4, '███', 5);
+        // TMA-1 黑石碑发射的同心亚像素球面谐波弧
+        for (let wIdx = 0; wIdx < 4; wIdx++) {
+          const rad = ((sec * 10 + wIdx * 7.5) % 30) + 4;
+          for (let a = -1.4; a <= 0.15; a += 0.08) {
+            setSubPixel(13 + Math.cos(a) * rad, 92 + Math.sin(a) * rad, 2);
+          }
         }
       } else if (realm === 'paper') {
-        if (!hdSubpixelMode) {
-          putStr(1, 13, '  .─═─.  ', 1);
-          putStr(2, 13, '══╡ O ╞══', 1);
-          putStr(3, 13, "  '─═─'  ", 1);
-        } else {
-          put(4, 17, 'O', 1);
-        }
-        putStr(0, 72, '[PRIME_RADIANT // SELDON]', 1);
+        // 《银河帝国》：川陀带环双星系统 + 谢顿“第一辐光”三维双螺旋心理史学流形 + 亚像素帝国巡洋舰编队
+        drawSubCircle(38, 20, 8.8, 1, true);
+        drawSubEllipseRing(38, 20, 23, 5.4, -0.26, 3);
+        drawSubEllipseRing(38, 20, 29, 7.0, -0.26, 4);
 
-        const fleetX = 28 + (Math.floor(sec * 4.5) % 44);
-        if (fleetX + 8 < 80) {
-          putStr(6, fleetX, '...-==>', 1);
-          putStr(7, fleetX - 5, '..-=>', 4);
+        // 第一辐光 (Prime Radiant) 亚像素相位流形与积分网格
+        for (let px = 68; px < 194; px++) {
+          const u = (px - 68) * 0.075;
+          const yA = 20 + Math.sin(u + sec * 2.0) * 8.2;
+          const yB = 20 + Math.cos(u * 0.85 - sec * 1.6) * 7.4;
+          setSubPixel(px, yA, 3);
+          setSubPixel(px, yB, 1);
+          if (px % 7 === 0) {
+            drawSubLine(px, yA, px, yB, 4);
+          }
         }
 
-        // 端点星谢顿穹顶 (Seldon Vault)
-        putStr(22, 2, ' ╔══╦══╗ ', 4);
-        putStr(23, 2, '╔╣  ║  ╠╗', 4);
-        putStr(24, 2, '║║  ║  ║║', 4);
-        putStr(25, 2, '╩╩══╩══╩╩', 4);
+        // 亚像素银河基地巡洋舰双机编队
+        const fleetPx = 64 + ((sec * 11) % 104);
+        drawSubLine(fleetPx, 36, fleetPx + 9, 36, 1);
+        drawSubLine(fleetPx + 5, 34, fleetPx + 9, 36, 1);
+        drawSubLine(fleetPx + 5, 38, fleetPx + 9, 36, 1);
+        drawSubLine(fleetPx - 12, 41, fleetPx - 5, 41, 3);
+        drawSubLine(fleetPx - 8, 39, fleetPx - 5, 41, 3);
+      } else if (realm === 'crt') {
+        // 《黑客帝国》：锡安主机多层电磁脉冲云层 + 劈向山谷的分叉闪电树 + 亚像素尼布甲尼撒号气垫船
+        for (let px = 36; px < 196; px += 2) {
+          const py = 18 + Math.sin(px * 0.11 - sec * 5) * 4.5;
+          const py2 = 24 + Math.cos(px * 0.08 + sec * 3.8) * 3.5;
+          setSubPixel(px, py, 2);
+          if (px % 4 === 0) setSubPixel(px, py2, 4);
+        }
+        if (sec % 2.2 < 0.5) {
+          let lx = 112 + Math.sin(sec * 17) * 24;
+          let ly = 3;
+          for (let seg = 0; seg < 11; seg++) {
+            const nx = lx + Math.sin(seg * 3.7 + sec * 31) * 9;
+            const ny = ly + 6;
+            drawSubLine(lx, ly, nx, ny, 9);
+            if (seg === 3 || seg === 6) {
+              drawSubLine(lx, ly, lx - 15, ly + 12, 3);
+            }
+            lx = nx;
+            ly = ny;
+          }
+        }
+
+        // 亚像素尼布甲尼撒号气垫船（椭圆船体 + 四组电磁反重力悬浮喷口）
+        const hovPx = 102 + Math.sin(sec * 1.3) * 26;
+        const hovPy = 32 + Math.cos(sec * 2.2) * 3.5;
+        drawSubEllipseRing(hovPx, hovPy, 9, 2.8, 0, 3);
+        drawSubLine(hovPx - 6, hovPy + 3, hovPx - 8, hovPy + 6, 2);
+        drawSubLine(hovPx + 6, hovPy + 3, hovPx + 8, hovPy + 6, 2);
+      } else {
+        // 《沙丘》：厄拉科斯精密亚像素新月双星 + 蜻蜓四翼高频振翅扑翼机 + 巨型沙虫夏胡鲁 + 沙槌地震波
+        drawSubCircle(32, 16, 10.2, 1, true, 4.4); // 穆阿迪布主弯月
+        drawSubCircle(62, 22, 5.2, 2, true, 2.5); // 弗雷曼手印伴月
+
+        // 厄拉科斯高空平行香料风沙流线
+        for (let wLine = 0; wLine < 4; wLine++) {
+          const wy0 = 14 + wLine * 11;
+          const wx0 = ((sec * 24 + wLine * 47) % 160) + 20;
+          drawSubLine(wx0, wy0, wx0 + 18, wy0 + 2, 4);
+        }
+
+        // 阿崔迪蜻蜓扑翼机 (Atreides Ornithopter)：100% 在 224x128 亚像素层绘制机身、驾驶舱、修长尾翼与四片高频连续扇动机翼（彻底消除 ASCII 字符宽度跳变！）
+        const thopPx = 68 + ((sec * 13.5) % 112);
+        const thopPy = 24 + Math.sin(sec * 2.8) * 3.2;
+        const wingAngle = Math.sin(sec * 22) * 6.5;
+        const wingAngle2 = Math.cos(sec * 22) * 5.2;
+        // 机身与尾梁
+        drawSubLine(thopPx - 8, thopPy, thopPx + 7, thopPy, 1);
+        drawSubLine(thopPx - 8, thopPy, thopPx - 11, thopPy - 3, 1);
+        drawSubCircle(thopPx + 5, thopPy, 1.8, 9, true); // 驾驶舱高光
+        // 前后两对蜻蜓扑翼（连续平滑正弦角度扇动）
+        drawSubLine(thopPx + 2, thopPy, thopPx - 5, thopPy - 2 + wingAngle, 1);
+        drawSubLine(thopPx + 2, thopPy, thopPx + 11, thopPy - 2 - wingAngle, 1);
+        drawSubLine(thopPx - 1, thopPy, thopPx - 7, thopPy + 1 + wingAngle2, 2);
+        drawSubLine(thopPx - 1, thopPy, thopPx + 8, thopPy + 1 - wingAngle2, 2);
+
+        // 巨型沙虫夏胡鲁 (Shai-Hulud) 224x128 亚像素厚重拱起躯干与体节环纹
+        const wormPhase = sec * 3.6;
+        for (let wx = 34; wx < 138; wx++) {
+          const arch = Math.sin((wx - 34) * 0.1 - wormPhase) * 11.5;
+          const groundPy = terrainY(wx * 0.5) * 4;
+          const wy = groundPy - 4 - arch;
+          if (wy < groundPy - 2) {
+            for (let thick = 0; thick < 6; thick++) {
+              const isRing = wx % 4 === 0 && thick > 0;
+              setSubPixel(wx, wy + thick, thick === 0 ? 1 : isRing ? 9 : 4);
+            }
+          }
+        }
+
+        // 塔布尔穴地沙槌同心地震波
+        const thumpR = ((sec * 13) % 26) + 2;
+        drawSubEllipseRing(12, 102, thumpR * 1.5, thumpR * 0.48, 0, 2);
+      }
+
+      // 将所有亚像素火花/流星/香料粒子光栅化至 224x128 盲文缓冲区
+      for (const sp of subParticles) {
+        setSubPixel(sp.x, sp.y, sp.cls);
+        setSubPixel(sp.x - sp.vx * 0.018, sp.y - sp.vy * 0.018, sp.cls);
+      }
+
+      // 点击画布触发的 224x128 亚像素高能天象集束流
+      if (skyStrikeTimer > 0) {
+        const bTargetPx = progToCol(boulderProg) * 2;
+        const bTargetPy = (terrainY(progToCol(boulderProg)) - 2) * 4;
+        drawSubLine(skyStrikeCol * 2, 2, bTargetPx, bTargetPy, 9);
+        drawSubLine(skyStrikeCol * 2 + 2, 2, bTargetPx - 1, bTargetPy, 2);
+        drawSubCircle(bTargetPx, bTargetPy, (0.6 - skyStrikeTimer) * 22, 9, false);
+      }
+
+      // 将 224x128 盲文缓冲区合成为 112x32 的 Unicode 盲文字符 (U+2800..U+28FF)
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const mask = brailleMask[r][c];
+          if (mask !== 0) {
+            chars[r][c] = String.fromCharCode(0x2800 | mask);
+            cls[r][c] = brailleCls[r][c] || 2;
+          }
+        }
+      }
+
+      // ================= 2. 四大科幻原著标志性地面建筑与天体核心标记（全部使用纯 ASCII 字符，零宽度漂移） =================
+      if (realm === 'void') {
+        put(5, 20, 'o', 9); // 木星大红斑核心
+        const m1x = Math.round(20 + Math.cos(sec * 0.9) * 14);
+        const m2x = Math.round(20 + Math.sin(sec * 0.55) * 17);
+        put(5, m1x, '*', 2);
+        put(4, m2x, '+', 3);
+
+        const halPulse = Math.floor(sec * 2) % 2 === 0 ? '(o)' : '(O)';
+        putStr(0, 96, '[HAL:9000 ', 10);
+        putStr(0, 106, halPulse, 9);
+        put(0, 109, ']', 10);
+
+        // 第谷环形山 TMA-1 1:4:9 黑色方尖碑
+        for (let r = 21; r <= 26; r++) {
+          putStr(r, 4, '###', 5);
+        }
+      } else if (realm === 'paper') {
+        put(5, 19, 'O', 1);
+        putStr(0, 85, '[PRIME_RADIANT // SELDON]', 1);
+
+        // 端点星谢顿全息穹顶 (Seldon Vault)
+        putStr(23, 2, ' .===. ', 4);
+        putStr(24, 2, '/| | |\\', 4);
+        putStr(25, 2, '|| | ||', 4);
+        putStr(26, 2, '=======', 4);
       } else if (realm === 'crt') {
         const rainChars = ['0', '1', ':', '|', '+', '#', '7', '9'];
         for (const drop of matrixDrops) {
@@ -875,12 +980,13 @@ const { initialSummits = 1 } = Astro.props;
           }
         }
 
+        // 远景机器城能量塔群
         const towers = [
-          [11, 16, 4],
-          [18, 13, 5],
-          [26, 14, 4],
-          [34, 15, 5],
-          [43, 16, 4],
+          [12, 18, 4],
+          [20, 15, 5],
+          [29, 16, 4],
+          [38, 17, 5],
+          [48, 18, 4],
         ] as const;
         towers.forEach(([tc, topR, tw], idx) => {
           const botR = Math.round(terrainY(tc)) - 1;
@@ -888,48 +994,25 @@ const { initialSummits = 1 } = Astro.props;
             for (let xOff = 0; xOff < tw; xOff++) {
               const isEdge = xOff === 0 || xOff === tw - 1 || r === topR;
               if (isEdge) {
-                put(r, tc + xOff, r === topR ? '▀' : '│', 4);
+                put(r, tc + xOff, r === topR ? '=' : '|', 4);
               } else if ((r + xOff + Math.floor(sec * 2 + idx)) % 3 === 0) {
-                put(r, tc + xOff, '▪', idx % 2 === 0 ? 9 : 1);
+                put(r, tc + xOff, ':', idx % 2 === 0 ? 9 : 1);
               }
             }
           }
         });
-
-        // 尼布甲尼撒号气垫船 (Nebuchadnezzar)
-        const hoverX = Math.round(44 + Math.sin(sec * 1.3) * 10);
-        const hoverY = Math.round(5.0 + Math.cos(sec * 2.2) * 0.9);
-        putStr(hoverY, hoverX, '<═╦═╬═╦═>', 3);
-        putStr(0, 71, '[ZION_MAINFRAME // 0x5F37]', 2);
+        putStr(0, 84, '[ZION_MAINFRAME // 0x5F37]', 2);
       } else {
-        if (!hdSubpixelMode) {
-          putStr(1, 11, '(o)', 1);
-          put(2, 19, 'o', 2);
-        }
-        // 阿崔迪扑翼机 (Ornithopter) 高频振翅掠过障壁山脉
-        const thopterX = 26 + (Math.floor(sec * 5.5) % 48);
-        const wingFrame = Math.floor(sec * 11) % 3;
-        const wings = wingFrame === 0 ? '\\\\═╦═//' : wingFrame === 1 ? '──═╦═──' : '//═╦═\\\\';
-        if (thopterX + 8 < 82) {
-          putStr(3 + (wingFrame === 2 ? 1 : 0), thopterX, wings, 1);
-        }
-
         // 弗雷曼沙槌 (Thumper)
         const thumpBeat = sec % 2.2;
-        put(22, 5, thumpBeat < 0.25 ? '▄' : '╤', 9);
-        put(23, 5, '║', 1);
-        put(24, 5, '║', 1);
-        put(25, 5, '╩', 1);
-        putStr(0, 73, '[ARRAKIS // SHIELD_WALL]', 1);
+        put(23, 5, thumpBeat < 0.25 ? '=' : 'T', 9);
+        put(24, 5, '|', 1);
+        put(25, 5, '|', 1);
+        put(26, 5, '^', 1);
+        putStr(0, 86, '[ARRAKIS // SHIELD_WALL]', 1);
       }
 
-      if (!hdSubpixelMode) {
-        for (const sp of subParticles) {
-          put(sp.y * 0.25, sp.x * 0.5, sp.asciiFallback, sp.cls);
-        }
-      }
-
-      // ================= 3. 主山脊线与 Chafa 明暗法线地质岩层 =================
+      // ================= 3. 低缓主山脊线与纯 ASCII/Braille 地质岩层（仅占底部 25% 空间） =================
       const treadShift = Math.floor(continuousRoll * 2.2);
       for (let c = 0; c < COLS; c++) {
         const yExact = terrainY(c);
@@ -937,9 +1020,9 @@ const { initialSummits = 1 } = Astro.props;
         const nextY = terrainY(Math.min(COLS - 1, c + 1));
         const diff = nextY - yExact;
 
-        let ridgeChar = '─';
-        if (c >= 87) ridgeChar = '═';
-        else if (diff < -0.1) ridgeChar = '/';
+        let ridgeChar = '=';
+        if (c >= 99) ridgeChar = '=';
+        else if (diff < -0.08) ridgeChar = '/';
         else ridgeChar = '_';
 
         if (sr >= 0 && sr < ROWS) {
@@ -948,7 +1031,7 @@ const { initialSummits = 1 } = Astro.props;
 
         for (let r = sr + 1; r < ROWS; r++) {
           const depth = r - sr;
-          let fill = '░';
+          let fill = ':';
           let colorId = 6;
 
           if (realm === 'crt') {
@@ -959,10 +1042,10 @@ const { initialSummits = 1 } = Astro.props;
                   ? '1'
                   : '0'
                 : depth === 2
-                  ? '┼'
+                  ? '+'
                   : (c + r) % 3 === 0
-                    ? '▒'
-                    : '░';
+                    ? '#'
+                    : ':';
             if (pulseWave && depth <= 3) colorId = 3;
           } else if (realm === 'paper') {
             fill =
@@ -977,43 +1060,42 @@ const { initialSummits = 1 } = Astro.props;
                     : '.';
           } else if (realm === 'amber') {
             const sandDrift = (c + r + Math.floor(sec * 3)) % 5;
-            fill = depth === 1 ? '~' : sandDrift === 0 ? '-' : depth <= 3 ? '▒' : '░';
+            fill = depth === 1 ? '~' : sandDrift === 0 ? '-' : depth <= 3 ? ':' : '.';
             if (sandDrift === 0 && depth === 2) colorId = 1;
           } else {
             const harmonic = (c * 2 + r + Math.floor(sec * 4)) % 17 === 0;
-            fill = depth === 1 ? '▓' : depth <= 3 ? '▒' : (r + c) % 2 === 0 ? '░' : ':';
+            fill = depth === 1 ? '#' : depth <= 3 ? '+' : (r + c) % 2 === 0 ? ':' : '.';
             if (harmonic) colorId = 2;
           }
           put(r, c, fill, colorId);
         }
       }
 
-      // 峰顶信标红旗与山巅界碑（全部严格收拢在 98 列可视画幅内部，右侧山顶直接延展至画框边缘）
-      const peakR = Math.round(terrainY(90));
+      // 峰顶信标红旗与山巅界碑（位于缓坡尽头高原，绝不错位）
+      const peakR = Math.round(terrainY(103));
       const flagWave = Math.floor(sec * 5) % 2 === 0 ? '[~>' : '[=>';
-      put(peakR - 2, 91, '│', 5);
-      put(peakR - 1, 91, '┴', 5);
-      putStr(peakR - 2, 92, flagWave, 9);
-      put(peakR - 1, 96, '▲', 4);
+      put(peakR - 2, 103, '|', 5);
+      put(peakR - 1, 103, '+', 5);
+      putStr(peakR - 2, 104, flagWave, 9);
+      putStr(peakR - 1, 108, '/\\', 4);
 
-      // ================= 4. 绘制 6x4 超清立体滚动多面体巨石 =================
+      // ================= 4. 绘制滚动巨石精灵 =================
       const bCol = progToCol(boulderProg);
       let bGroundY = terrainY(bCol);
 
       if (phase === 'AVALANCHE') {
-        const bounce = Math.abs(Math.sin(boulderProg * Math.PI * 7.0)) * 1.75;
+        const bounce = Math.abs(Math.sin(boulderProg * Math.PI * 7.0)) * 1.5;
         bGroundY -= bounce;
       } else if (phase === 'SUMMIT_BREATH' && phaseElapsed > 2.2) {
-        bGroundY -= (Math.random() - 0.5) * 0.25;
+        bGroundY -= (Math.random() - 0.5) * 0.2;
       }
 
-      const rockSprite = getBoulderSprite(realm, Math.floor(continuousRoll), hdSubpixelMode);
-      const rockTopRow = Math.round(bGroundY) - 4;
-      const rockLeftCol = Math.round(bCol) - 2;
+      const rockSprite = getBoulderSprite(realm, Math.floor(continuousRoll));
+      const rockTopRow = Math.round(bGroundY) - 3;
+      const rockLeftCol = Math.round(bCol) - 3;
       putStr(rockTopRow, rockLeftCol, rockSprite[0], 8);
       putStr(rockTopRow + 1, rockLeftCol, rockSprite[1], 8);
       putStr(rockTopRow + 2, rockLeftCol, rockSprite[2], 8);
-      putStr(rockTopRow + 3, rockLeftCol, rockSprite[3], 8);
 
       // ================= 5. 绘制关节化西西弗斯小人 + 原著独白气泡 =================
       const sCol = progToCol(sisyphusProg);
@@ -1025,7 +1107,7 @@ const { initialSummits = 1 } = Astro.props;
 
       if (phase === 'CLIMB') {
         const legIdx = Math.floor(continuousStep) % CLIMB_LEGS.length;
-        const armPush = Math.floor(continuousStep * 0.5) % 2 === 0 ? '/|═' : '/|─';
+        const armPush = Math.floor(continuousStep * 0.5) % 2 === 0 ? '/|=' : '/|-';
         const headPose = boostVelocity > 0.02 || sprintToSummit ? ' o/' : ' o_';
 
         putStr(sGroundRow - 3, sLeft, headPose, 7);
@@ -1075,12 +1157,12 @@ const { initialSummits = 1 } = Astro.props;
           putStr(Math.max(1, sGroundRow - 5), Math.max(1, sLeft - 3), '(happy.)', 7);
         } else {
           putStr(sGroundRow - 3, sLeft, ' o_', 7);
-          putStr(sGroundRow - 2, sLeft, '/|═', 7);
+          putStr(sGroundRow - 2, sLeft, '/|=', 7);
           putStr(sGroundRow - 1, sLeft, '/ \\', 7);
         }
       }
 
-      // ================= 6. 左上角内嵌 TUI 遥测角标（与全站全局海拔数据源 100% 统一） =================
+      // ================= 6. 左上角内嵌 TUI 遥测角标 =================
       const latestTotalNow = getTotalRawCycles(Date.now());
       const unifiedCycleIdx = Math.floor(latestTotalNow);
       const unifiedFrac =
@@ -1105,7 +1187,28 @@ const { initialSummits = 1 } = Astro.props;
         putStr(0, 18, `>> +${lastBoostGainMeters.toFixed(1)}m [${lastBoostSource}] <<`, 9);
       }
 
-      // ================= 7. 合并连续同色字符输出高对比多彩 HTML =================
+      // ================= 7. Canvas 固定格点字符光栅渲染（借鉴 ROT.Display / Xterm.js，彻底根除行宽抖动！） =================
+      if (ctx) {
+        const totalW = COLS * CELL_W;
+        const totalH = ROWS * CELL_H;
+        ctx.fillStyle = palette.bg;
+        ctx.fillRect(0, 0, totalW, totalH);
+        ctx.textBaseline = 'top';
+        ctx.font = '600 11.5px Menlo, Monaco, Consolas, "JetBrains Mono", "SF Mono", monospace';
+
+        for (let r = 0; r < ROWS; r++) {
+          const yPx = r * CELL_H + 1;
+          for (let c = 0; c < COLS; c++) {
+            const ch = chars[r][c];
+            if (ch === ' ') continue;
+            const colorId = cls[r][c];
+            ctx.fillStyle = palette.colors[colorId] || palette.colors[0];
+            ctx.fillText(ch, c * CELL_W, yPx);
+          }
+        }
+      }
+
+      // 同步无障碍与测试镜面 `<pre>`
       const htmlLines: string[] = [];
       for (let r = 0; r < ROWS; r++) {
         let lineHtml = '';

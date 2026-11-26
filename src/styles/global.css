@@ -874,11 +874,49 @@ main.page-main {
   -webkit-line-clamp: 2;
 }
 
-/* 108x30 (216x120 亚像素 = 25,920 点阵) 高密度宽画幅西西弗斯 ASCII 剧场画布 */
+/* 112x32 (224x128 亚像素 = 28,672 点阵) 固定格点 Canvas 光栅化西西弗斯 ASCII 剧场画布 */
 .sisyphus-stage-card {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.ascii-slope-viewport {
+  position: relative;
+  width: 100%;
+  background: var(--stage-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  padding: 0.35rem 0.4rem;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: inset 0 0 32px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+
+.ascii-slope-viewport:hover {
+  border-color: var(--accent);
+}
+
+.ascii-slope-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 896 / 448;
+  image-rendering: auto;
+}
+
+.ascii-slope-pre.is-sr-mirror {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: pre;
+  border: 0;
+  pointer-events: none;
 }
 
 .ascii-slope-pre {
