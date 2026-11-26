@@ -251,16 +251,27 @@ const { initialSummits = 1 } = Astro.props;
     let skyStrikeTimer = 0;
     let skyStrikeCol = 54;
 
-    // 险峻高耸半山曲线：山麓在 y=32.0，陡峭攀升 24 行至右侧山顶高原 y=8.0，同时左上方拥有极其辽阔的深空与双层远山视野！
+    // 多地形起伏山脊曲线：
+    // 1. 山麓起点贴近画幅最底部 y=34.2（总高 36 行，底部仅留 1~2 行基岩）
+    // 2. 山峰最高处位于画幅从下往上 2/3 高度处 y=12.2（36 * (1 - 2/3) = 12）
+    // 3. 山坡带有明显的高低起伏（前哨陡坡 -> 第一高冈 -> 马鞍缓谷 -> 绝壁陡坡 -> 高山鞍部 -> 冲顶陡崖 -> 峰顶高原）
     const terrainY = (c: number): number => {
-      if (c <= 10) return 32.0;
-      if (c >= 99) return 8.0;
-      const u = (c - 10) / 89;
-      const base = 32.0 - u * 24.0;
-      const crag =
-        Math.sin(u * Math.PI * 3.0) * 0.45 * Math.sin(u * Math.PI) +
-        Math.sin(u * Math.PI * 7.0) * 0.16 * Math.sin(u * Math.PI);
-      return base + crag;
+      if (c <= 9) return 34.2;
+      if (c >= 99) return 12.2;
+      const u = (c - 9) / 90;
+      const base = 34.2 - u * 22.0; // 34.2 -> 12.2
+      // 复合双频地形波：形成 2 个小山包/马鞍谷与 3 段陡壁的真实高低起伏
+      const undulation =
+        -Math.sin(u * Math.PI * 4.0) * 1.65 * Math.sin(u * Math.PI) +
+        Math.sin(u * Math.PI * 8.0) * 0.45 * Math.sin(u * Math.PI);
+      return Math.max(11.8, Math.min(34.4, base + undulation));
+    };
+
+    // 计算任意列处的局部爬升坡度 (正值越大代表上坡越陡，0 或负值代表平缓台地/鞍部微下坡)
+    const getTerrainGrade = (c: number): number => {
+      const c0 = Math.max(0, Math.min(COLS - 2, c - 1));
+      const c1 = Math.min(COLS - 1, c0 + 2);
+      return (terrainY(c0) - terrainY(c1)) / (c1 - c0);
     };
 
     const progToCol = (p: number): number => {
@@ -422,7 +433,10 @@ const { initialSummits = 1 } = Astro.props;
       return [' .---. ', `( ${cores[f]} )`, " '---' "];
     };
 
-    const CLIMB_LEGS = ['/ \\', '| /', '> \\', '\\ |'];
+    // 针对起伏山坡不同坡度点位的多模态腿部与推石动作库
+    const STEEP_CLIMB_LEGS = ['/>\\', '|/\\', '/>|', '/\\|']; // 陡坡深弓步蹬地
+    const NORMAL_CLIMB_LEGS = ['/ \\', '| /', '> \\', '\\ |']; // 标准斜坡攀登
+    const SADDLE_STRIDE_LEGS = ['/ >', '| \\', '/ |', '> \\']; // 鞍部/缓坡大步推进
     const WALK_DOWN_LEGS = ['/ \\', '| \\', '/ |', '\\ /'];
 
     const escapeHtml = (s: string) =>
@@ -521,14 +535,25 @@ const { initialSummits = 1 } = Astro.props;
       if (skyStrikeTimer > 0) skyStrikeTimer = Math.max(0, skyStrikeTimer - dt);
 
       if (phase === 'CLIMB') {
-        const speedMult = sprintToSummit ? 6.5 : 1 + boostVelocity * 11;
+        const curCol = progToCol(boulderProg);
+        const curGrade = getTerrainGrade(curCol);
+        // 陡坡处步频沉重扎实、碎石飞溅更频繁；缓坡/鞍部处步频轻快
+        const slopeTempo = curGrade > 0.36 ? 0.76 : curGrade < 0.12 ? 1.28 : 1.0;
+        const speedMult = (sprintToSummit ? 6.5 : 1 + boostVelocity * 11) * slopeTempo;
         continuousStep += dt * 2.6 * speedMult;
         continuousRoll += dt * 2.1 * speedMult;
 
         if (nowPerf > nextPebbleTick) {
-          nextPebbleTick = nowPerf + (boostVelocity > 0.02 || sprintToSummit ? 130 : 560);
+          const baseInterval = curGrade > 0.36 ? 360 : 580;
+          nextPebbleTick = nowPerf + (boostVelocity > 0.02 || sprintToSummit ? 120 : baseInterval);
           const sx = progToCol(sisyphusProg);
-          spawnSubParticles(sx - 1.4, terrainY(sx) - 0.4, 2, -0.9, boostVelocity > 0.02 ? 9 : 5);
+          spawnSubParticles(
+            sx - 1.4,
+            terrainY(sx) - 0.4,
+            curGrade > 0.36 ? 3 : 2,
+            -0.9,
+            boostVelocity > 0.02 || curGrade > 0.38 ? 9 : 5,
+          );
         }
 
         if (sprintToSummit) {
@@ -811,7 +836,7 @@ const { initialSummits = 1 } = Astro.props;
         for (let wIdx = 0; wIdx < 4; wIdx++) {
           const rad = ((sec * 10 + wIdx * 7.5) % 30) + 4;
           for (let a = -1.4; a <= 0.15; a += 0.08) {
-            setSubPixel(13 + Math.cos(a) * rad, 110 + Math.sin(a) * rad, 2);
+            setSubPixel(13 + Math.cos(a) * rad, 118 + Math.sin(a) * rad, 2);
           }
         }
       } else if (realm === 'paper') {
@@ -911,7 +936,7 @@ const { initialSummits = 1 } = Astro.props;
 
         // 塔布尔穴地沙槌同心地震波
         const thumpR = ((sec * 13) % 26) + 2;
-        drawSubEllipseRing(12, 120, thumpR * 1.5, thumpR * 0.48, 0, 2);
+        drawSubEllipseRing(12, 128, thumpR * 1.5, thumpR * 0.48, 0, 2);
       }
 
       // 将所有亚像素火花/流星/香料粒子光栅化至 224x128 盲文缓冲区
@@ -954,7 +979,7 @@ const { initialSummits = 1 } = Astro.props;
         put(0, 109, ']', 10);
 
         // 第谷环形山 TMA-1 1:4:9 黑色方尖碑
-        for (let r = 26; r <= 31; r++) {
+        for (let r = 28; r <= 33; r++) {
           putStr(r, 4, '###', 5);
         }
       } else if (realm === 'paper') {
@@ -962,10 +987,10 @@ const { initialSummits = 1 } = Astro.props;
         putStr(0, 85, '[PRIME_RADIANT // SELDON]', 1);
 
         // 端点星谢顿全息穹顶 (Seldon Vault)
-        putStr(28, 2, ' .===. ', 4);
-        putStr(29, 2, '/| | |\\', 4);
-        putStr(30, 2, '|| | ||', 4);
-        putStr(31, 2, '=======', 4);
+        putStr(30, 2, ' .===. ', 4);
+        putStr(31, 2, '/| | |\\', 4);
+        putStr(32, 2, '|| | ||', 4);
+        putStr(33, 2, '=======', 4);
       } else if (realm === 'crt') {
         const rainChars = ['0', '1', ':', '|', '+', '#', '7', '9'];
         for (const drop of matrixDrops) {
@@ -982,11 +1007,11 @@ const { initialSummits = 1 } = Astro.props;
 
         // 远景机器城能量塔群
         const towers = [
-          [12, 21, 4],
-          [20, 17, 5],
-          [29, 18, 4],
-          [38, 18, 5],
-          [48, 17, 4],
+          [12, 23, 4],
+          [20, 19, 5],
+          [29, 20, 4],
+          [38, 19, 5],
+          [48, 18, 4],
         ] as const;
         towers.forEach(([tc, topR, tw], idx) => {
           const botR = Math.round(terrainY(tc)) - 1;
@@ -1005,14 +1030,14 @@ const { initialSummits = 1 } = Astro.props;
       } else {
         // 弗雷曼沙槌 (Thumper)
         const thumpBeat = sec % 2.2;
-        put(28, 5, thumpBeat < 0.25 ? '=' : 'T', 9);
-        put(29, 5, '|', 1);
-        put(30, 5, '|', 1);
-        put(31, 5, '^', 1);
+        put(30, 5, thumpBeat < 0.25 ? '=' : 'T', 9);
+        put(31, 5, '|', 1);
+        put(32, 5, '|', 1);
+        put(33, 5, '^', 1);
         putStr(0, 86, '[ARRAKIS // SHIELD_WALL]', 1);
       }
 
-      // ================= 3. 低缓主山脊线与纯 ASCII/Braille 地质岩层（仅占底部 25% 空间） =================
+      // ================= 3. 起伏主山脊线与纯 ASCII/Braille 地质岩层 =================
       const treadShift = Math.floor(continuousRoll * 2.2);
       for (let c = 0; c < COLS; c++) {
         const yExact = terrainY(c);
@@ -1022,7 +1047,9 @@ const { initialSummits = 1 } = Astro.props;
 
         let ridgeChar = '=';
         if (c >= 99) ridgeChar = '=';
-        else if (diff < -0.08) ridgeChar = '/';
+        else if (diff < -0.22) ridgeChar = '/';
+        else if (diff < -0.05) ridgeChar = '~';
+        else if (diff > 0.08) ridgeChar = '\\';
         else ridgeChar = '_';
 
         if (sr >= 0 && sr < ROWS) {
@@ -1097,32 +1124,71 @@ const { initialSummits = 1 } = Astro.props;
       putStr(rockTopRow + 1, rockLeftCol, rockSprite[1], 8);
       putStr(rockTopRow + 2, rockLeftCol, rockSprite[2], 8);
 
-      // ================= 5. 绘制关节化西西弗斯小人 + 原著独白气泡 =================
+      // ================= 5. 绘制随地形坡度自适应切换姿态的关节化西西弗斯小人 =================
       const sCol = progToCol(sisyphusProg);
+      const localGrade = getTerrainGrade(bCol);
+      // 陡坡时身体前倾压低紧贴巨石，鞍部微下坡时向后拉拽控石
       const sLeft =
         phase === 'CLIMB'
           ? Math.max(1, rockLeftCol - 3)
           : Math.round(sCol) - 1;
-      const sGroundRow = Math.round(terrainY(sLeft + 1));
+      const sFootGroundRow = Math.round(terrainY(sLeft + 1));
+      const bContactRow = Math.round(bGroundY);
+      // 限制小人与巨石的垂直落差不超过 1 行，确保双手始终稳稳抵住巨石腰部！
+      const sGroundRow =
+        phase === 'CLIMB'
+          ? Math.max(bContactRow, Math.min(bContactRow + 1, sFootGroundRow))
+          : sFootGroundRow;
 
       if (phase === 'CLIMB') {
-        const legIdx = Math.floor(continuousStep) % CLIMB_LEGS.length;
-        const armPush = Math.floor(continuousStep * 0.5) % 2 === 0 ? '/|=' : '/|-';
-        const headPose = boostVelocity > 0.02 || sprintToSummit ? ' o/' : ' o_';
+        let headPose = ' o_';
+        let armPush = '/|=';
+        let legPose = '/ \\';
+
+        if (localGrade > 0.35) {
+          // 1. 绝壁陡坡点位 (STEEP_HEAVE)：极度压低重心埋头以肩背死顶巨石，双腿深弓步蹬地，背后冒出汗珠/火星
+          headPose = boostVelocity > 0.02 || sprintToSummit ? '_o/' : '_o_';
+          armPush = Math.floor(continuousStep * 0.5) % 2 === 0 ? '//=\\' : '/|==';
+          legPose = STEEP_CLIMB_LEGS[Math.floor(continuousStep) % STEEP_CLIMB_LEGS.length];
+          if (Math.floor(sec * 4) % 2 === 0) {
+            put(sGroundRow - 3, Math.max(0, sLeft - 1), "'", 2);
+          }
+        } else if (localGrade < 0.03) {
+          // 2. 山脊马鞍谷 / 微下坡点位 (SADDLE_BRAKE)：身体微后仰稳住巨石防止前溜，稳步调节呼吸
+          headPose = ' o ';
+          armPush = Math.floor(continuousStep * 0.5) % 2 === 0 ? '\\|-' : '\\|=';
+          legPose = SADDLE_STRIDE_LEGS[Math.floor(continuousStep) % SADDLE_STRIDE_LEGS.length];
+        } else if (localGrade < 0.16) {
+          // 3. 缓坡台地点位 (PLATEAU_STRIDE)：昂首挺胸大步平推
+          headPose = boostVelocity > 0.02 || sprintToSummit ? ' o/' : ' o ';
+          armPush = Math.floor(continuousStep * 0.5) % 2 === 0 ? '-|=' : '/|-';
+          legPose = SADDLE_STRIDE_LEGS[Math.floor(continuousStep) % SADDLE_STRIDE_LEGS.length];
+        } else {
+          // 4. 标准斜坡点位 (NORMAL_CLIMB)：经典前倾发力推石
+          headPose = boostVelocity > 0.02 || sprintToSummit ? ' o/' : ' o_';
+          armPush = Math.floor(continuousStep * 0.5) % 2 === 0 ? '/|=' : '/|-';
+          legPose = NORMAL_CLIMB_LEGS[Math.floor(continuousStep) % NORMAL_CLIMB_LEGS.length];
+        }
 
         putStr(sGroundRow - 3, sLeft, headPose, 7);
-        putStr(sGroundRow - 2, sLeft, armPush, 7);
-        putStr(sGroundRow - 1, sLeft, CLIMB_LEGS[legIdx], 7);
+        putStr(sGroundRow - 2, sLeft, armPush.slice(0, 3), 7);
+        putStr(sGroundRow - 1, sLeft, legPose, 7);
 
-        if (boostVelocity > 0.025 || sprintToSummit) {
-          put(sGroundRow - 2, sLeft - 1, '*', 9);
-          put(sGroundRow - 1, sLeft - 2, ':', 9);
+        if (boostVelocity > 0.025 || sprintToSummit || localGrade > 0.38) {
+          put(sGroundRow - 2, Math.max(0, sLeft - 1), '*', 9);
+          put(sGroundRow - 1, Math.max(0, sLeft - 2), ':', 9);
         }
 
         const bubbleCycle = sec % 7.5;
         if (bubbleCycle < 2.8 && boostBannerTimer <= 0) {
           const lines = BUBBLE_LINES[realm] || BUBBLE_LINES.void;
-          const msg = lines[Math.floor(sec / 7.5) % lines.length];
+          const baseMsg = lines[Math.floor(sec / 7.5) % lines.length];
+          const msg =
+            localGrade > 0.36
+              ? '(heave...!!)'
+              : localGrade < 0.04
+                ? '(steady...)'
+                : baseMsg;
           const bubbleCol = Math.max(1, Math.min(COLS - msg.length - 1, sLeft - 4));
           putStr(Math.max(1, Math.min(rockTopRow - 1, sGroundRow - 5)), bubbleCol, msg, 7);
         }
