@@ -862,11 +862,16 @@ main.page-main {
   white-space: normal;
   word-break: break-word;
   overflow-wrap: anywhere;
-  min-height: 1.95em;
+  height: calc(1.42em + 0.48rem);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
 }
 
 .heatmap-block.is-writing .heatmap-meta {
-  min-height: 2.85em;
+  height: calc(2.84em + 0.48rem);
+  -webkit-line-clamp: 2;
 }
 
 /* 108x30 (216x120 亚像素 = 25,920 点阵) 高密度宽画幅西西弗斯 ASCII 剧场画布 */
@@ -878,12 +883,11 @@ main.page-main {
 
 .ascii-slope-pre {
   position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
+  white-space: pre;
+  width: 100%;
   margin: 0;
-  padding: 0.55rem 0.6rem;
+  padding: 0.6rem 0.65rem;
   background: var(--stage-bg);
   border: 1px solid var(--border-strong);
   border-radius: 2px;
