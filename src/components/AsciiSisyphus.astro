@@ -19,7 +19,7 @@ const { initialSummits = 1 } = Astro.props;
         type="button"
         class="term-btn is-primary"
         id="sisyphus-push-btn"
-        title="助推巨石：分段触发【稳步/突进/暴击神迹】专属动画，更有 1% 概率直接触发【骑沙虫/星门舱/帝国舰/救世主】直达峰顶彩蛋！"
+        title="助推巨石：分段触发【稳步/突进/暴击神迹】或反击逆境事件，更有 1% 概率直接触发【骑沙虫/星门舱/帝国舰/救世主】直达峰顶彩蛋！"
       >
         [+PUSH 助推]
       </button>
@@ -27,20 +27,20 @@ const { initialSummits = 1 } = Astro.props;
         type="button"
         class="term-btn"
         id="sisyphus-summit-btn"
-        title="体验完整史诗冲顶演出（骑乘沙虫/星门推进舱/川陀反重力舰/尼奥觉醒御空）→ 巨石崩落 → 走下山坡"
+        title="体验完整史诗冲顶演出（骑乘沙虫/星门推进舱/川陀反重力舰/尼奥觉醒御空）→ 登顶喘息欢呼 → 巨石失稳崩落 → 走下山坡重新抵石"
       >
         [&gt;&gt; 冲顶轮回]
       </button>
     </div>
   </div>
 
-  <!-- 320x180 原生像素画舞台：自研像素光栅器 + 4 套科幻主题场景 + 分段助推与 1% 彩蛋演出 -->
+  <!-- 320x180 原生像素画舞台：全骨骼平滑过渡 + 4 套科幻场景 + 随机顺逆境推石事件 + 1% 彩蛋演出 -->
   <div
     class="ascii-slope-viewport"
     id="sisyphus-stage-viewport"
     tabindex="0"
     role="img"
-    aria-label="西西弗斯推石上山的像素动画，点击画面可助推并触发分段特效或1%登顶彩蛋"
+    aria-label="西西弗斯推石上山的像素动画，包含完整动作衔接与随机顺逆境天象事件，点击画面可助推或反击逆境"
   >
     <canvas id="sisyphus-canvas" class="ascii-slope-canvas" width="320" height="180"></canvas>
     <pre class="ascii-slope-pre is-sr-mirror" id="sisyphus-sr-status" aria-hidden="true"></pre>
@@ -56,7 +56,25 @@ const { initialSummits = 1 } = Astro.props;
 
 <script>
   type Realm = 'void' | 'paper' | 'crt' | 'amber';
-  type Mode = 'push' | 'stand' | 'cheer' | 'walk' | 'watch' | 'ride';
+  // 细化全生命周期动作姿态：
+  // stand_breath(驻足擦汗喘息) | engage_prep(沉肩伸手抵石衔接) | push(常规推石) | accel_push(加速突进推石)
+  // brace_slide(逆境死顶防滑退) | ride(1%彩蛋坐骑/御空冲顶) | final_heave(登顶最后一顶)
+  // knees_pant(登顶双手撑膝喘息) | cheer(登顶振臂高呼) | walk(行走)
+  // reach_stop(巨石松动伸手挽留) | startle_back(惊愕后撤) | watch(目送巨石滚落)
+  type PoseId =
+    | 'stand_breath'
+    | 'engage_prep'
+    | 'push'
+    | 'accel_push'
+    | 'brace_slide'
+    | 'ride'
+    | 'final_heave'
+    | 'knees_pant'
+    | 'cheer'
+    | 'walk'
+    | 'reach_stop'
+    | 'startle_back'
+    | 'watch';
   type Phase = 'CLIMB' | 'SUMMIT' | 'ROLL' | 'DESCENT';
 
   const boot = () => {
@@ -88,6 +106,15 @@ const { initialSummits = 1 } = Astro.props;
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+    const damp = (a: number, b: number, lambda: number, dt: number) =>
+      a + (b - a) * (1 - Math.exp(-lambda * dt));
+    const smoothstep = (a: number, b: number, x: number) => {
+      const t = clamp((x - a) / (b - a || 1), 0, 1);
+      return t * t * (3 - 2 * t);
+    };
+    const eventEnv = (p: number, fadeIn = 0.24, fadeOut = 0.26) =>
+      smoothstep(0, fadeIn, p) * (1 - smoothstep(1 - fadeOut, 1, p));
     const pack = (r: number, g: number, b: number) =>
       ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
     const hex = (h: string) => {
@@ -128,6 +155,7 @@ const { initialSummits = 1 } = Astro.props;
     let toLayer = false;
     let layerId = 1;
     let clipFn: ((x: number, y: number) => boolean) | null = null;
+    let drawAlpha = 1;
     let bx0 = W;
     let by0 = H;
     let bx1 = 0;
@@ -136,6 +164,7 @@ const { initialSummits = 1 } = Astro.props;
     const plot = (x: number, y: number, c: number) => {
       if (x < 0 || y < 0 || x >= W || y >= H) return;
       if (clipFn && !clipFn(x, y)) return;
+      if (drawAlpha < 1 && (drawAlpha <= 0 || drawAlpha <= bayer(x, y))) return;
       const i = y * W + x;
       if (toLayer) {
         layer[i] = c;
@@ -183,6 +212,22 @@ const { initialSummits = 1 } = Astro.props;
         if (w <= 1) plot(Math.round(x), Math.round(y), c);
         else rect(x - w / 2, y - w / 2, w, w, c);
       }
+    };
+    // 渐进式延伸/收回光束绘制：仅绘制线段区间 [u0, u1]，实现光束从发射源射出并向目标收束的连续动画
+    const progStroke = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      u0: number,
+      u1: number,
+      w: number,
+      c: number,
+    ) => {
+      const a = clamp(u0, 0, 1);
+      const b = clamp(u1, 0, 1);
+      if (b <= a + 0.01) return;
+      stroke(lerp(x0, x1, a), lerp(y0, y1, a), lerp(x0, x1, b), lerp(y0, y1, b), w, c);
     };
     const ring = (cx: number, cy: number, rx: number, ry: number, c: number, a = 1) => {
       const steps = Math.ceil((rx + ry) * 3.4);
@@ -239,7 +284,7 @@ const { initialSummits = 1 } = Astro.props;
       return t > bayer(x, y) ? cb : ca;
     };
 
-    // 3x5 像素字体（支持浮动数字、暴击与彩蛋标识）
+    // 3x5 像素字体（支持正负号、暴击、反击与彩蛋标识）
     const FONT: Record<string, string> = {
       '0': '111101101101111',
       '1': '010110010010111',
@@ -252,6 +297,7 @@ const { initialSummits = 1 } = Astro.props;
       '8': '111101111101111',
       '9': '111101111001111',
       '+': '000010111010000',
+      '-': '000000111000000',
       m: '000110111101101',
       '!': '010010010000010',
       '*': '101010111010101',
@@ -395,7 +441,6 @@ const { initialSummits = 1 } = Astro.props;
         [105, '#0c1430'],
         [150, '#18234a'],
       ]);
-      // 木星 + 卫星连珠
       const jx = 62;
       const jy = 46;
       const jr = 25;
@@ -471,7 +516,6 @@ const { initialSummits = 1 } = Astro.props;
         disc(x, gy(x) - r * 0.6, r, hex('#6a7184'));
         plot(Math.round(x - r * 0.4), Math.round(gy(x) - r), hex('#d0d5df'));
       }
-      // 峰顶 TMA-1 黑石碑
       const mb = gyi[294];
       for (let i = 0; i < 24; i++) pdither(297 + i, mb, hex('#1d2233'), 0.8 - i / 30);
       rect(290, mb - 17, 7, 17, hex('#020204'));
@@ -488,9 +532,7 @@ const { initialSummits = 1 } = Astro.props;
       }
     };
 
-    // 《银河帝国：基地》—— 川陀帝国摩天大楼首都 (Trantor Ecumenopolis) + 天空中的端点星 (Planet Terminus)
     const buildPaper = () => {
-      // 1. 川陀穹顶大气渐变：高空星轨蓝灰 -> 中空帝国金辉 -> 城市地平线暖象牙色
       gradient([
         [0, '#2a3c56'],
         [28, '#466080'],
@@ -498,28 +540,23 @@ const { initialSummits = 1 } = Astro.props;
         [96, '#c8bfae'],
         [135, '#ebe1cc'],
       ]);
-
-      // 高空微星与星轨经纬网格
       for (let i = 0; i < 45; i++) {
         const sx = Math.floor(hash(i, 61) * W);
         const sy = Math.floor(hash(i, 62) * 52);
         plot(sx, sy, i % 3 === 0 ? hex('#fff6dc') : hex('#a9c0d9'));
       }
 
-      // 2. 天空中的【端点星 Planet Terminus】(海洋深蓝 + 百科全书金陆地 + 双层星环与轨道信标)
       const tx = 64;
       const ty = 36;
       const tr = 19;
-      // 端点星背侧星环
       for (let s = 0; s < 140; s++) {
-        const ang = (s / 140) * Math.PI; // 背部半环
+        const ang = (s / 140) * Math.PI;
         const rx = Math.cos(ang + Math.PI) * 34;
         const ry = Math.sin(ang + Math.PI) * 8.5;
         const px = tx + rx * 0.94 - ry * 0.34;
         const py = ty + rx * 0.34 + ry * 0.94;
         pdither(px, py, hex('#d4a756'), 0.85);
       }
-      // 端点星球体（带极冠、海洋、大陆与晨昏线）
       const oceanLit = hex('#3a6691');
       const oceanMid = hex('#274769');
       const oceanDark = hex('#1b2e47');
@@ -542,7 +579,6 @@ const { initialSummits = 1 } = Astro.props;
           plot(tx + dx, ty + dy, c);
         }
       }
-      // 端点星前侧双星环与轨道百科空间站
       for (let s = 0; s < 160; s++) {
         const ang = (s / 160) * Math.PI;
         for (const [radX, radY, col] of [
@@ -556,9 +592,8 @@ const { initialSummits = 1 } = Astro.props;
           pdither(px, py, col, 0.92);
         }
       }
-      disc(tx + 31, ty + 11, 1.5, hex('#fff5d6')); // 端点星轨道空间站
+      disc(tx + 31, ty + 11, 1.5, hex('#fff5d6'));
 
-      // 3. 川陀星环太空电梯主索 (Imperial Space Elevator Tether, x = 148)
       const elevX = 148;
       for (let y = 0; y < 140; y++) {
         plot(elevX, y, y % 4 === 0 ? hex('#f5d484') : hex('#5d6e82'));
@@ -568,11 +603,9 @@ const { initialSummits = 1 } = Astro.props;
         }
       }
 
-      // 4. 川陀远景巨型帝国参议院穹顶与高耸尖塔天际线 (Far Megacity Layer)
       const farDark = hex('#526173');
       const farEdge = hex('#7f90a3');
       const farGold = hex('#d9b264');
-      // 帝国中央大穹顶 (cx = 148, cy = 126, rx = 38, ry = 26)
       for (let dy = -26; dy <= 10; dy++) {
         for (let dx = -38; dx <= 38; dx++) {
           if ((dx * dx) / (38 * 38) + (dy * dy) / (26 * 26) <= 1) {
@@ -583,7 +616,6 @@ const { initialSummits = 1 } = Astro.props;
           }
         }
       }
-      // 远景摩天楼森林 (x = 0..290)
       let fx = 2;
       while (fx < 285) {
         const fw = 5 + Math.floor(hash(fx, 11) * 9);
@@ -595,7 +627,6 @@ const { initialSummits = 1 } = Astro.props;
             plot(x, y, isRim ? farEdge : farDark);
           }
         }
-        // 塔尖信号塔
         if (hash(fx, 13) > 0.35) {
           const mid = fx + (fw >> 1);
           stroke(mid, ftop - 8, mid, ftop, 1, farEdge);
@@ -604,7 +635,6 @@ const { initialSummits = 1 } = Astro.props;
         fx += fw + 1 + Math.floor(hash(fx, 14) * 3);
       }
 
-      // 5. 川陀中景高楼大厦群 (Mid-ground High-Rise Skyscrapers + Skybridges + Lit Windows)
       const bFace = hex('#2e3846');
       const bShade = hex('#1f2630');
       const bTrim = hex('#8c9bab');
@@ -621,7 +651,7 @@ const { initialSummits = 1 } = Astro.props;
         [81, 13, 66, 1],
         [98, 17, 46, 2],
         [119, 15, 62, 1],
-        [139, 18, 38, 2], // 太空电梯基座摩天巨塔
+        [139, 18, 38, 2],
         [161, 14, 56, 1],
         [179, 16, 48, 2],
         [199, 13, 64, 0],
@@ -629,7 +659,6 @@ const { initialSummits = 1 } = Astro.props;
         [235, 14, 68, 2],
       ];
 
-      // 摩天楼之间的双层高空连廊 (Skybridges)
       for (let i = 0; i < towers.length - 1; i++) {
         const [xA, wA, topA] = towers[i];
         const [xB, , topB] = towers[i + 1];
@@ -647,7 +676,6 @@ const { initialSummits = 1 } = Astro.props;
             const isLeftLit = x < bx + (bw >> 1);
             const isBorder = x === bx || x === bx + bw - 1 || y === btop;
             let c = isBorder ? bTrim : isLeftLit ? bFace : bShade;
-            // 密集的摩天楼窗户矩阵
             const wx = x - bx;
             const wy = y - btop;
             if (wx >= 2 && wx <= bw - 3 && wy >= 4 && wy % 3 !== 0 && wx % 2 === 1) {
@@ -658,21 +686,18 @@ const { initialSummits = 1 } = Astro.props;
             plot(x, y, c);
           }
         }
-        // 阶梯式退台塔冠 (Art-Deco / Imperial Stepped Crown)
         if (style === 1) {
           rect(bx + 2, btop - 5, bw - 4, 5, bFace);
           rect(bx + 2, btop - 5, bw - 4, 1, bGold);
           stroke(bx + (bw >> 1), btop - 12, bx + (bw >> 1), btop - 5, 1, bTrim);
           plot(bx + (bw >> 1), btop - 13, bRed);
         } else if (style === 2) {
-          // 帝国金字塔/穹顶塔冠
           poly([bx + 1, btop, bx + bw - 1, btop, bx + (bw >> 1), btop - 9], bGold);
           stroke(bx + (bw >> 1), btop - 15, bx + (bw >> 1), btop - 9, 1, bTrim);
           plot(bx + (bw >> 1), btop - 16, bRed);
         }
       }
 
-      // 6. 主山坡：川陀帝国钛金大理石大道 (Imperial Titanium-Marble Causeway)
       const tones: [number, number][] = [
         [0, hex('#d8ccb4')],
         [8, hex('#b8aa90')],
@@ -686,7 +711,6 @@ const { initialSummits = 1 } = Astro.props;
         for (let y = top; y < H; y++) {
           const d = y - top;
           let c = depthTone(tones, d, x, y);
-          // 帝国装甲金属接缝与金色心理史学导轨线
           if (d === 3) c = hex('#d4a756');
           else if (d === 4) c = hex('#6e5832');
           else if (d > 5 && ((x + (d >> 3) * 11) % 22 === 0 || d % 10 === 0)) c = hex('#594f40');
@@ -696,7 +720,6 @@ const { initialSummits = 1 } = Astro.props;
         if (top + 1 < H) plot(x, top + 1, ink);
       }
 
-      // 大道沿途的帝国路灯柱与全息信标桩
       for (let lx = 44; lx <= 252; lx += 34) {
         const ly = gyi[lx];
         rect(lx, ly - 8, 1, 8, hex('#3b4654'));
@@ -704,15 +727,12 @@ const { initialSummits = 1 } = Astro.props;
         plot(lx, ly - 10, hex('#c8402a'));
       }
 
-      // 7. 峰顶：谢顿时间穹顶与第一辐光浑天圣殿 (Seldon Time Vault & Prime Radiant Rotunda)
       const tb = gyi[298];
-      // 穹顶阶梯基座
       rect(286, tb - 3, 26, 3, hex('#4a5568'));
       rect(288, tb - 11, 22, 8, hex('#dcd0b8'));
       for (let cx = 290; cx <= 308; cx += 3) {
         rect(cx, tb - 11, 1, 8, hex('#736857'));
       }
-      // 帝国穹顶金顶与悬浮第一辐光环
       for (let dy = -9; dy <= 0; dy++) {
         const hw = Math.round(Math.sqrt(Math.max(0, 11 * 11 - dy * dy * 1.4)));
         rect(299 - hw, tb - 11 + dy, hw * 2, 1, dy < -5 ? hex('#e5ba63') : hex('#3a506b'));
@@ -840,7 +860,7 @@ const { initialSummits = 1 } = Astro.props;
     };
 
     // ======================================================================
-    // 5. 动态粒子、分段推石特效 (Tier 1~3)、1% 坐骑冲顶彩蛋 (Tier 4) 与背景随机小事件
+    // 5. 动态粒子、分段推石特效、1% 彩蛋与「影响巨石进退的随机天象事件」
     // ======================================================================
     interface Particle {
       x: number; y: number; vx: number; vy: number;
@@ -848,13 +868,12 @@ const { initialSummits = 1 } = Astro.props;
     }
     const parts: Particle[] = [];
     const emit = (x: number, y: number, vx: number, vy: number, max: number, c: number, g = 0, kind = 0) => {
-      if (parts.length > 280) parts.shift();
+      if (parts.length > 300) parts.shift();
       parts.push({ x, y, vx, vy, life: 0, max, c, g, kind, seed: Math.floor(Math.random() * 511) });
     };
     interface Floater { x: number; y: number; s: string; t: number; tier: number }
     const floats: Floater[] = [];
 
-    // 黑客帝国代码雨
     const GLYPHS: number[] = [];
     for (let i = 0; i < 48; i++) {
       let m = 0;
@@ -869,24 +888,86 @@ const { initialSummits = 1 } = Astro.props;
       seed: Math.floor(Math.random() * 1000),
     }));
 
-    // 分段助推小动画状态 (Tier 1: 稳步发力, Tier 2: 强力突进, Tier 3: 史诗暴击, Tier 4: 1% 坐骑神迹直达峰顶!)
+    // 分段助推小动画状态
     let activeTier = 0; // 1 | 2 | 3 | 4
     let tierTimer = 0;
     let tierDuration = 1.0;
-    let epicCharge = false; // true 时播放盛大坐骑/载具冲顶演出（骑沙虫 / 星门推进舱 / 帝国反重力舰 / 救世主御空）
+    let epicCharge = false;
+    let epicMountEnv = 0; // 0..1 坐骑/载具平滑破土/降临与离场包络
     let pushPityCount = 0;
+    let windupTimer = 0; // 推石→加速推石前的屈膝沉肩蓄力过渡 (0.22s)
 
-    // 背景随机小事件系统 (每个主题 3 种独特背景事件，每隔 5~9 秒随机触发)
+    // 攀登途中的周期性「驻足喘息 → 沉肩重新抵石」自然衔接循环
+    let climbBreatherClock = 4.0; // 每 15s 触发一次 2.7s 的驻足擦汗+重新抵石过渡
+
+    // 背景纯观赏随机小事件
     interface BgEvent {
-      type: number; // 0, 1, 2
+      type: number;
       t: number;
       dur: number;
       x0: number;
       y0: number;
       dir: number;
     }
-    let bgEvent: BgEvent | null = { type: 0, t: 0.5, dur: 6.0, x0: 85, y0: 40, dir: 1 };
-    let nextBgEventTimer = 5.5;
+    let bgEvent: BgEvent | null = { type: 0, t: 0.01, dur: 6.5, x0: 85, y0: 40, dir: 1 };
+    let nextBgEventTimer = 5.0;
+
+    // 影响巨石前进/后退的「世界随机顺逆境事件系统」(World Force Events)
+    interface WorldForceEvent {
+      dir: 1 | -1; // +1: 顺境天象推石前进 | -1: 逆境灾变迫使巨石滑退
+      variant: 0 | 1; // 每个主题各有 2 种前进事件 + 2 种后退事件 (共 16 种)
+      t: number;
+      dur: number;
+      totalMeters: number;
+      appliedMeters: number;
+      quote: string;
+      aborted?: boolean; // 被玩家反击或登顶中断时进入快速平滑消散态，绝不瞬间消失
+    }
+    let worldForce: WorldForceEvent | null = null;
+    let nextWorldForceTimer = 7.5;
+
+    const FORCE_EVENT_QUOTES: Record<Realm, { fwd: [string, string]; bwd: [string, string] }> = {
+      void: {
+        fwd: [
+          '"[天象顺流 +] 峰顶 TMA-1 黑石碑释放 1:4:9 反重力谐波，巨石失重轻盈上行！"',
+          '"[天象顺流 +] 发现号 EVA 球形支援舱飞抵上空，投下等离子牵引束助推巨石！"',
+        ],
+        bwd: [
+          '"[逆境滑退 -] HAL-9000 红眼锁定巨石：I\'m sorry Dave... 局部重力倍增！（点击助推可反击破锁）"',
+          '"[逆境滑退 -] 月面微陨石群轰击前方山脊！冲击波震退巨石，西西弗斯死命抵住防滑！"',
+        ],
+      },
+      paper: {
+        fwd: [
+          '"[天象顺流 +] 谢顿第一辐光展开黄金流形，心理史学历史必然性顺流推石前进！"',
+          '"[天象顺流 +] 川陀太空电梯与端点星同步降下百科全书能量束，导轨磁浮加速！"',
+        ],
+        bwd: [
+          '"[逆境滑退 -] 变种人【骡 The Mule】心灵风暴降临大道，扭曲谢顿计划迫使巨石倒退！（点击可反击）"',
+          '"[逆境滑退 -] 川陀帝国上层穹顶震荡波掠过大道，巨石在金属坡面发生后滑！"',
+        ],
+      },
+      crt: {
+        fwd: [
+          '"[天象顺流 +] 先知绿码瀑布灌注巨石（0x00 FREE_MIND），巨石质量清零高速上行！"',
+          '"[天象顺流 +] 尼布甲尼撒号气垫船掠过山脊，释放反重力脉冲波助推西西弗斯！"',
+        ],
+        bwd: [
+          '"[逆境滑退 -] 机械乌贼哨兵俯冲发射猩红切割激光压迫巨石倒退！（点击助推释放 EMP 反击）"',
+          '"[逆境滑退 -] 特工史密斯故障门闪现前方，强行执行母体坐标回滚，西西弗斯死顶抗衡！"',
+        ],
+      },
+      amber: {
+        fwd: [
+          '"[天象顺流 +] 巨石后方香料矿脉喷发，橙金气浪推着西西弗斯与巨石顺风疾行！"',
+          '"[天象顺流 +] 弗雷曼沙槌谐波硬化流沙，阿崔迪扑翼机投下牵引索拉动巨石上行！"',
+        ],
+        bwd: [
+          '"[逆境滑退 -] 厄拉科斯科里奥利逆向狂沙暴呼啸而下，巨石在流沙上向后滑退！（点击可反击）"',
+          '"[逆境滑退 -] 野生沙虫震波引发前方沙坡流沙塌陷，西西弗斯双脚犁沙死顶巨石！"',
+        ],
+      },
+    };
 
     const worm = { active: false, t: 0, x0: 120, dir: 1 };
     let nextWorm = 10;
@@ -935,14 +1016,24 @@ const { initialSummits = 1 } = Astro.props;
     let kick = 0;
     let rollX = PATH_X1;
     let rollV = 0;
+    let rollLandingWait = 0; // 巨石滚落到底部撞击后的缓冲停顿 (0.85s)
     let heroX = pushHeroX(frac);
     let prevSin = 0;
+
+    const abortWorldForceSmoothly = () => {
+      if (worldForce && !worldForce.aborted) {
+        worldForce.aborted = true;
+        // 将事件推进至淡出尾段 (76%)，通过 Bayer 抖动与退场轨迹在 ~0.45 秒内自然消散，避免一帧突兀消失
+        worldForce.t = Math.max(worldForce.t, worldForce.dur * 0.76);
+      }
+    };
 
     const enterSummit = () => {
       phase = 'SUMMIT';
       phaseT = 0;
       frac = 1;
       epicCharge = false;
+      abortWorldForceSmoothly();
       summitFx = 0;
       if (realm === 'amber') {
         worm.active = true;
@@ -954,7 +1045,7 @@ const { initialSummits = 1 } = Astro.props;
     };
 
     // ======================================================================
-    // 7. 分段助推匹配动画 + 1% 直接登顶史诗彩蛋
+    // 7. 分段助推匹配动画 + 逆境反击 + 1% 直接登顶史诗彩蛋
     // ======================================================================
     const EPIC_QUOTES: Record<Realm, string> = {
       void: '"★ 1% 神迹触发：发现号 EVA 舱对接！1:4:9 星门引力光廊直冲第谷峰顶！"',
@@ -975,23 +1066,31 @@ const { initialSummits = 1 } = Astro.props;
       reloadSave();
       const gained = amount * PEAK_ALT;
 
-      // 根据弹出的进度米数自动匹配 4 档分段动画：
-      // Tier 1 (<18.5m): 稳步发力 | Tier 2 (18.5~35m): 强力突进 | Tier 3 (>35m): 史诗暴击 | Tier 4: 1% 坐骑神迹冲顶
+      // 若玩家在「逆境滑退事件」期间点击助推，立即触发【逆境反击 COUNTER】平滑震退并消散灾变！
+      const counteredHazard = Boolean(worldForce && worldForce.dir === -1 && !worldForce.aborted);
+      if (counteredHazard) {
+        abortWorldForceSmoothly();
+        nextWorldForceTimer = 9 + Math.random() * 6;
+      }
+
+      // 结束驻足喘息，先触发 0.22s 屈膝沉肩蓄力过渡 (windupTimer)，再爆发蹬地推进
+      climbBreatherClock = 0.2;
+      windupTimer = 0.22;
+
       const tier =
         forcedTier ??
-        (gained >= 180 ? 4 : gained >= 35 ? 3 : gained >= 18.5 ? 2 : 1);
+        (gained >= 180 ? 4 : counteredHazard || gained >= 35 ? 3 : gained >= 18.5 ? 2 : 1);
 
       activeTier = tier;
-      tierDuration = tier === 4 ? 3.5 : tier === 3 ? 1.75 : tier === 2 ? 1.15 : 0.65;
+      tierDuration = tier === 4 ? 3.5 : tier === 3 ? 1.75 : tier === 2 ? 1.15 : 0.7;
       tierTimer = tierDuration;
-      kick = tier >= 2 ? 0.75 : 0.45;
+      kick = tier >= 2 ? 0.78 : 0.48;
 
       const bc = boulderCenter(contactX(frac));
       const hx = bc.x - R;
       const pal = ROCK[realm];
 
       if (tier === 4) {
-        // 1% 终极登顶彩蛋：启动主题专属坐骑/载具冲顶演出！
         sprint = true;
         epicCharge = true;
         if (quoteEl) quoteEl.textContent = EPIC_QUOTES[realm];
@@ -1002,8 +1101,11 @@ const { initialSummits = 1 } = Astro.props;
           emit(bc.x, bc.y, Math.cos(a) * v, Math.sin(a) * v - 15, 1.4, i % 2 ? hex('#ffd56b') : pal[0], 18, 4);
         }
       } else if (tier === 3) {
-        // Tier 3 (35m~68m): 暴击神迹过场小动画
-        if (quoteEl) quoteEl.textContent = TIER3_QUOTES[realm];
+        if (quoteEl) {
+          quoteEl.textContent = counteredHazard
+            ? '"[★逆境反击!] 西西弗斯怒吼顶碎逆流，将灾变阻力反转为暴击冲量！"'
+            : TIER3_QUOTES[realm];
+        }
         floats.push({ x: bc.x - 14, y: bc.y - R - 10, s: `CRIT+${gained.toFixed(0)}m!!`, t: 0, tier: 3 });
         for (let i = 0; i < 30; i++) {
           const a = Math.random() * Math.PI * 2;
@@ -1024,7 +1126,6 @@ const { initialSummits = 1 } = Astro.props;
         }
         if (realm === 'crt') glitch = Math.max(glitch, 0.25);
       } else if (tier === 2) {
-        // Tier 2 (18.5m~35m): 强力突进小动画
         floats.push({ x: bc.x - 8, y: bc.y - R - 8, s: `+${gained.toFixed(0)}m!`, t: 0, tier: 2 });
         for (let i = 0; i < 22; i++) {
           const a = Math.random() * Math.PI * 2;
@@ -1035,7 +1136,6 @@ const { initialSummits = 1 } = Astro.props;
           else emit(hx, bc.y, Math.cos(a) * v, Math.sin(a) * v, 0.9, i % 2 ? pal[0] : hex('#8fd3ff'), 0, 4);
         }
       } else {
-        // Tier 1 (8m~18.5m): 稳步蓄力推石
         floats.push({ x: bc.x - 6, y: bc.y - R - 6, s: `+${gained.toFixed(0)}m`, t: 0, tier: 1 });
         for (let i = 0; i < 12; i++) {
           const a = Math.random() * Math.PI * 2;
@@ -1058,7 +1158,6 @@ const { initialSummits = 1 } = Astro.props;
       pendingAt = at;
       pushPityCount++;
 
-      // 1% 直接登顶彩蛋判定（附带保底机制：连续点击满 45 次必触发一次 1% 神迹彩蛋！）
       const roll = Math.random();
       if (roll < 0.01 || pushPityCount >= 45) {
         pushPityCount = 0;
@@ -1067,7 +1166,7 @@ const { initialSummits = 1 } = Astro.props;
         window.dispatchEvent(
           new CustomEvent('sisyphus:boulder-boost', {
             detail: {
-              rolledAmount: remainFrac * 0.25, // 先记入一部分立即冲量，剩余由 epicCharge 狂飙完成
+              rolledAmount: remainFrac * 0.25,
               source: '★1%神迹登顶',
             },
           }),
@@ -1075,13 +1174,14 @@ const { initialSummits = 1 } = Astro.props;
         return;
       }
 
-      // 分段随机权重：
-      // 45% Tier 1 (稳步发力: +8m ~ +18m)
-      // 35% Tier 2 (强力突进: +19m ~ +34m)
-      // 19% Tier 3 (暴击神迹: +36m ~ +66m)
       let minM = 8;
       let maxM = 18;
-      if (roll < 0.20) {
+      if (worldForce && worldForce.dir === -1) {
+        // 逆境反击必出 Tier 3 暴击！
+        pendingTier = 3;
+        minM = 36;
+        maxM = 58;
+      } else if (roll < 0.20) {
         pendingTier = 3;
         minM = 36;
         maxM = 66;
@@ -1122,6 +1222,7 @@ const { initialSummits = 1 } = Astro.props;
 
     const triggerEpicSummitCharge = () => {
       if (phase === 'CLIMB') {
+        abortWorldForceSmoothly();
         sprint = true;
         epicCharge = true;
         activeTier = 4;
@@ -1138,7 +1239,6 @@ const { initialSummits = 1 } = Astro.props;
     viewportEl?.addEventListener('click', (e: MouseEvent) => {
       const rct = canvas.getBoundingClientRect();
       const at = { x: ((e.clientX - rct.left) / rct.width) * W, y: ((e.clientY - rct.top) / rct.height) * H };
-      // 点击高空背景区域时除了助推，若当前没有背景小事件还会立即唤醒一个背景小事件！
       if (at.y < gy(at.x) - 18 && !bgEvent) {
         bgEvent = {
           type: Math.floor(Math.random() * 3),
@@ -1166,7 +1266,7 @@ const { initialSummits = 1 } = Astro.props;
     }
 
     // ======================================================================
-    // 8. 角色：IK 骨骼小人 + 主题装束 + 骑乘姿态
+    // 8. 角色：连续骨骼关键帧插值器 (Continuous Skeletal Pose Blender)
     // ======================================================================
     const ik = (ax: number, ay: number, bx: number, by: number, l1: number, l2: number, sign: number) => {
       let dx = bx - ax;
@@ -1183,59 +1283,270 @@ const { initialSummits = 1 } = Astro.props;
       return { jx: ax + Math.cos(ang) * l1, jy: ay + Math.sin(ang) * l1, ex: ax + dx, ey: ay + dy };
     };
 
+    // 骨骼平滑插值寄存器：彻底消除站立、推石、加速、冲顶、喘息、欢呼、挽留、目送、下山之间的断帧跳变！
+    const rig = {
+      inited: false,
+      hipX: 35,
+      hipY: 145,
+      shDx: 5.4,
+      shDy: -4.6,
+      headDx: 2.2,
+      headDy: -2.6,
+      armFDx: 6.2,
+      armFDy: 1.5,
+      armBDx: 5.6,
+      armBDy: 2.8,
+      stride: 3.2,
+      facing: 1.0,
+    };
+
     const drawHero = (
-      mode: Mode,
+      pose: PoseId,
       hx: number,
-      f: number,
+      targetFacing: number,
       gp: number,
       hand: { x: number; y: number } | null,
       heave: number,
       sec: number,
+      dt: number,
       rideMountY?: number,
+      gazeTargetY?: number,
     ) => {
       const st = HERO[realm];
-      const moving = mode === 'push' || mode === 'walk' || mode === 'ride';
-      const bob = moving ? Math.abs(Math.sin(gp)) * 0.7 : 0;
-      let hipX: number;
-      let hipY: number;
-      let shX: number;
-      let shY: number;
+      const moving =
+        pose === 'push' ||
+        pose === 'accel_push' ||
+        pose === 'walk' ||
+        pose === 'ride' ||
+        pose === 'final_heave';
+      const bob = moving ? Math.abs(Math.sin(gp)) * 0.75 : Math.sin(sec * 3.2) * 0.25;
 
-      if (mode === 'ride' && rideMountY !== undefined) {
-        hipX = hx;
-        hipY = rideMountY - 8.5 + Math.sin(sec * 16) * 0.6;
-        shX = hipX + (realm === 'crt' ? 4.8 : 2.2);
-        shY = hipY - (realm === 'crt' ? 3.2 : 5.8);
-      } else if (mode === 'push' && hand) {
-        const tierLean = activeTier === 2 ? 1.4 : activeTier === 3 ? 2.0 : 0;
-        hipX = hand.x - 10.8 - heave * 0.4;
-        const g = gy(hipX + 0.5);
-        hipY = clamp(hand.y + 3.4, g - 9.4, g - 7.2) + bob * 0.4;
-        shX = hipX + 5.6 + heave * 0.5 + tierLean * 0.4;
-        shY = hipY - 4.6 - heave * 0.2 + (activeTier === 1 && kick > 0 ? 0.8 : 0);
-      } else {
+      // 1. 计算当前姿态的目标骨骼偏移量 (Target Skeletal Pose)
+      let tHipX = hx;
+      let tHipY = gy(hx) - 9.5 + bob * 0.5;
+      let tShDx = targetFacing * 0.6;
+      let tShDy = -6.3;
+      let tHeadDx = targetFacing * 0.5;
+      let tHeadDy = -3.2;
+      let tArmFDx = targetFacing * 0.8;
+      let tArmFDy = 6.6;
+      let tArmBDx = -targetFacing * 0.6;
+      let tArmBDy = 6.6;
+      let tStride = 0;
+      let elbowSign = targetFacing;
+
+      if (pose === 'ride' && rideMountY !== undefined) {
+        tHipX = hx;
+        tHipY = rideMountY - 8.5 + Math.sin(sec * 16) * 0.6;
+        tShDx = realm === 'crt' ? 4.8 : 2.2;
+        tShDy = realm === 'crt' ? -3.2 : -5.8;
+        tHeadDx = 2.4;
+        tHeadDy = -2.6;
+        if (hand) {
+          tArmFDx = hand.x - (tHipX + tShDx);
+          tArmFDy = hand.y - (tHipY + tShDy);
+          tArmBDx = tArmFDx - 1.4;
+          tArmBDy = tArmFDy + 1.4;
+        }
+        tStride = 0;
+      } else if ((pose === 'push' || pose === 'accel_push' || pose === 'final_heave') && hand) {
+        const isAccel = pose === 'accel_push' || pose === 'final_heave';
+        const windupCrouch = windupTimer > 0 ? Math.sin((windupTimer / 0.22) * Math.PI) * 1.8 : 0;
+        const distBack = isAccel ? 11.4 : 10.6;
+        tHipX = hand.x - distBack - heave * 0.35 + windupCrouch * 0.6;
+        const g = gy(tHipX + 0.5);
+        tHipY = clamp(hand.y + 3.5 + windupCrouch, g - 9.2, g - 6.8) + bob * 0.4;
+        tShDx = (isAccel ? 6.4 : 5.5) + heave * 0.45 - windupCrouch * 0.5;
+        tShDy = (isAccel ? -4.1 : -4.6) - heave * 0.2 + windupCrouch * 0.6;
+        tHeadDx = isAccel ? 2.6 : 2.2;
+        tHeadDy = isAccel ? -2.2 : -2.6;
+        tArmFDx = hand.x - (tHipX + tShDx);
+        tArmFDy = hand.y - 1.0 - (tHipY + tShDy);
+        tArmBDx = hand.x - 0.6 - (tHipX + tShDx);
+        tArmBDy = hand.y + 1.2 - (tHipY + tShDy);
+        tStride = isAccel ? 4.4 : 3.3;
+      } else if (pose === 'brace_slide' && hand) {
+        // 逆境滑退：双膝深屈向前死撑地面，肩背死死顶住倒退的巨石！
+        tHipX = hand.x - 8.4;
+        const g = gy(tHipX);
+        tHipY = g - 7.3 + Math.sin(sec * 28) * 0.35;
+        tShDx = 4.2;
+        tShDy = -4.2;
+        tHeadDx = 1.4;
+        tHeadDy = -2.0; // 低头咬牙硬顶
+        tArmFDx = hand.x - (tHipX + tShDx);
+        tArmFDy = hand.y - 0.5 - (tHipY + tShDy);
+        tArmBDx = hand.x - 0.4 - (tHipX + tShDx);
+        tArmBDy = hand.y + 1.0 - (tHipY + tShDy);
+        tStride = 1.2;
+      } else if (pose === 'stand_breath') {
+        // 攀登途中驻足喘息：直立身体、胸腔起伏、一手叉腰一手抬起擦拭额头汗水，仰望山巅
         const g = gy(hx);
-        hipX = hx;
-        hipY = g - 9.6 + bob * 0.5;
-        shX = hipX + (mode === 'walk' ? f * 0.7 : 0);
-        shY = hipY - 6.4;
+        const breath = Math.sin(sec * 5.5) * 0.55;
+        tHipX = hx;
+        tHipY = g - 9.6;
+        tShDx = -0.4; // 微向后仰舒展腰背
+        tShDy = -6.4 + breath * 0.4;
+        tHeadDx = 0.8;
+        tHeadDy = -3.3 - 0.4; // 抬头望向峰顶
+        // 前手抬至额头擦汗，后手叉腰
+        const wipeWave = Math.sin(sec * 9) * 0.7;
+        tArmFDx = 2.0 + wipeWave;
+        tArmFDy = -3.2;
+        tArmBDx = -1.6;
+        tArmBDy = 3.6;
+        tStride = 0;
+      } else if (pose === 'engage_prep' && hand) {
+        // 驻足/山脚→推石的衔接动作：屈身沉肩，双手向前伸出触碰巨石
+        tHipX = lerp(hx, hand.x - 10.6, 0.7);
+        const g = gy(tHipX);
+        tHipY = g - 8.3;
+        tShDx = 4.2;
+        tShDy = -5.1;
+        tHeadDx = 1.9;
+        tHeadDy = -2.8;
+        tArmFDx = hand.x - 0.8 - (tHipX + tShDx);
+        tArmFDy = hand.y - 0.5 - (tHipY + tShDy);
+        tArmBDx = hand.x - 1.6 - (tHipX + tShDx);
+        tArmBDy = hand.y + 1.2 - (tHipY + tShDy);
+        tStride = 1.5;
+      } else if (pose === 'knees_pant') {
+        // 登顶后双手撑膝大口喘息
+        const g = gy(hx);
+        const pant = Math.sin(sec * 10) * 0.65;
+        tHipX = hx - 1.2;
+        tHipY = g - 8.4;
+        tShDx = 3.4;
+        tShDy = -4.3 + pant;
+        tHeadDx = 1.8;
+        tHeadDy = -2.1 + pant * 0.4;
+        tArmFDx = 0.6;
+        tArmFDy = 4.2 - pant * 0.5;
+        tArmBDx = -0.8;
+        tArmBDy = 4.4 - pant * 0.5;
+        tStride = 0;
+      } else if (pose === 'cheer') {
+        const w = Math.sin(sec * 10) * 0.8;
+        tShDx = 0;
+        tShDy = -6.6;
+        tHeadDx = 0;
+        tHeadDy = -3.4;
+        tArmFDx = 2.8;
+        tArmFDy = -6.6 + w;
+        tArmBDx = -2.8;
+        tArmBDy = -6.6 - w;
+        tStride = 0;
+      } else if (pose === 'reach_stop' && hand) {
+        // 巨石在山顶失稳摇晃时，西西弗斯身体前倾伸手试图挽留巨石！
+        tHipX = hx - 1.8;
+        tHipY = gy(tHipX) - 8.8;
+        tShDx = -3.2;
+        tShDy = -5.4;
+        tHeadDx = -2.0;
+        tHeadDy = -2.6;
+        tArmFDx = clamp(hand.x + R - (tHipX + tShDx), -8.5, -3.5);
+        tArmFDy = 0.5;
+        tArmBDx = 2.0;
+        tArmBDy = 4.2;
+        tStride = 1.4;
+        elbowSign = -1;
+      } else if (pose === 'startle_back') {
+        // 巨石滚落瞬间的惊愕后撤半步
+        tHipX = hx + 0.8;
+        tHipY = gy(tHipX) - 9.2;
+        tShDx = 1.2; // 身体微后仰
+        tShDy = -6.1;
+        tHeadDx = -1.2;
+        tHeadDy = -2.9;
+        tArmFDx = -3.4;
+        tArmFDy = -1.8;
+        tArmBDx = 2.2;
+        tArmBDy = 3.5;
+        tStride = 0.8;
+        elbowSign = -1;
+      } else if (pose === 'watch') {
+        // 手搭凉棚/面罩远眺滚落的巨石，头部俯角随巨石海拔实时下移
+        const lookDrop = gazeTargetY !== undefined ? clamp((gazeTargetY - tHipY) * 0.015, 0, 1.4) : 0.6;
+        tShDx = -0.8;
+        tShDy = -6.3;
+        tHeadDx = -1.0;
+        tHeadDy = -3.1 + lookDrop;
+        tArmFDx = -2.2;
+        tArmFDy = -3.4 + lookDrop;
+        tArmBDx = 0.8;
+        tArmBDy = 6.2;
+        tStride = 0;
+        elbowSign = -1;
+      } else if (pose === 'walk') {
+        const s = Math.cos(gp + Math.PI) * 2.4 * targetFacing;
+        tShDx = targetFacing * 0.7;
+        tShDy = -6.3;
+        tHeadDx = targetFacing * 0.6;
+        tHeadDy = -3.2 + (targetFacing < 0 ? 0.4 : 0);
+        tArmFDx = s;
+        tArmFDy = 6.6;
+        tArmBDx = -s;
+        tArmBDy = 6.6;
+        tStride = 3.0;
       }
-      const headX = shX + (mode === 'push' || mode === 'ride' ? 2.4 : f * 0.5);
-      const headY = shY - (mode === 'push' || mode === 'ride' ? 2.6 : 3.3);
 
-      // 腿
-      const stride = mode === 'push' ? (activeTier >= 2 ? 4.4 : 3.4) : mode === 'walk' ? 3.0 : 0;
-      const base = mode === 'push' ? hipX + 0.4 : hipX;
+      // 2. 对所有骨骼节点进行指数阻尼平滑过渡 (Exponential Damping Blend)
+      if (!rig.inited) {
+        rig.inited = true;
+        rig.hipX = tHipX;
+        rig.hipY = tHipY;
+        rig.shDx = tShDx;
+        rig.shDy = tShDy;
+        rig.headDx = tHeadDx;
+        rig.headDy = tHeadDy;
+        rig.armFDx = tArmFDx;
+        rig.armFDy = tArmFDy;
+        rig.armBDx = tArmBDx;
+        rig.armBDy = tArmBDy;
+        rig.stride = tStride;
+        rig.facing = targetFacing;
+      } else {
+        const posLambda = pose === 'push' || pose === 'accel_push' || pose === 'ride' ? 22 : 13;
+        const poseLambda = 11;
+        rig.hipX = damp(rig.hipX, tHipX, posLambda, dt);
+        rig.hipY = damp(rig.hipY, tHipY, posLambda, dt);
+        rig.shDx = damp(rig.shDx, tShDx, poseLambda, dt);
+        rig.shDy = damp(rig.shDy, tShDy, poseLambda, dt);
+        rig.headDx = damp(rig.headDx, tHeadDx, poseLambda, dt);
+        rig.headDy = damp(rig.headDy, tHeadDy, poseLambda, dt);
+        rig.armFDx = damp(rig.armFDx, tArmFDx, poseLambda + 3, dt);
+        rig.armFDy = damp(rig.armFDy, tArmFDy, poseLambda + 3, dt);
+        rig.armBDx = damp(rig.armBDx, tArmBDx, poseLambda + 3, dt);
+        rig.armBDy = damp(rig.armBDy, tArmBDy, poseLambda + 3, dt);
+        rig.stride = damp(rig.stride, tStride, poseLambda, dt);
+        rig.facing = damp(rig.facing, targetFacing, 9, dt);
+      }
+
+      const f = rig.facing >= 0 ? 1 : -1;
+      const hipX = rig.hipX;
+      const hipY = rig.hipY;
+      const shX = hipX + rig.shDx;
+      const shY = hipY + rig.shDy;
+      const headX = shX + rig.headDx;
+      const headY = shY + rig.headDy;
+
+      // 腿部 IK
+      const stride = rig.stride;
+      const base =
+        pose === 'push' || pose === 'accel_push'
+          ? hipX + 0.4
+          : pose === 'brace_slide'
+            ? hipX + 2.4
+            : hipX;
       let fFx = base + Math.cos(gp) * stride * f;
       let fBx = base + Math.cos(gp + Math.PI) * stride * f;
-      const liftF = stride ? Math.max(0, -Math.sin(gp)) * 2 : 0;
-      const liftB = stride ? Math.max(0, Math.sin(gp)) * 2 : 0;
+      const liftF = stride > 0.6 ? Math.max(0, -Math.sin(gp)) * 2.0 : 0;
+      const liftB = stride > 0.6 ? Math.max(0, Math.sin(gp)) * 2.0 : 0;
       let footBaseY_F = gy(fFx) - 1 - liftF;
       let footBaseY_B = gy(fBx) - 1 - liftB;
 
-      if (mode === 'ride' && rideMountY !== undefined) {
+      if (pose === 'ride' && rideMountY !== undefined) {
         if (realm === 'crt') {
-          // 尼奥超人御空飞行双腿后掠
           fFx = hipX - 6.5;
           fBx = hipX - 7.5;
           footBaseY_F = hipY + 2.5;
@@ -1246,8 +1557,14 @@ const { initialSummits = 1 } = Astro.props;
           footBaseY_F = rideMountY - 1;
           footBaseY_B = rideMountY - 1;
         }
-      } else if (!stride) {
-        fFx = hipX + 1.5 * f;
+      } else if (pose === 'brace_slide') {
+        // 死顶防滑退：双脚向前斜撑在山坡上犁地制动
+        fFx = hipX + 4.4;
+        fBx = hipX + 1.8;
+        footBaseY_F = gy(fFx) - 1;
+        footBaseY_B = gy(fBx) - 1;
+      } else if (stride <= 0.35) {
+        fFx = hipX + 1.6 * f;
         fBx = hipX - 1.3 * f;
         footBaseY_F = gy(fFx) - 1;
         footBaseY_B = gy(fBx) - 1;
@@ -1255,47 +1572,22 @@ const { initialSummits = 1 } = Astro.props;
       const legF = ik(hipX, hipY, fFx, footBaseY_F, 5, 5.2, -f);
       const legB = ik(hipX, hipY, fBx, footBaseY_B, 5, 5.2, -f);
 
-      // 手
-      let aF: { x: number; y: number };
-      let aB: { x: number; y: number };
-      if (mode === 'ride' && hand) {
-        aF = { x: hand.x, y: hand.y };
-        aB = { x: hand.x - 1.5, y: hand.y + 1.5 };
-      } else if (mode === 'push' && hand) {
-        aF = { x: hand.x, y: hand.y - 1 };
-        aB = { x: hand.x - 0.6, y: hand.y + 1.2 };
-      } else if (mode === 'cheer') {
-        const w = Math.sin(sec * 10) * 0.8;
-        aF = { x: shX + 2.6, y: shY - 6.6 + w };
-        aB = { x: shX - 2.6, y: shY - 6.6 - w };
-      } else if (mode === 'watch') {
-        aF = { x: headX + f * 1.8, y: headY - 0.6 };
-        aB = { x: shX - f * 0.6, y: shY + 7 };
-      } else if (mode === 'walk') {
-        const s = Math.cos(gp + Math.PI) * 2.4 * f;
-        aF = { x: shX + s, y: shY + 6.8 };
-        aB = { x: shX - s, y: shY + 6.8 };
-      } else {
-        aF = { x: shX + 0.6 * f, y: shY + 7 };
-        aB = { x: shX - 0.6 * f, y: shY + 7 };
-      }
-      const armF = ik(shX, shY + 0.5, aF.x, aF.y, 3.9, 3.9, f);
-      const armB = ik(shX - 0.4 * f, shY + 0.8, aB.x, aB.y, 3.9, 3.9, f);
+      const armF = ik(shX, shY + 0.5, shX + rig.armFDx, shY + rig.armFDy, 3.9, 3.9, elbowSign);
+      const armB = ik(shX - 0.4 * f, shY + 0.8, shX + rig.armBDx, shY + rig.armBDy, 3.9, 3.9, elbowSign);
 
       // —— 身后装束 ——
       if (realm === 'void') {
         const px = shX - f * 2.6 + (hipX - shX) * 0.25;
         rect(px - 1.5, shY + 0.5, 3, 5, st.acc2);
-        // Tier 2/3/4 宇航服背包等离子喷射尾焰
-        if (activeTier >= 2 && mode === 'push') {
-          const jetLen = activeTier === 3 ? 9 : 5;
+        if ((activeTier >= 2 || pose === 'accel_push' || pose === 'brace_slide') && phase === 'CLIMB') {
+          const jetLen = activeTier === 3 ? 9 : 5.5;
           poly([px - 1, shY + 2, px - 1, shY + 5, px - 1 - jetLen, shY + 3.5 + Math.sin(sec * 35)], hex('#5ec8ff'));
           poly([px - 1, shY + 3, px - 1, shY + 4, px - 1 - jetLen * 0.6, shY + 3.5], hex('#ffffff'));
         }
       } else {
-        // 披风 / 帝国学者大氅 / 尼奥黑风衣 / 弗雷曼沙漠披风
-        const boostBlow = activeTier >= 2 || mode === 'ride' ? 3.2 : 0;
-        const w1 = Math.sin(sec * 9 + 1) * 1.2 + (moving ? 1.5 : 0.3) + boostBlow;
+        const isHeadwind = worldForce && worldForce.dir === -1;
+        const boostBlow = activeTier >= 2 || pose === 'ride' || pose === 'accel_push' ? 3.2 : isHeadwind ? 4.8 : 0;
+        const w1 = Math.sin(sec * (isHeadwind ? 18 : 9) + 1) * 1.3 + (moving ? 1.5 : 0.3) + boostBlow;
         const tail = (realm === 'amber' ? 5 : 3.8) + boostBlow;
         const cloakColor = realm === 'paper' ? st.acc : realm === 'amber' ? st.acc2 : st.main;
         poly(
@@ -1319,13 +1611,12 @@ const { initialSummits = 1 } = Astro.props;
       stroke(hipX, hipY, shX, shY, 3, st.main);
       if (realm === 'paper') rect(hipX - 1.5, hipY - 1.5, 3, 1, st.acc2);
 
-      // 头 + 头饰
+      // 头部 + 主题头饰
       if (realm === 'void') {
         disc(headX, headY, 3, st.main);
         rect(headX + (f > 0 ? 0.5 : -2.5), headY - 1.5, 2, 2, st.acc);
         plot(Math.round(headX + f * 1.4), Math.round(headY - 2), hex('#ffffff'));
       } else if (realm === 'paper') {
-        // 川陀心理史学大师：金冠头环与第一辐光徽记
         disc(headX, headY, 2.4, hex('#e8d2b5'));
         rect(headX - 2, headY - 2.2, 4.5, 1.4, st.main);
         stroke(headX - 2, headY - 1, headX + 2.2, headY - 1, 1, st.acc2);
@@ -1337,6 +1628,12 @@ const { initialSummits = 1 } = Astro.props;
         disc(headX - f * 0.4, headY, 2.9, st.acc2);
         disc(headX + f * 0.7, headY + 0.2, 1.4, st.main);
         plot(Math.round(headX + f * 1.3), Math.round(headY - 0.3), st.acc);
+      }
+
+      // 喘息时的呼吸白雾 / 汗珠微粒
+      if ((pose === 'stand_breath' || pose === 'knees_pant') && Math.sin(sec * 8) > 0.35) {
+        plot(Math.round(headX + f * 3.5), Math.round(headY - 1), hex('#ffffff'));
+        plot(Math.round(headX - f * 2.5), Math.round(headY - 3), hex('#7fd8ff'));
       }
 
       stroke(hipX, hipY, legF.jx, legF.jy, 2, st.main);
@@ -1365,7 +1662,9 @@ const { initialSummits = 1 } = Astro.props;
       const x0 = Math.round(cx);
       const y0 = Math.round(cy);
       const rr = R + 0.5;
-      const isWireframe = realm === 'crt' && (activeTier >= 2 || epicCharge);
+      const isWireframe =
+        realm === 'crt' &&
+        (activeTier >= 2 || epicCharge || (worldForce && worldForce.dir === 1 && worldForce.variant === 0));
 
       for (let dy = -R; dy <= R; dy++) {
         for (let dx = -R; dx <= R; dx++) {
@@ -1399,7 +1698,6 @@ const { initialSummits = 1 } = Astro.props;
               else if (d < cr + 0.08 && ((u - cu) * Lx + (v - cv) * Ly) > 0) lum += 0.15;
             }
           } else if (realm === 'paper') {
-            // 第一辐光浑天球：旋转正交金环与发光赤红方程脉络
             const onRing = Math.abs(u) < 0.14 || Math.abs(v) < 0.14 || Math.abs(u * u + v * v - 0.52) < 0.1;
             if (onRing) {
               plot(px, py, lum > 0.35 ? hex('#fff2b2') : hex('#c8402a'));
@@ -1461,7 +1759,7 @@ const { initialSummits = 1 } = Astro.props;
     };
 
     // ======================================================================
-    // 10. 四大主题常态动态背景 + 随机背景小事件渲染 (Random Background Micro-Events)
+    // 10. 四大主题常态动态背景 + 背景随机小事件渲染
     // ======================================================================
     const CAT = ['.......x.x', 'x......xxx', '.x.xxxxxxx', '..xxxxxxx.'];
     const CAT_LEGS = ['..x.x..x.x', '.x..x.x..x'];
@@ -1481,7 +1779,6 @@ const { initialSummits = 1 } = Astro.props;
         } else if (tw > 0.45) plot(s.x, s.y, hex('#9aaee0'));
         else if (tw > 0.2) plot(s.x, s.y, hex('#3a4876'));
       }
-      // 太阳从木星边缘探出
       const fl = 4 + Math.sin(sec * 2.2) * 1.5;
       const sx = 43;
       const sy = 28;
@@ -1493,7 +1790,6 @@ const { initialSummits = 1 } = Astro.props;
         pdither(sx, sy - i, hex('#fff2c8'), a);
         pdither(sx, sy + i, hex('#fff2c8'), a);
       }
-      // 发现号缓缓掠过
       const shipX = W + 30 - ((sec * 4) % (W + 90));
       const shipY = 66 + Math.sin(sec * 0.4) * 1.5;
       disc(shipX, shipY, 2, hex('#e6eaf2'));
@@ -1502,47 +1798,49 @@ const { initialSummits = 1 } = Astro.props;
       for (let k = 6; k < 18; k += 3) plot(Math.round(shipX + k), Math.round(shipY - 1), hex('#6f7790'));
       plot(Math.round(shipX - 1), Math.round(shipY - 1), hex('#ff5a5a'));
 
-      // —— 背景随机小事件 (Void) ——
       if (bgEvent) {
         const p = clamp(bgEvent.t / bgEvent.dur, 0, 1);
+        const env = eventEnv(p, 0.22, 0.24);
+        drawAlpha = env;
         if (bgEvent.type === 0) {
-          // 事件 0：克拉维斯球形登月舱着陆/起飞 (Lunar Lander Touchdown & Liftoff)
-          const lx = 132;
+          // 事件 0：克拉维斯球形登月舱从高轨屏外 (-10) 缓缓下降悬停，随后点火升空返回轨道
+          const lx = 132 + Math.sin(p * Math.PI * 2) * 6;
           const arc = Math.sin(p * Math.PI);
-          const ly = 32 + arc * 74;
+          const ly = -8 + arc * 112;
           disc(lx, ly, 3.2, hex('#e6eaf2'));
           rect(lx - 2, ly - 1, 4, 2, hex('#f2b44f'));
           stroke(lx - 3, ly + 2, lx - 5, ly + 5, 1, hex('#8c94a8'));
           stroke(lx + 3, ly + 2, lx + 5, ly + 5, 1, hex('#8c94a8'));
-          // 反推火箭蓝白喷焰
           if (Math.sin(sec * 40) > -0.3) {
-            poly([lx - 1.5, ly + 3, lx + 1.5, ly + 3, lx, ly + 8 + Math.sin(sec * 50) * 2], hex('#8fd3ff'));
+            poly([lx - 1.5, ly + 3, lx + 1.5, ly + 3, lx, ly + 7 + arc * 3 + Math.sin(sec * 50) * 1.5], hex('#8fd3ff'));
           }
         } else if (bgEvent.type === 1) {
-          // 事件 1：EVA 宇航员与球形救援舱太空漂浮 (EVA Astronaut Drift & Pod Rescue)
-          const ax = 150 + p * 75;
+          // 事件 1：EVA 宇航员与救援球舱从木星暗影区渐入漂浮，随后淡出至深空
+          const ax = 128 + p * 92;
           const ay = 34 + Math.sin(p * 6) * 4;
           disc(ax, ay, 1.8, hex('#ffffff'));
           plot(Math.round(ax + 1), Math.round(ay), hex('#f2b44f'));
-          // 闪烁红光求救信标
           if (Math.floor(sec * 6) % 2 === 0) plot(Math.round(ax), Math.round(ay - 3), hex('#ff4d5e'));
-          // 追赶的 EVA 救援球舱
-          const px = ax - 14 + p * 8;
+          const px = ax - 18 + smoothstep(0, 0.85, p) * 12;
           disc(px, ay + 1, 2.4, hex('#cbd5e1'));
           stroke(px - 4, ay + 1, px - 2, ay + 1, 1, hex('#7fd8ff'));
         } else {
-          // 事件 2：TMA-1 黑石碑向木星发射高能谐波光柱 (Monolith Harmonic Beam to Jupiter)
-          const env = Math.sin(p * Math.PI);
+          // 事件 2：TMA-1 黑石碑向木星渐进发射谐波光束（光束首尾渐进延伸与收束，绝不瞬间贯穿）
           const mx = 293;
           const my = gyi[294] - 17;
-          stroke(mx, my, 62, 46, 1, hex('#8fd3ff'));
+          const headU = smoothstep(0, 0.32, p);
+          const tailU = smoothstep(0.66, 1.0, p);
+          progStroke(mx, my, 62, 46, tailU, headU, 1, hex('#8fd3ff'));
           for (let k = 0; k < 4; k++) {
-            const u = ((sec * 1.4 + k * 0.25) % 1);
-            const rx = mx + (62 - mx) * u;
-            const ry = my + (46 - my) * u;
-            ring(rx, ry, 3 + u * 6, 3 + u * 6, hex('#ffffff'), env * 0.85);
+            const u = (sec * 1.2 + k * 0.25) % 1;
+            if (u >= tailU && u <= headU) {
+              const rx = lerp(mx, 62, u);
+              const ry = lerp(my, 46, u);
+              ring(rx, ry, 3 + u * 6, 3 + u * 6, hex('#ffffff'), env * 0.85);
+            }
           }
         }
+        drawAlpha = 1;
       }
 
       if (summitFx >= 0 && summitFx < 4) {
@@ -1555,7 +1853,6 @@ const { initialSummits = 1 } = Astro.props;
     };
 
     const drawBgPaper = (sec: number) => {
-      // 1. 常态川陀高空飞车航道 (2 条反重力空轨车流穿梭于摩天大楼之间)
       for (let i = 0; i < 9; i++) {
         const dir = i % 2 === 0 ? 1 : -1;
         const speed = 16 + (i % 3) * 7;
@@ -1567,27 +1864,28 @@ const { initialSummits = 1 } = Astro.props;
         pdither(x - dir * 2, y, i % 3 === 0 ? hex('#5ec8ff') : hex('#c8402a'), 0.8);
       }
 
-      // 2. 太空电梯常态运行指示灯
       const beaconY = Math.round(120 - ((sec * 18) % 115));
       rect(147, beaconY, 3, 2, hex('#fff2b2'));
 
-      // —— 背景随机小事件 (Paper: 川陀首都与端点星) ——
       if (bgEvent) {
         const p = clamp(bgEvent.t / bgEvent.dur, 0, 1);
+        const env = eventEnv(p, 0.22, 0.24);
+        drawAlpha = env;
         if (bgEvent.type === 0) {
-          // 事件 0：川陀太空电梯巨型轨道运输舱升空并与高轨星环对接 (Space Elevator Orbital Pod)
-          const podY = Math.round(124 - p * 114);
+          // 事件 0：太空电梯轨道舱从穹顶下方渐入加速升空，直至驶出顶层高轨 (-8)
+          const easeP = smoothstep(0, 1, p);
+          const podY = Math.round(132 - easeP * 140);
           rect(144, podY - 3, 9, 6, hex('#2e3846'));
           rect(145, podY - 2, 7, 4, hex('#f0c875'));
           rect(144, podY, 9, 1, hex('#c8402a'));
-          // 底部反重力推进蓝光
           poly([145, podY + 3, 152, podY + 3, 148.5, podY + 9], hex('#88c9e8'));
-          if (p > 0.82) {
-            ring(148, 12, (p - 0.82) * 85, (p - 0.82) * 32, hex('#fff2b2'), 0.9);
+          if (p > 0.72) {
+            const rp = (p - 0.72) / 0.28;
+            ring(148, 12, rp * 26, rp * 10, hex('#fff2b2'), 1 - rp);
           }
         } else if (bgEvent.type === 1) {
-          // 事件 1：银河帝国巡洋舰编队掠过摩天楼群并投下探照光束 (Imperial Cruiser Squadron Flyby)
-          const fx = W + 35 - p * (W + 90);
+          // 事件 1：帝国巡洋舰编队从右侧屏外飞入并驶出左侧屏外，探照灯渐亮渐熄
+          const fx = W + 38 - p * (W + 105);
           const fy = 46;
           for (let k = 0; k < 3; k++) {
             const cx = fx + k * 16;
@@ -1595,32 +1893,32 @@ const { initialSummits = 1 } = Astro.props;
             poly([cx - 8, cy, cx + 6, cy - 2, cx + 9, cy + 1, cx - 5, cy + 2], hex('#2e3846'));
             stroke(cx - 5, cy, cx + 5, cy, 1, hex('#e5ba63'));
             plot(Math.round(cx - 8), Math.round(cy), hex('#5ec8ff'));
-            // 向下扫描摩天楼的金色探照灯束
-            for (let sy = cy + 3; sy < cy + 32; sy += 2) {
+            const beamLen = Math.round(28 * env);
+            for (let sy = cy + 3; sy < cy + 3 + beamLen; sy += 2) {
               const hw = (sy - cy) * 0.18;
-              pdither(cx - hw, sy, hex('#f5e0a6'), 0.45);
-              pdither(cx + hw, sy, hex('#f5e0a6'), 0.45);
+              pdither(cx - hw, sy, hex('#f5e0a6'), 0.45 * env);
+              pdither(cx + hw, sy, hex('#f5e0a6'), 0.45 * env);
             }
           }
         } else {
-          // 事件 2：中央帝国大穹顶上方投射巨幅【哈里·谢顿 & 第一辐光】全息广播 + 端点星脉冲
-          const env = Math.sin(p * Math.PI);
+          // 事件 2：中央大穹顶全息投影自下而上逐行扫描展开，结束时自上而下收束回穹顶
           const hx = 148;
           const hy = 72;
-          // 穹顶投射光锥
-          for (let y = hy; y < 100; y++) {
+          const scanY = Math.round(100 - env * 42);
+          for (let y = Math.max(hy, scanY); y < 100; y++) {
             const hw = Math.round((100 - y) * 0.45);
             pdither(hx - hw, y, hex('#5ec8ff'), env * 0.65);
             pdither(hx + hw, y, hex('#5ec8ff'), env * 0.65);
           }
-          // 旋转的全息第一辐光双星环与谢顿剪影
-          ring(hx, hy, 14, 5, hex('#f0c875'), env * 0.95);
-          ring(hx, hy, 7, 13, hex('#5ec8ff'), env * 0.85);
-          disc(hx, hy - 2, 2.2, hex('#fff6dc'));
-          rect(hx - 2.5, hy + 1, 5, 6, hex('#5ec8ff'));
-          // 天空端点星同步发出金色百科星环波
-          ring(64, 36, 20 + p * 26, 8 + p * 10, hex('#f0c875'), env * 0.8);
+          if (scanY <= hy + 6) {
+            ring(hx, hy, 14 * env, 5 * env, hex('#f0c875'), env * 0.95);
+            ring(hx, hy, 7 * env, 13 * env, hex('#5ec8ff'), env * 0.85);
+            disc(hx, hy - 2, 2.2 * env, hex('#fff6dc'));
+            rect(hx - 2.5, hy + 1, 5, Math.round(6 * env), hex('#5ec8ff'));
+          }
+          ring(64, 36, 19 + p * 24, 7 + p * 9, hex('#f0c875'), env * 0.8);
         }
+        drawAlpha = 1;
       }
     };
 
@@ -1638,13 +1936,13 @@ const { initialSummits = 1 } = Astro.props;
         }
       }
 
-      // —— 背景随机小事件 (CRT: 黑客帝国) ——
       if (bgEvent) {
         const p = clamp(bgEvent.t / bgEvent.dur, 0, 1);
+        const env = eventEnv(p, 0.2, 0.22);
+        drawAlpha = env;
         if (bgEvent.type === 0) {
-          // 事件 0：3 只机械乌贼巡逻小队游过天际线并投射红色扫描线 (Sentinel Squid Patrol Swarm)
           for (let s = 0; s < 3; s++) {
-            const sx = -20 + p * (W + 60) - s * 18;
+            const sx = -25 + p * (W + 75) - s * 18;
             const sy = 36 + s * 10 + Math.sin(sec * 4 + s) * 5;
             fillEllipse(sx, sy, 4, 2.5, hex('#0c381b'));
             plot(Math.round(sx + 3), Math.round(sy), hex('#ff3b5c'));
@@ -1653,30 +1951,34 @@ const { initialSummits = 1 } = Astro.props;
               const wave = Math.sin(sec * 12 + t + s) * 2.5;
               stroke(sx - 3, sy + t, sx - 10, sy + t * 2 + wave, 1, hex('#16a548'));
             }
-            if (Math.sin(sec * 8 + s) > 0.2) {
-              stroke(sx + 4, sy, sx + 22, sy + 18, 1, hex('#ff3b5c'));
+            const scanEnv = Math.max(0, Math.sin(sec * 6 + s)) * env;
+            if (scanEnv > 0.1) {
+              progStroke(sx + 4, sy, sx + 22, sy + 18, 0, scanEnv, 1, hex('#ff3b5c'));
             }
           }
         } else if (bgEvent.type === 1) {
-          // 事件 1：尼布甲尼撒号气垫船低空掠过并释放蓝青色反重力电弧 (Nebuchadnezzar Hovercraft)
-          const hx = W + 25 - p * (W + 60);
+          const hx = W + 28 - p * (W + 68);
           const hy = 58 + Math.sin(sec * 3) * 3;
           rect(hx - 9, hy - 2, 18, 4, hex('#0b3a1a'));
           rect(hx - 5, hy - 4, 10, 2, hex('#3dff7a'));
           for (const off of [-7, -2, 3, 7]) {
             rect(hx + off, hy + 2, 2, 1, hex('#7fd8ff'));
-            pdither(hx + off, hy + 4, hex('#7fd8ff'), 0.8);
+            pdither(hx + off, hy + 4, hex('#7fd8ff'), 0.8 * env);
           }
-          if (Math.abs(p - 0.5) < 0.18) {
-            ring(hx, hy, (p - 0.32) * 140, (p - 0.32) * 55, hex('#7fd8ff'), 0.85);
+          if (p > 0.3 && p < 0.75) {
+            const rp = (p - 0.3) / 0.45;
+            ring(hx, hy, rp * 32, rp * 13, hex('#7fd8ff'), (1 - rp) * env);
           }
         } else {
-          // 事件 2：机械城巨型分叉闪电 + 屋顶黑猫 Déjà Vu 故障闪现
-          if (p < 0.25 || (p > 0.45 && p < 0.65)) {
+          // 闪电自顶向下生长并带有荧光余辉衰减
+          const reachSegs = Math.ceil(smoothstep(0, 0.22, p) * 11);
+          const glow = Math.max(0, Math.sin(p * Math.PI * 2.2)) * env;
+          drawAlpha = glow;
+          if (glow > 0.05) {
             let lx = bgEvent.x0;
             let ly = 2;
-            for (let seg = 0; seg < 11; seg++) {
-              const nx = lx + Math.sin(seg * 4.1 + sec * 20) * 10;
+            for (let seg = 0; seg < reachSegs; seg++) {
+              const nx = lx + Math.sin(seg * 4.1 + Math.floor(sec * 5)) * 10;
               const ny = ly + 10;
               stroke(lx, ly, nx, ny, 1, hex('#c8ffd9'));
               if (seg === 4) stroke(lx, ly, lx - 18, ly + 16, 1, hex('#3dff7a'));
@@ -1685,11 +1987,11 @@ const { initialSummits = 1 } = Astro.props;
             }
           }
         }
+        drawAlpha = 1;
       }
     };
 
     const drawBgAmber = (sec: number) => {
-      // 常态扑翼机
       const tx = ((sec * 14) % (W + 80)) - 40;
       const ty = 52 + Math.sin(sec * 0.8) * 4;
       const dark = hex('#2a140c');
@@ -1702,7 +2004,6 @@ const { initialSummits = 1 } = Astro.props;
       stroke(tx + 1, ty, tx - 3, ty - wy * 0.6, 1, hex('#5a2c1a'));
       stroke(tx + 1, ty, tx + 5, ty - wy * 0.6, 1, hex('#5a2c1a'));
 
-      // 远景沙虫夏胡鲁
       if (worm.active) {
         const dur = 5.5;
         const env = Math.sin(Math.PI * clamp(worm.t / dur, 0, 1));
@@ -1731,44 +2032,46 @@ const { initialSummits = 1 } = Astro.props;
         }
       }
 
-      // —— 背景随机小事件 (Amber: 沙丘) ——
       if (bgEvent) {
         const p = clamp(bgEvent.t / bgEvent.dur, 0, 1);
+        const env = eventEnv(p, 0.22, 0.24);
+        drawAlpha = env;
         if (bgEvent.type === 0) {
-          // 事件 0：香料采集车作业 + 巨翼运输机空中紧急吊装撤离 (Spice Harvester & Carryall Airlift)
-          const hx = 115;
-          const groundY = midDune(hx) - 2;
-          const liftH = p > 0.45 ? ((p - 0.45) / 0.55) * 48 : 0;
-          const hy = groundY - liftH;
-          // 香料采集车 (Harvester Crawler)
+          // 香料采集车从沙丘脊后渐入驶上沙坡，随后巨翼运输机从高空屏外俯冲吊装并飞出顶屏
+          const enterShift = (1 - smoothstep(0, 0.24, p)) * 6;
+          const liftP = smoothstep(0.45, 1.0, p);
+          const hx = 115 + liftP * 28;
+          const groundY = midDune(115) - 2 + enterShift;
+          const hy = groundY - liftP * 76;
           rect(hx - 5, hy - 3, 10, 4, hex('#5e321c'));
           rect(hx - 3, hy - 4, 6, 2, hex('#d9944f'));
-          plot(hx + 3, hy - 2, hex('#5ec8ff'));
-          // 巨翼运输机 (Carryall) 俯冲抓取
-          const cy = p < 0.45 ? groundY - 42 + (p / 0.45) * 34 : hy - 8;
-          const cx = hx + (p < 0.45 ? (0.45 - p) * 40 : (p - 0.45) * 24);
+          plot(Math.round(hx + 3), Math.round(hy - 2), hex('#5ec8ff'));
+
+          const approachP = smoothstep(0, 0.45, p);
+          const cy = p < 0.45 ? lerp(-10, groundY - 8, approachP) : hy - 8;
+          const cx = p < 0.45 ? lerp(165, 115, approachP) : hx;
           poly([cx - 9, cy, cx + 9, cy, cx + 5, cy - 3, cx - 5, cy - 3], hex('#3b2014'));
           stroke(cx - 12, cy + 1, cx + 12, cy + 1, 1, hex('#f2bb78'));
-          if (p >= 0.38) {
-            stroke(cx - 3, cy + 1, hx - 3, hy - 3, 1, hex('#fbdc98'));
-            stroke(cx + 3, cy + 1, hx + 3, hy - 3, 1, hex('#fbdc98'));
+          if (p >= 0.36) {
+            const cableU = smoothstep(0.36, 0.45, p);
+            progStroke(cx - 3, cy + 1, hx - 3, hy - 3, 0, cableU, 1, hex('#fbdc98'));
+            progStroke(cx + 3, cy + 1, hx + 3, hy - 3, 0, cableU, 1, hex('#fbdc98'));
           }
         } else if (bgEvent.type === 1) {
-          // 事件 1：沙漠香料矿脉大喷发 (Pre-Spice Mass Geyser Blow)
           const gx = 142;
           const gy0 = midDune(gx);
-          const env = Math.sin(p * Math.PI);
           const gh = Math.round(env * 38);
+          const windDrift = smoothstep(0.5, 1.0, p) * 14;
           for (let dy = 0; dy < gh; dy++) {
-            const spread = 1 + (dy / 38) * 11;
+            const hRatio = dy / 38;
+            const spread = 1 + hRatio * 11;
             for (let dx = -Math.ceil(spread); dx <= Math.ceil(spread); dx++) {
               const c = (dx + dy) % 3 === 0 ? hex('#ffd59a') : dy > gh * 0.6 ? hex('#c85a32') : hex('#8f3246');
-              pdither(gx + dx + Math.sin(dy * 0.3 + sec * 10) * 2, gy0 - dy, c, env * 0.85);
+              pdither(gx + dx - windDrift * hRatio + Math.sin(dy * 0.3 + sec * 10) * 2, gy0 - dy, c, env * (1 - Math.abs(dx) / (spread + 1)));
             }
           }
         } else {
-          // 事件 2：远山沙脊上的弗雷曼游牧小队剪影 (Fremen Stilgar Caravan on Distant Dune)
-          const baseX = 55 + p * 65;
+          const baseX = 50 + p * 72;
           for (let k = 0; k < 4; k++) {
             const fx = Math.round(baseX - k * 6);
             const fy = Math.round(122 + Math.sin(fx * 0.018 + 0.5) * 6 + Math.sin(fx * 0.051 + 1.2) * 3);
@@ -1776,11 +2079,166 @@ const { initialSummits = 1 } = Astro.props;
             plot(fx - 1, fy - 3, hex('#5a2c1a'));
           }
         }
+        drawAlpha = 1;
       }
     };
 
     // ======================================================================
-    // 10B. 分段推石特效 (Tier 2 / Tier 3) 与 1% 终极坐骑冲顶彩蛋 (Tier 4) 渲染器
+    // 10B. 渲染影响巨石进退的「16种世界随机天象/灾变事件」视觉特效（全渐入渐出 + 空间进退轨迹）
+    // ======================================================================
+    const drawWorldForceEventFx = (bc: { x: number; y: number }, sec: number) => {
+      if (!worldForce) return;
+      const p = clamp(worldForce.t / worldForce.dur, 0, 1);
+      // 平滑淡入 (前 24%) 与平滑淡出 (后 26%)
+      const env = eventEnv(p, 0.24, 0.26);
+      if (env <= 0.01) return;
+      drawAlpha = env;
+
+      const beamHead = smoothstep(0.05, 0.32, p);
+      const beamTail = smoothstep(0.72, 0.98, p);
+
+      if (worldForce.dir === 1) {
+        // —— 顺境前进事件 (8 种：每个主题 2 种) ——
+        if (realm === 'void') {
+          if (worldForce.variant === 0) {
+            for (let k = 0; k < 3; k++) {
+              const r = (R + 2 + ((sec * 18 + k * 5) % 14)) * env;
+              ring(bc.x, bc.y, r, r * 0.45, hex('#8fd3ff'), env * 0.9);
+            }
+          } else {
+            // 发现号球形 EVA 支援舱从顶屏飞入悬停，结束时向上飞离屏幕
+            const px = bc.x + 12 + (1 - env) * 18;
+            const py = lerp(-12, Math.max(16, bc.y - 34), env);
+            disc(px, py, 3.8, hex('#e6eaf2'));
+            disc(px + 1, py, 1.6, hex('#38bdf8'));
+            progStroke(px, py + 4, bc.x - 3, bc.y - R, beamTail, beamHead, 1, hex('#8fd3ff'));
+            progStroke(px, py + 4, bc.x + 3, bc.y - R, beamTail, beamHead, 1, hex('#8fd3ff'));
+          }
+        } else if (realm === 'paper') {
+          if (worldForce.variant === 0) {
+            const span = Math.round(16 * env);
+            for (let dx = -span; dx <= span; dx++) {
+              const wy = bc.y + R - 1 + Math.sin(dx * 0.35 - sec * 14) * 2.5 * env;
+              pdither(bc.x + dx, wy, hex('#f0c875'), env);
+              pdither(bc.x + dx, wy + 1, hex('#c8402a'), env * 0.8);
+            }
+          } else {
+            // 端点星与太空电梯光束渐进向下射向巨石，结束时尾端向下收束
+            progStroke(64, 36, bc.x, bc.y - R, beamTail, beamHead, 1, hex('#f0c875'));
+            progStroke(148, 25, bc.x, bc.y - R, beamTail, beamHead, 1, hex('#5ec8ff'));
+            ring(bc.x, bc.y, (R + 3) * env, (R + 3) * env, hex('#fff2b2'), env);
+          }
+        } else if (realm === 'crt') {
+          if (worldForce.variant === 0) {
+            for (let k = -3; k <= 3; k++) {
+              const dropY = bc.y - 28 * env + ((sec * 45 + k * 7) % 26);
+              rect(bc.x + k * 2, dropY, 1, Math.max(1, Math.round(4 * env)), hex('#c8ffd9'));
+            }
+          } else {
+            for (let k = 1; k <= 3; k++) {
+              const rx = bc.x - 16 + ((sec * 25 + k * 6) % 16);
+              ring(rx, bc.y, 4 * env, 8 * env, hex('#7fd8ff'), env);
+            }
+          }
+        } else {
+          if (worldForce.variant === 0) {
+            for (let k = 0; k < 14; k++) {
+              const sx = bc.x - 18 * env + ((sec * 35 + k * 3) % 18);
+              const sy = bc.y + R - (k % 7) * 2 * env;
+              pdither(sx, sy, k % 2 ? hex('#ffd59a') : hex('#c8402a'), env);
+            }
+          } else {
+            // 扑翼机从右侧飞入牵引，结束时向左上飞离
+            const ox = bc.x + 18 + (p < 0.25 ? (0.25 - p) * 90 : p > 0.75 ? -(p - 0.75) * 90 : 0);
+            const oy = lerp(-10, Math.max(18, bc.y - 30), env);
+            stroke(ox - 5, oy, ox + 5, oy, 1, hex('#2a140c'));
+            progStroke(ox, oy + 1, bc.x, bc.y - R, beamTail, beamHead, 1, hex('#fbdc98'));
+          }
+        }
+      } else {
+        // —— 逆境滑退事件 (8 种：每个主题 2 种，全渐入与空间进退) ——
+        if (realm === 'void') {
+          if (worldForce.variant === 0) {
+            // HAL-9000 红眼如光圈瞳孔般从半径 0 渐开至 5.5，结束时闭拢消散
+            const hx = clamp(bc.x + 28, 80, W - 25);
+            const hy = Math.max(18, bc.y - 38);
+            const eyeR = 5.5 * env;
+            disc(hx, hy, eyeR, hex('#1a080d'));
+            ring(hx, hy, eyeR, eyeR, hex('#ff3b5c'), env);
+            disc(hx, hy, 2.5 * env, hex('#ff3b5c'));
+            if (env > 0.4) plot(Math.round(hx - 1), Math.round(hy - 1), hex('#ffffff'));
+            progStroke(hx, hy + eyeR, bc.x, bc.y - R, beamTail, beamHead, 1, hex('#ff3b5c'));
+            progStroke(hx, hy + eyeR, bc.x + 5, bc.y, beamTail, beamHead, 1, hex('#ff3b5c'));
+          } else {
+            // 微陨石群从高空连续坠落至前方坡面
+            for (let m = 0; m < 2; m++) {
+              const mp = (p * 1.8 + m * 0.45) % 1;
+              const mx = lerp(bc.x + 48, bc.x + 6, mp);
+              const my = lerp(-6, bc.y + 2, mp);
+              disc(mx, my, 2.0 * env, hex('#ff6b4a'));
+              stroke(mx, my, mx + 9 * env, my - 11 * env, 1, hex('#ffd56b'));
+              if (mp > 0.75) {
+                const rp = (mp - 0.75) / 0.25;
+                ring(bc.x + 6, bc.y + 2, rp * 10, rp * 4, hex('#ff6b4a'), (1 - rp) * env);
+              }
+            }
+          }
+        } else if (realm === 'paper') {
+          if (worldForce.variant === 0) {
+            // 【骡 The Mule】心灵扭曲漩涡从半径 0 渐扩展开，结束时向中心坍缩消散
+            const mx = bc.x + 13;
+            const my = bc.y - 2;
+            for (let r = 3; r <= 11; r += 3) {
+              const rad = r * env;
+              ring(mx, my, rad, rad * 0.85, r % 2 ? hex('#c8402a') : hex('#a855f7'), env);
+            }
+            progStroke(mx - 4 * env, my, bc.x + R, bc.y, beamTail, beamHead, 1, hex('#c8402a'));
+          } else {
+            // 川陀穹顶震波电弧自上而下渐进劈落
+            for (let k = 0; k < 4; k++) {
+              const sx = bc.x + 8 + k * 4;
+              progStroke(sx, bc.y - 16, sx - 3, gy(sx), beamTail, beamHead, 1, hex('#ff6b4a'));
+            }
+          }
+        } else if (realm === 'crt') {
+          if (worldForce.variant === 0) {
+            // 机械乌贼从顶屏外 (-14) 俯冲而下，发射激光后拉升飞离顶屏
+            const sx = bc.x + 22 + (1 - env) * 16;
+            const sy = lerp(-14, Math.max(16, bc.y - 24), env);
+            fillEllipse(sx, sy, 5, 3, hex('#0c381b'));
+            disc(sx - 2, sy, 1.5, hex('#ff3b5c'));
+            progStroke(sx - 4, sy + 1, bc.x + 2, bc.y - 3, beamTail, beamHead, 1, hex('#ff3b5c'));
+            progStroke(sx - 4, sy + 2, bc.x + 4, bc.y + 2, beamTail, beamHead, 1, hex('#ff3b5c'));
+          } else {
+            // 特工史密斯代码回滚门：从地面 1px 裂缝垂直向上缓缓升起展开，结束时向下闭合回地面
+            const ax = Math.round(bc.x + 12);
+            const gBase = Math.round(gy(ax));
+            const doorH = Math.max(1, Math.round(13 * env));
+            const ay = gBase - doorH;
+            rect(ax, ay, 7, doorH, hex('#ff3b5c'));
+            if (doorH > 3) rect(ax + 1, ay + 1, 5, doorH - 2, hex('#030d06'));
+            if (doorH > 9) rect(ax + 2, ay + 3, 3, 1, hex('#ff3b5c'));
+          }
+        } else {
+          if (worldForce.variant === 0) {
+            // 科里奥利逆向狂沙暴风线长度与密度随 env 渐强渐弱
+            const streakLen = Math.max(1, Math.round(7 * env));
+            for (let k = 0; k < 18; k++) {
+              const wx = bc.x + 26 - ((sec * 75 + k * 7) % 44);
+              const wy = bc.y - 14 + (k % 9) * 3;
+              stroke(wx, wy, wx + streakLen, wy - Math.round(2 * env), 1, k % 2 ? hex('#f2bb78') : hex('#c85a32'));
+            }
+          } else {
+            ring(bc.x, bc.y + R, 11 * env, 3 * env, hex('#c8402a'), env);
+            ring(bc.x, bc.y + R, 6 * env, 2 * env, hex('#ffd59a'), env);
+          }
+        }
+      }
+      drawAlpha = 1;
+    };
+
+    // ======================================================================
+    // 10C. 分段推石特效 (Tier 2 / Tier 3) 与 1% 终极坐骑冲顶彩蛋 (Tier 4) 渲染器（带破土/飞入/淡出）
     // ======================================================================
     const drawTierEffectsAndEpicMount = (
       bc: { x: number; y: number },
@@ -1788,103 +2246,115 @@ const { initialSummits = 1 } = Astro.props;
       hand: { x: number; y: number },
       heave: number,
       sec: number,
+      dt: number,
     ): { customHeroDrawn: boolean } => {
-      // —— A. 1% 终极登顶彩蛋 (或冲顶轮回)：四大主题盛大坐骑/载具冲顶演出！ ——
-      if (epicCharge && phase === 'CLIMB') {
+      if (epicMountEnv > 0.02) {
+        const mEnv = epicMountEnv;
+        drawAlpha = mEnv;
+
         if (realm === 'amber') {
-          // 《沙丘》：骑乘巨型沙虫夏胡鲁破沙冲顶 (Riding Shai-Hulud with Maker Hooks!)
+          // 沙虫夏胡鲁从沙坡下方平滑破沙拱出 (sinkOff: 16px -> 0px)，登顶时再度潜入沙层
+          const sinkOff = (1 - mEnv) * 16;
           const K = 20;
           for (let k = K - 1; k >= 0; k--) {
             const wx = bc.x + 2 - k * 3.6;
-            const wave = Math.sin(sec * 16 - k * 0.45) * 2.2;
-            const wy = gy(wx) - 4 + wave + (k === 0 ? -2 : 0);
-            const r = k === 0 ? 6.2 : Math.max(2.6, 5.8 - k * 0.14);
+            const wave = Math.sin(sec * 16 - k * 0.45) * 2.2 * mEnv;
+            const wy = gy(wx) - 4 * mEnv + sinkOff + wave + (k === 0 ? -2 * mEnv : 0);
+            if (wy > gy(wx) + 3) continue;
+            const r = (k === 0 ? 6.2 : Math.max(2.6, 5.8 - k * 0.14)) * mEnv;
             disc(wx, wy, r, k % 2 ? hex('#8a492b') : hex('#63311c'));
-            // 背部甲片高光
             stroke(wx - r * 0.5, wy - r + 1, wx + r * 0.5, wy - r + 1, 1, hex('#eaa25c'));
-            if (k === 0) {
-              // 沙虫环形晶齿巨口托举巨石
-              disc(wx + 3, wy, 4.5, hex('#260e07'));
+            if (k === 0 && mEnv > 0.35) {
+              disc(wx + 3, wy, 4.5 * mEnv, hex('#260e07'));
               for (let t = 0; t < 8; t++) {
                 const ang = (t / 8) * Math.PI * 2 + sec * 4;
-                pset(wx + 3 + Math.cos(ang) * 4.8, wy + Math.sin(ang) * 4.8, hex('#fff3db'));
+                pset(wx + 3 + Math.cos(ang) * 4.8 * mEnv, wy + Math.sin(ang) * 4.8 * mEnv, hex('#fff3db'));
               }
             }
           }
-          // 西西弗斯站在沙虫第 4 体节背上，双手持弗雷曼造物主沙钩 (Maker Hooks) 驭虫！
-          const mountX = bc.x - 13;
-          const mountY = gy(mountX) - 9 + Math.sin(sec * 16 - 1.5) * 2.0;
-          const hookTarget = { x: bc.x - 4, y: mountY - 2 };
-          drawHero('ride', mountX, 1, gait, hookTarget, heave, sec, mountY);
-          // 绘制两根银白沙钩与绷紧的驭虫索
-          stroke(hookTarget.x, hookTarget.y, bc.x - 1, bc.y + 3, 1, hex('#e6eef8'));
-          stroke(hookTarget.x - 1, hookTarget.y + 1, bc.x - 6, mountY + 2, 1, hex('#d9944f'));
-          return { customHeroDrawn: true };
+          if (epicCharge && phase === 'CLIMB') {
+            drawAlpha = 1;
+            const mountX = bc.x - 13;
+            const mountY = gy(mountX) - 9 * mEnv + Math.sin(sec * 16 - 1.5) * 2.0 * mEnv;
+            const hookTarget = { x: bc.x - 4, y: mountY - 2 };
+            drawHero('ride', mountX, 1, gait, hookTarget, heave, sec, dt, mountY);
+            drawAlpha = mEnv;
+            stroke(hookTarget.x, hookTarget.y, bc.x - 1, bc.y + 3, 1, hex('#e6eef8'));
+            stroke(hookTarget.x - 1, hookTarget.y + 1, bc.x - 6, mountY + 2, 1, hex('#d9944f'));
+            drawAlpha = 1;
+            return { customHeroDrawn: true };
+          }
+          drawAlpha = 1;
+          return { customHeroDrawn: false };
         }
 
         if (realm === 'void') {
-          // 《2001：太空漫游》：1:4:9 多彩相对论星门走廊 + 发现号球形 EVA 作业舱推进！
           const rainbow = ['#38bdf8', '#f2b44f', '#ff4d79', '#a78bfa', '#ffffff'].map(hex);
           for (let i = -3; i <= 3; i++) {
             const c = rainbow[Math.abs(i) % rainbow.length];
-            stroke(bc.x - 55, bc.y + i * 5 + 14, bc.x + 28, bc.y + i * 2 - 10, 1, c);
+            progStroke(bc.x - 55, bc.y + i * 5 + 14, bc.x + 28, bc.y + i * 2 - 10, 1 - mEnv, mEnv, 1, c);
           }
-          // 球形 EVA 出舱作业舱 (EVA Pod) 在西西弗斯身后托举推进
-          const podX = bc.x - 21;
-          const podY = bc.y + 1;
+          // EVA 球形舱从左后方飞入对接，登顶后向高空脱离
+          const podX = bc.x - 21 - (1 - mEnv) * 28;
+          const podY = bc.y + 1 - (1 - mEnv) * 14;
           disc(podX, podY, 5.5, hex('#e6eaf2'));
-          disc(podX + 2, podY - 1, 2.2, hex('#38bdf8')); // 观察窗
-          // 机械臂握持西西弗斯与巨石
-          stroke(podX + 5, podY + 1, bc.x - R, bc.y + 2, 1, hex('#9aaee0'));
-          // 尾部巨型核热等离子喷焰
-          poly([podX - 5, podY - 3, podX - 5, podY + 3, podX - 22 - Math.sin(sec * 40) * 4, podY], hex('#38bdf8'));
-          poly([podX - 5, podY - 1.5, podX - 5, podY + 1.5, podX - 14, podY], hex('#ffffff'));
+          disc(podX + 2, podY - 1, 2.2, hex('#38bdf8'));
+          progStroke(podX + 5, podY + 1, bc.x - R, bc.y + 2, 0, mEnv, 1, hex('#9aaee0'));
+          poly([podX - 5, podY - 3, podX - 5, podY + 3, podX - 5 - (17 + Math.sin(sec * 40) * 4) * mEnv, podY], hex('#38bdf8'));
+          poly([podX - 5, podY - 1.5, podX - 5, podY + 1.5, podX - 5 - 9 * mEnv, podY], hex('#ffffff'));
+          drawAlpha = 1;
           return { customHeroDrawn: false };
         }
 
         if (realm === 'paper') {
-          // 《银河帝国：基地》：川陀帝国反重力黄金舰艇 (Imperial Grav-Barge) 托举冲顶！
-          const bargeX = bc.x - 7;
-          const bargeY = gy(bargeX) - 2;
-          // 黄金反重力光桥与舰体
+          // 川陀帝国黄金反重力舰从上空缓缓降落接应，登顶时升空离场
+          const bargeX = bc.x - 7 - (1 - mEnv) * 18;
+          const bargeY = gy(bc.x - 7) - 2 - (1 - mEnv) * 24;
           poly([bargeX - 18, bargeY, bargeX + 16, bargeY - 5, bargeX + 13, bargeY + 2, bargeX - 15, bargeY + 4], hex('#2e3846'));
           stroke(bargeX - 17, bargeY, bargeX + 15, bargeY - 5, 1, hex('#f0c875'));
-          // 舰底双反重力光环
-          ring(bargeX - 8, bargeY + 4, 6, 1.8, hex('#5ec8ff'), 0.95);
-          ring(bargeX + 6, bargeY + 1, 6, 1.8, hex('#5ec8ff'), 0.95);
-          // 环绕巨石的第一辐光全息牵引金环
-          ring(bc.x, bc.y, R + 3, R + 3, hex('#f0c875'), 0.95);
-          ring(bc.x, bc.y, R + 5, 3, hex('#c8402a'), 0.9);
-          const mountX = bc.x - 12;
-          drawHero('ride', mountX, 1, gait, { x: bc.x - R, y: bc.y }, heave, sec, bargeY - 1);
-          return { customHeroDrawn: true };
+          ring(bargeX - 8, bargeY + 4, 6 * mEnv, 1.8 * mEnv, hex('#5ec8ff'), mEnv);
+          ring(bargeX + 6, bargeY + 1, 6 * mEnv, 1.8 * mEnv, hex('#5ec8ff'), mEnv);
+          ring(bc.x, bc.y, (R + 3) * mEnv, (R + 3) * mEnv, hex('#f0c875'), mEnv);
+          ring(bc.x, bc.y, (R + 5) * mEnv, 3 * mEnv, hex('#c8402a'), mEnv);
+          if (epicCharge && phase === 'CLIMB') {
+            drawAlpha = 1;
+            const mountX = bc.x - 12;
+            drawHero('ride', mountX, 1, gait, { x: bc.x - R, y: bc.y }, heave, sec, dt, lerp(gy(mountX), bargeY - 1, mEnv));
+            return { customHeroDrawn: true };
+          }
+          drawAlpha = 1;
+          return { customHeroDrawn: false };
         }
 
         if (realm === 'crt') {
-          // 《黑客帝国》：救世主尼奥觉醒御空飞行 + 4 重绿光残影 + 念力电磁闪电驭石！
           const flyX = bc.x - 14;
-          const flyY = gy(flyX) - 6;
-          // 4 道子弹时间绿光残影
+          const flyY = gy(flyX) - 6 * mEnv;
           for (let clone = 3; clone >= 1; clone--) {
-            const cx = flyX - clone * 6;
-            const cy = gy(cx) - 5;
+            const cx = flyX - clone * 6 * mEnv;
+            const cy = gy(cx) - 5 * mEnv;
             rect(cx - 2, cy - 9, 4, 6, clone === 1 ? hex('#16a548') : hex('#0b3a1a'));
           }
-          // 念力闪电弧连接尼奥手掌与线框巨石
           for (let b = -1; b <= 1; b++) {
-            stroke(flyX + 6, flyY - 9, bc.x, bc.y + b * 3, 1, b === 0 ? hex('#ffffff') : hex('#3dff7a'));
+            progStroke(flyX + 6, flyY - 9, bc.x, bc.y + b * 3, 0, mEnv, 1, b === 0 ? hex('#ffffff') : hex('#3dff7a'));
           }
-          ring(bc.x, bc.y, R + 2 + Math.sin(sec * 30), R + 2, hex('#c8ffd9'), 0.9);
-          drawHero('ride', flyX, 1, gait, { x: bc.x - R - 1, y: bc.y - 2 }, heave, sec, flyY);
-          return { customHeroDrawn: true };
+          ring(bc.x, bc.y, (R + 2) * mEnv + Math.sin(sec * 30), (R + 2) * mEnv, hex('#c8ffd9'), mEnv);
+          if (epicCharge && phase === 'CLIMB') {
+            drawAlpha = 1;
+            drawHero('ride', flyX, 1, gait, { x: bc.x - R - 1, y: bc.y - 2 }, heave, sec, dt, flyY);
+            return { customHeroDrawn: true };
+          }
+          drawAlpha = 1;
+          return { customHeroDrawn: false };
         }
       }
 
-      // —— B. Tier 2 (强力突进) & Tier 3 (史诗暴击) 分段专属动画 ——
       if (tierTimer > 0 && phase === 'CLIMB') {
-        const p = tierTimer / tierDuration; // 1 -> 0
+        // u: 0 (开始) -> 1 (结束)，env 实现平滑渐入与渐出！
+        const u = 1 - tierTimer / tierDuration;
+        const env = eventEnv(u, 0.2, 0.28);
+        drawAlpha = env;
+
         if (activeTier >= 2) {
-          // Tier 2 & 3 共有：巨石高能外环 + 地面推进滑痕
           const auraC =
             realm === 'crt'
               ? hex('#3dff7a')
@@ -1893,50 +2363,46 @@ const { initialSummits = 1 } = Astro.props;
                 : realm === 'amber'
                   ? hex('#5ec8ff')
                   : hex('#8fd3ff');
-          ring(bc.x, bc.y, R + 1.5 + Math.sin(sec * 25), R + 1.5, auraC, p * 0.9);
+          ring(bc.x, bc.y, R + 1.5 + Math.sin(sec * 25), R + 1.5, auraC, env * 0.9);
           for (let s = 2; s < 18; s++) {
             const sx = Math.round(bcx - s);
-            if (sx > 0 && sx < W) pdither(sx, gyi[sx] - 1, auraC, p * (1 - s / 18));
+            if (sx > 0 && sx < W) pdither(sx, gyi[sx] - 1, auraC, env * (1 - s / 18));
           }
         }
 
         if (activeTier === 3) {
-          // Tier 3 (35m~68m) 四大主题专属暴击过场小动画！
+          const bHead = smoothstep(0, 0.28, u);
+          const bTail = smoothstep(0.68, 1.0, u);
           if (realm === 'void') {
-            // 太空漫游：轨道 1:4:9 谐波光束从天而降轰击巨石
             for (let dx = -2; dx <= 2; dx++) {
-              pdither(bc.x + dx, 0, hex('#8fd3ff'), p);
-              stroke(bc.x + dx, 2, bc.x + dx, bc.y - R, 1, Math.abs(dx) <= 1 ? hex('#ffffff') : hex('#38bdf8'));
+              progStroke(bc.x + dx, 0, bc.x + dx, bc.y - R, bTail, bHead, 1, Math.abs(dx) <= 1 ? hex('#ffffff') : hex('#38bdf8'));
             }
-            ring(bc.x, bc.y, (1 - p) * 24 + 4, (1 - p) * 8 + 2, hex('#ffffff'), p);
+            ring(bc.x, bc.y, u * 24 + 4, u * 8 + 2, hex('#ffffff'), env);
           } else if (realm === 'paper') {
-            // 银河帝国：帝国巡洋舰俯冲牵引光束 + 谢顿全息金印悬顶
-            const shipX = bc.x - 25 + (1 - p) * 55;
-            const shipY = Math.max(16, bc.y - 38);
+            const shipX = bc.x - 32 + u * 68;
+            const shipY = lerp(-8, Math.max(16, bc.y - 38), env);
             poly([shipX - 9, shipY, shipX + 8, shipY - 2, shipX + 11, shipY + 2, shipX - 6, shipY + 2], hex('#2e3846'));
             stroke(shipX - 6, shipY, shipX + 7, shipY, 1, hex('#f0c875'));
-            // 金色牵引光锥
-            stroke(shipX, shipY + 2, bc.x - 4, bc.y - R, 1, hex('#f0c875'));
-            stroke(shipX, shipY + 2, bc.x + 4, bc.y - R, 1, hex('#f0c875'));
-            stroke(shipX, shipY + 2, bc.x, bc.y - R, 1, hex('#c8402a'));
+            progStroke(shipX, shipY + 2, bc.x - 4, bc.y - R, bTail, bHead, 1, hex('#f0c875'));
+            progStroke(shipX, shipY + 2, bc.x + 4, bc.y - R, bTail, bHead, 1, hex('#f0c875'));
+            progStroke(shipX, shipY + 2, bc.x, bc.y - R, bTail, bHead, 1, hex('#c8402a'));
           } else if (realm === 'crt') {
-            // 黑客帝国：全屏扩散的双环青色 EMP 电磁脉冲波
-            const empR = (1 - p) * 75 + 6;
-            ring(bc.x, bc.y, empR, empR * 0.6, hex('#7fd8ff'), p);
-            ring(bc.x, bc.y, empR * 0.7, empR * 0.42, hex('#c8ffd9'), p);
+            const empR = u * 75 + 4;
+            ring(bc.x, bc.y, empR, empR * 0.6, hex('#7fd8ff'), env);
+            ring(bc.x, bc.y, empR * 0.7, empR * 0.42, hex('#c8ffd9'), env);
           } else {
-            // 沙丘：阿崔迪扑翼机低空俯冲 + 巨石脚下香料喷泉爆发
-            const ox = bc.x - 30 + (1 - p) * 65;
-            const oy = Math.max(18, bc.y - 32);
+            const ox = bc.x - 36 + u * 76;
+            const oy = lerp(-8, Math.max(18, bc.y - 32), env);
             stroke(ox - 5, oy, ox + 5, oy, 1, hex('#2a140c'));
             stroke(ox, oy, ox - 6, oy - 3, 1, hex('#fbdc98'));
             stroke(ox, oy, ox + 6, oy - 3, 1, hex('#fbdc98'));
-            // 巨石下方香料喷泉柱
-            for (let dy = 0; dy < 16; dy++) {
-              pdither(bc.x + (Math.random() - 0.5) * 8, bc.y + R - dy, dy % 2 ? hex('#ffd59a') : hex('#c8402a'), p);
+            const geyserH = Math.round(16 * env);
+            for (let dy = 0; dy < geyserH; dy++) {
+              pdither(bc.x + (Math.random() - 0.5) * 8, bc.y + R - dy, dy % 2 ? hex('#ffd59a') : hex('#c8402a'), env);
             }
           }
         }
+        drawAlpha = 1;
       }
 
       return { customHeroDrawn: false };
@@ -1979,28 +2445,35 @@ const { initialSummits = 1 } = Astro.props;
     };
 
     // ======================================================================
-    // 11. 更新
+    // 11. 更新（含顺逆境随机事件推进/倒退物理与全阶段衔接）
     // ======================================================================
+    let lastDt = 0.016;
     const update = (dt: number, sec: number) => {
+      lastDt = dt;
       const total = getTotal(Date.now());
       phaseT += dt;
       if (kick > 0) kick = Math.max(0, kick - dt);
+      if (windupTimer > 0) windupTimer = Math.max(0, windupTimer - dt);
       if (tierTimer > 0) {
         tierTimer = Math.max(0, tierTimer - dt);
         if (tierTimer <= 0 && !epicCharge) activeTier = 0;
       }
+      // 1% 坐骑/载具冲顶包络：启动时 0.45s 平滑破土/飞入，接近峰顶或登顶后 0.55s 平滑潜入/升空离场
+      const shouldShowMount = epicCharge && phase === 'CLIMB' && frac < 0.975;
+      epicMountEnv = clamp(epicMountEnv + dt * (shouldShowMount ? 2.2 : -1.8), 0, 1);
+
       if (summitFx >= 0) {
         summitFx += dt;
         if (summitFx > 6) summitFx = -1;
       }
       if (glitch > 0) glitch = Math.max(0, glitch - dt);
 
-      // 更新随机背景小事件计时器
+      // 1. 更新纯背景随机小事件
       if (bgEvent) {
         bgEvent.t += dt;
         if (bgEvent.t >= bgEvent.dur) {
           bgEvent = null;
-          nextBgEventTimer = 4.5 + Math.random() * 5.5;
+          nextBgEventTimer = 4.2 + Math.random() * 5.0;
         }
       } else {
         nextBgEventTimer -= dt;
@@ -2016,7 +2489,72 @@ const { initialSummits = 1 } = Astro.props;
         }
       }
 
+      // 2. 更新「影响石头前进/后退的随机天象与灾变事件」
+      if (worldForce && (worldForce.aborted || phase !== 'CLIMB' || sprint || epicCharge)) {
+        // 被玩家反击或进入冲顶/登顶阶段时：快速推进淡出尾段，不再生效推力，确保视觉平滑退场
+        worldForce.t += dt * 1.65;
+        if (worldForce.t >= worldForce.dur) {
+          worldForce = null;
+        }
+      } else if (phase === 'CLIMB' && !sprint && !epicCharge) {
+        if (worldForce) {
+          worldForce.t += dt;
+          const p = clamp(worldForce.t / worldForce.dur, 0, 1);
+          // 推力同样遵循平滑渐入渐出包络 (env)，石头不会突然加速或突然顿挫！
+          const forceEnv = eventEnv(p, 0.24, 0.26);
+          const rateMetersPerSec = (worldForce.totalMeters / worldForce.dur) * 1.28 * forceEnv;
+          const stepMeters = rateMetersPerSec * dt * worldForce.dir;
+          const stepFrac = stepMeters / PEAK_ALT;
+
+          // 后退事件最低退到山脚 0.025 (22m)，绝不穿模到负海拔
+          if (worldForce.dir === 1 || frac + stepFrac >= 0.025) {
+            save.boostAccum = Math.max(-0.5, save.boostAccum + stepFrac);
+            if (worldForce.dir === 1) save.boostMeters += Math.max(0, stepMeters);
+            frac = clamp(frac + stepFrac, 0.025, 0.999);
+            worldForce.appliedMeters += Math.abs(stepMeters);
+          }
+
+          // 逆境滑退时：西西弗斯战靴与巨石底部持续迸发制动火花与碎石！
+          if (worldForce.dir === -1 && Math.random() < 0.65 * forceEnv) {
+            const bc = boulderCenter(contactX(frac));
+            emit(bc.x - R - 4, gy(bc.x - R) - 1, 14 + Math.random() * 18, -8 - Math.random() * 12, 0.55, hex('#ff6b4a'), 45, 0);
+          } else if (worldForce.dir === 1 && Math.random() < 0.55 * forceEnv) {
+            const bc = boulderCenter(contactX(frac));
+            emit(bc.x - R, bc.y, -14 - Math.random() * 18, -6 - Math.random() * 10, 0.65, hex('#5ec8ff'), 20, 4);
+          }
+
+          if (worldForce.t >= worldForce.dur) {
+            persistSave();
+            worldForce = null;
+            nextWorldForceTimer = 7.5 + Math.random() * 6.5;
+          }
+        } else if (tierTimer <= 0) {
+          nextWorldForceTimer -= dt;
+          if (nextWorldForceTimer <= 0) {
+            const dir: 1 | -1 = frac < 0.075 || Math.random() < 0.54 ? 1 : -1;
+            const variant: 0 | 1 = Math.random() < 0.5 ? 0 : 1;
+            const totalMeters = dir === 1 ? 15 + Math.random() * 13 : 10 + Math.random() * 8;
+            const dur = dir === 1 ? 2.4 : 2.6;
+            const quote = FORCE_EVENT_QUOTES[realm][dir === 1 ? 'fwd' : 'bwd'][variant];
+            worldForce = { dir, variant, t: 0, dur, totalMeters, appliedMeters: 0, quote };
+            if (quoteEl) quoteEl.textContent = quote;
+
+            const bc = boulderCenter(contactX(frac));
+            floats.push({
+              x: bc.x - 10,
+              y: bc.y - R - 9,
+              s: dir === 1 ? `+${Math.round(totalMeters)}m!` : `-${Math.round(totalMeters)}m!`,
+              t: 0,
+              tier: dir === 1 ? 2 : -1,
+            });
+            if (realm === 'crt' && dir === -1) glitch = Math.max(glitch, 0.22);
+          }
+        }
+      }
+
+      // 3. 主阶段状态机与无缝动作衔接
       if (phase === 'CLIMB') {
+        climbBreatherClock = (climbBreatherClock + dt) % 16.5;
         const prev = frac;
         if (sprint) {
           const speed = epicCharge ? 0.32 : 0.35;
@@ -2043,56 +2581,85 @@ const { initialSummits = 1 } = Astro.props;
         } else if (Math.floor(total) > activeCycle) {
           frac += Math.min(1.001 - frac, dt * 0.5);
           if (frac >= 1) enterSummit();
-        } else {
+        } else if (!worldForce) {
           frac += (total - activeCycle - frac) * Math.min(1, dt * 3);
         }
-        const vel = dt > 1e-5 ? Math.max(0, (frac - prev) / dt) : 0;
-        const tierSpeedBonus = activeTier === 3 ? 2.2 : activeTier === 2 ? 1.5 : 0;
-        gait += dt * Math.PI * 2 * (0.8 + tierSpeedBonus + Math.min(3, vel * 90));
+
+        const vel = dt > 1e-5 ? Math.max(0, Math.abs(frac - prev) / dt) : 0;
+        const isStandingBreather =
+          !sprint && !epicCharge && tierTimer <= 0 && !worldForce && climbBreatherClock > 13.8;
+        const tierSpeedBonus = activeTier === 3 ? 2.3 : activeTier === 2 ? 1.5 : 0;
+        if (!isStandingBreather) {
+          gait += dt * Math.PI * 2 * (0.85 + tierSpeedBonus + Math.min(3, vel * 90));
+        }
         const s = Math.sin(gait);
-        if (prevSin < 0 && s >= 0 && !reduceMotion) {
+        if (!isStandingBreather && prevSin < 0 && s >= 0 && !reduceMotion) {
           const fx = pushHeroX(frac) - 2;
           for (let i = 0; i < 2; i++) emit(fx, gy(fx) - 1, -4 - Math.random() * 8, -4 - Math.random() * 6, 0.6, ROCK[realm][2], realm === 'void' ? 6 : 30, 0);
         }
         prevSin = s;
       } else if (phase === 'SUMMIT') {
+        // 4段式登顶衔接：
+        // 0.0~0.75s: final_heave (最后一步推上峰顶平台)
+        // 0.75~1.75s: knees_pant (双手撑膝喘息)
+        // 1.75~2.75s: cheer (直立振臂高呼)
+        // 2.75~3.65s: walk (走向崖边转身)
+        // 3.65~4.45s: reach_stop (巨石松动摇晃，西西弗斯惊觉伸手试图挽留！)
         const startX = pushHeroX(1);
-        if (phaseT > 1.3 && phaseT < 2.7) {
-          heroX = startX + ((phaseT - 1.3) / 1.4) * (SUMMIT_STAND_X - startX);
+        if (phaseT <= 2.75) {
+          heroX = startX;
+        } else if (phaseT < 3.65) {
+          heroX = lerp(startX, SUMMIT_STAND_X, (phaseT - 2.75) / 0.9);
           gait += dt * Math.PI * 2 * 2.2;
-        } else heroX = phaseT <= 1.3 ? startX : SUMMIT_STAND_X;
-        if (phaseT >= 3.8) {
+        } else {
+          heroX = SUMMIT_STAND_X;
+          // 巨石松动掉下碎石预警
+          if (Math.random() < 0.45) {
+            emit(PATH_X1 - 3, gy(PATH_X1) - 1, -12 - Math.random() * 14, -4 - Math.random() * 8, 0.55, ROCK[realm][1], 45, 0);
+          }
+        }
+        if (phaseT >= 4.45) {
           phase = 'ROLL';
           phaseT = 0;
           rollX = PATH_X1;
-          rollV = 4;
+          rollV = 6;
+          rollLandingWait = 0;
         }
       } else if (phase === 'ROLL') {
-        rollV = Math.min(120, rollV + dt * 60);
-        rollX -= rollV * dt;
-        if (Math.random() < 0.7) {
-          const c = ROCK[realm][2];
-          emit(rollX + 4, gy(rollX) - 1, 6 + Math.random() * 14, -6 - Math.random() * 14, 0.7, c, realm === 'void' ? 8 : 50, 0);
-        }
-        if (rollX <= PATH_X0) {
-          rollX = PATH_X0;
-          for (let i = 0; i < 18; i++) emit(PATH_X0, gy(PATH_X0) - 1, (Math.random() - 0.3) * 40, -Math.random() * 26, 0.9, ROCK[realm][1], realm === 'void' ? 8 : 60, 0);
-          phase = 'DESCENT';
-          phaseT = 0;
-          heroX = SUMMIT_STAND_X;
+        if (rollX > PATH_X0) {
+          rollV = Math.min(120, rollV + dt * 62);
+          rollX = Math.max(PATH_X0, rollX - rollV * dt);
+          if (Math.random() < 0.7) {
+            const c = ROCK[realm][2];
+            emit(rollX + 4, gy(rollX) - 1, 6 + Math.random() * 14, -6 - Math.random() * 14, 0.7, c, realm === 'void' ? 8 : 50, 0);
+          }
+          if (rollX <= PATH_X0) {
+            rollX = PATH_X0;
+            rollLandingWait = 0.85; // 撞击山脚后驻足凝视 0.85s 再迈步下山
+            for (let i = 0; i < 20; i++) emit(PATH_X0, gy(PATH_X0) - 1, (Math.random() - 0.3) * 42, -Math.random() * 28, 0.9, ROCK[realm][1], realm === 'void' ? 8 : 60, 0);
+          }
+        } else {
+          rollLandingWait -= dt;
+          if (rollLandingWait <= 0) {
+            phase = 'DESCENT';
+            phaseT = 0;
+            heroX = SUMMIT_STAND_X;
+          }
         }
       } else if (phase === 'DESCENT') {
+        // 下山 → 走近巨石 → 转身端详 → 屈身沉肩重新抵住巨石 (engage_prep) → 无缝切入 CLIMB
         const target = pushHeroX(0);
         if (heroX > target) {
-          heroX = Math.max(target, heroX - dt * 20);
+          heroX = Math.max(target, heroX - dt * 22);
           gait += dt * Math.PI * 2 * 3.1;
           phaseT = 0;
-        } else if (phaseT > 1.4) {
+        } else if (phaseT > 1.75) {
           const t2 = getTotal(Date.now());
           activeCycle = Math.floor(t2);
           frac = Math.min(0.03, t2 - activeCycle);
           phase = 'CLIMB';
           phaseT = 0;
+          climbBreatherClock = 0;
         }
       }
 
@@ -2117,7 +2684,6 @@ const { initialSummits = 1 } = Astro.props;
           }
         }
       } else if (realm === 'paper') {
-        // 川陀高空悬浮金尘与微光信标粒子
         if (!reduceMotion && Math.random() < dt * 1.8) {
           emit(Math.random() * W, 30 + Math.random() * 80, 8 + Math.random() * 10, -2 + Math.random() * 4, 4.5, Math.random() < 0.6 ? hex('#f0c875') : hex('#88c9e8'), 0, 1);
         }
@@ -2154,7 +2720,7 @@ const { initialSummits = 1 } = Astro.props;
       for (let i = floats.length - 1; i >= 0; i--) {
         floats[i].t += dt;
         floats[i].y -= dt * 10;
-        if (floats[i].t > 1.55) floats.splice(i, 1);
+        if (floats[i].t > 1.65) floats.splice(i, 1);
       }
       void sec;
     };
@@ -2181,65 +2747,127 @@ const { initialSummits = 1 } = Astro.props;
         }
       }
 
-      // —— 计算角色与巨石位置 ——
+      // —— 计算角色精确姿态 (PoseId) 与巨石位置 ——
       let bcx: number;
       let lift = 0;
-      let mode: Mode = 'push';
+      let pose: PoseId = 'push';
       let facing = 1;
       let hx = heroX;
+      let gazeY: number | undefined;
       const heaveAmp = activeTier === 3 ? 3.8 : activeTier === 2 ? 2.8 : 2.2;
-      const heave = kick > 0 ? Math.sin(((0.75 - Math.min(0.75, kick)) / 0.75) * Math.PI) * heaveAmp : Math.sin(gait * 2) * 0.35;
+      const heave =
+        kick > 0
+          ? Math.sin(((0.78 - Math.min(0.78, kick)) / 0.78) * Math.PI) * heaveAmp
+          : Math.sin(gait * 2) * 0.35;
+
       if (phase === 'CLIMB') {
         bcx = contactX(frac) + Math.max(0, heave) * 0.5;
+        hx = pushHeroX(frac);
         if (epicCharge) {
-          lift = realm === 'crt' ? 4.5 : realm === 'paper' ? 3.5 : realm === 'amber' ? 4.0 : 2.5;
-        } else if (activeTier === 3) {
-          lift = Math.sin((tierTimer / tierDuration) * Math.PI) * 2.4;
+          lift = (realm === 'crt' ? 4.5 : realm === 'paper' ? 3.5 : realm === 'amber' ? 4.0 : 2.5) * epicMountEnv;
+          pose = 'ride';
+        } else if (worldForce && worldForce.dir === -1 && !worldForce.aborted) {
+          // 逆境滑退：死顶制动姿态
+          pose = 'brace_slide';
+        } else if (activeTier >= 2 || sprint || (worldForce && worldForce.dir === 1)) {
+          // 加速突进推石姿态
+          pose = 'accel_push';
+          if (activeTier === 3) {
+            lift = Math.sin((tierTimer / tierDuration) * Math.PI) * 2.4;
+          }
+        } else if (climbBreatherClock > 13.8 && climbBreatherClock <= 15.8) {
+          // 周期性驻足擦汗喘息 (巨石下垫起三角止动楔石)
+          pose = 'stand_breath';
+          hx = pushHeroX(frac) - 1.5;
+        } else if (climbBreatherClock > 15.8) {
+          // 喘息结束 → 屈身沉肩重新伸手抵住巨石的衔接姿态
+          pose = 'engage_prep';
+        } else {
+          pose = 'push';
         }
       } else if (phase === 'SUMMIT') {
-        bcx = PATH_X1 + (phaseT > 3 ? Math.sin(phaseT * 30) * 0.6 * (phaseT - 3) : 0);
-        if (phaseT <= 1.3) mode = 'cheer';
-        else if (phaseT < 2.7) mode = 'walk';
-        else {
-          mode = 'stand';
+        if (phaseT <= 0.75) {
+          // 1. 最后一搏把巨石推上峰顶边沿
+          const u = phaseT / 0.75;
+          bcx = lerp(PATH_X1 - 5, PATH_X1, u);
+          pose = 'final_heave';
+          hx = pushHeroX(1) - (1 - u) * 4;
+        } else if (phaseT <= 1.75) {
+          // 2. 双手撑膝大口喘息
+          bcx = PATH_X1;
+          pose = 'knees_pant';
+          hx = pushHeroX(1) - 1.2;
+        } else if (phaseT <= 2.75) {
+          // 3. 缓缓直起身振臂高呼
+          bcx = PATH_X1;
+          pose = 'cheer';
+          hx = pushHeroX(1);
+        } else if (phaseT < 3.65) {
+          // 4. 走向峰顶崖边并平滑转身
+          bcx = PATH_X1;
+          pose = 'walk';
+          facing = phaseT > 3.45 ? -1 : 1;
+        } else {
+          // 5. 巨石在悬崖边剧烈摇晃，西西弗斯伸手试图挽留！
+          bcx = PATH_X1 + Math.sin(phaseT * 34) * 1.1 * (phaseT - 3.65);
+          pose = 'reach_stop';
           facing = -1;
         }
-        if (phaseT >= 2.7) facing = -1;
       } else if (phase === 'ROLL') {
         bcx = rollX;
-        lift = Math.abs(Math.sin(rollX * 0.21)) * Math.min(4, rollV * 0.04);
-        mode = 'watch';
+        lift = rollX > PATH_X0 ? Math.abs(Math.sin(rollX * 0.21)) * Math.min(4, rollV * 0.04) : 0;
         facing = -1;
+        gazeY = gy(rollX);
+        // 巨石刚脱手滚落的前 0.55 秒：西西弗斯惊愕后撤半步，随后抬手搭在眉前目送巨石滚落
+        pose = phaseT < 0.55 ? 'startle_back' : 'watch';
       } else {
+        // DESCENT: 下山 → 走近山脚巨石 → 转身站立端详 → 沉肩伸手重新抵住巨石
         bcx = PATH_X0;
         const target = pushHeroX(0);
-        if (heroX > target + 0.01) {
-          mode = 'walk';
+        hx = heroX;
+        if (heroX > target + 0.05) {
+          pose = 'walk';
           facing = -1;
+        } else if (phaseT < 0.75) {
+          // 抵达山脚：平滑转身面向巨石并深呼吸调整
+          pose = 'stand_breath';
+          facing = 1;
         } else {
-          mode = 'stand';
+          // 0.75s ~ 1.75s：屈身沉肩，双手向前伸出重新抵住巨石 (engage_prep)
+          pose = 'engage_prep';
           facing = 1;
         }
-        hx = heroX;
       }
+
       const bc = boulderCenter(bcx, lift);
       const angle = ((bcx - PATH_X0) / R) * 1.05;
       const hand = { x: bc.x - R + 0.5, y: bc.y + 1 };
 
       castShadow(bcx - (SHADOW[realm]?.dir ?? 1) * 3, 16);
-      castShadow((mode === 'push' ? hand.x - 10 : hx) - (SHADOW[realm]?.dir ?? 1) * 1, 10);
+      castShadow((pose === 'push' || pose === 'accel_push' ? hand.x - 10 : hx) - (SHADOW[realm]?.dir ?? 1) * 1, 10);
+
+      // 驻足喘息时，巨石底部自动垫起一颗止动小楔石防止溜坡
+      if (phase === 'CLIMB' && pose === 'stand_breath') {
+        poly([bcx - 3, gy(bcx - 2), bcx + 1, gy(bcx), bcx - 2, gy(bcx) - 3], ROCK[realm][1]);
+      }
 
       toLayer = true;
       layerId = 1;
       drawBoulder(bc.x, bc.y, angle, sec);
       layerId = 2;
-      const { customHeroDrawn } = drawTierEffectsAndEpicMount(bc, bcx, hand, heave, sec);
+      const { customHeroDrawn } = drawTierEffectsAndEpicMount(bc, bcx, hand, heave, sec, lastDt);
       if (!customHeroDrawn) {
-        // Tier 2 / Tier 3 突进残影
-        if (activeTier >= 2 && tierTimer > 0 && mode === 'push') {
+        if ((activeTier >= 2 && tierTimer > 0) || pose === 'accel_push') {
           rect(hand.x - 14, hand.y - 4, 3, 8, HERO[realm].back);
         }
-        drawHero(mode, hx, facing, gait, mode === 'push' ? hand : null, heave, sec);
+        const needHand =
+          pose === 'push' ||
+          pose === 'accel_push' ||
+          pose === 'brace_slide' ||
+          pose === 'engage_prep' ||
+          pose === 'final_heave' ||
+          pose === 'reach_stop';
+        drawHero(pose, hx, facing, gait, needHand ? hand : null, heave, sec, lastDt, undefined, gazeY);
       }
       if (realm === 'crt' && summitFx >= 0 && summitFx < 4.4) {
         layerId = 3;
@@ -2253,6 +2881,9 @@ const { initialSummits = 1 } = Astro.props;
       }
       toLayer = false;
       compositeLayer(HERO[realm].outline);
+
+      // 绘制影响石头前进/后退的世界随机天象与灾变光效
+      drawWorldForceEventFx(bc, sec);
 
       // —— 粒子 ——
       for (const p of parts) {
@@ -2279,7 +2910,6 @@ const { initialSummits = 1 } = Astro.props;
         }
       }
 
-      // —— 登顶：川陀谢顿穹顶全息星环爆发 ——
       if (realm === 'paper' && summitFx >= 0 && summitFx < 4.5) {
         const top = gyi[298] - 22;
         for (let k = 0; k < 3; k++) {
@@ -2289,22 +2919,26 @@ const { initialSummits = 1 } = Astro.props;
       }
 
       for (const fl of floats) {
-        if (fl.t > 1.2 && Math.floor(fl.t * 20) % 2) continue;
+        const fp = clamp(fl.t / 1.65, 0, 1);
+        drawAlpha = eventEnv(fp, 0.16, 0.32);
         const pal = ROCK[realm];
         const fg =
-          fl.tier === 4
-            ? hex('#ffd54f')
-            : fl.tier === 3
-              ? hex('#ff6b4a')
-              : fl.tier === 2
-                ? hex('#5ec8ff')
-                : realm === 'paper'
-                  ? hex('#f0c875')
-                  : realm === 'crt'
-                    ? hex('#c8ffd9')
-                    : pal[0];
+          fl.tier === -1
+            ? hex('#ff4d5e')
+            : fl.tier === 4
+              ? hex('#ffd54f')
+              : fl.tier === 3
+                ? hex('#ff6b4a')
+                : fl.tier === 2
+                  ? hex('#5ec8ff')
+                  : realm === 'paper'
+                    ? hex('#f0c875')
+                    : realm === 'crt'
+                      ? hex('#c8ffd9')
+                      : pal[0];
         drawText(fl.s, fl.x, fl.y, fg, hex('#0a0c14'));
       }
+      drawAlpha = 1;
 
       if (realm === 'crt') {
         if (glitch > 0) glitchPass();
@@ -2330,7 +2964,7 @@ const { initialSummits = 1 } = Astro.props;
       const latest = getTotal(Date.now());
       const idx = Math.floor(latest);
       let p: number;
-      if (phase === 'CLIMB') p = sprint ? frac : clamp(latest - idx, 0, 1);
+      if (phase === 'CLIMB') p = sprint || worldForce ? frac : clamp(latest - idx, 0, 1);
       else if (phase === 'SUMMIT') p = 1;
       else if (phase === 'ROLL') p = clamp((rollX - PATH_X0) / (PATH_X1 - PATH_X0), 0, 1);
       else p = 0;
@@ -2343,14 +2977,18 @@ const { initialSummits = 1 } = Astro.props;
         telemetryEl.textContent = tele;
         lastTele = tele;
       }
-      if (tierTimer <= 0 && !epicCharge) {
+      if (tierTimer <= 0 && !epicCharge && !worldForce) {
         const q =
           phase === 'SUMMIT'
-            ? '"登顶的片刻停驻，风正掠过山脊。"'
+            ? phaseT > 3.65
+              ? '"巨石在峰顶边沿开始松动……西西弗斯伸出了手。"'
+              : '"登顶的片刻喘息与停驻，风正掠过山脊。"'
             : phase === 'ROLL'
               ? '"引力终将夺回巨石，但夺不走攀登本身。"'
               : phase === 'DESCENT'
-                ? '"Il faut imaginer Sisyphe heureux." —— 走下山去的清醒时刻'
+                ? heroX <= pushHeroX(0) + 0.1
+                  ? '"他重新沉下双肩，将双手抵上冰冷的巨石。"'
+                  : '"Il faut imaginer Sisyphe heureux." —— 走下山去的清醒时刻'
                 : CLIMB_QUOTES[realm];
         if (quoteEl && q !== lastQuote) {
           quoteEl.textContent = q;
@@ -2369,6 +3007,7 @@ const { initialSummits = 1 } = Astro.props;
       if (r === realm && titleEl?.textContent === TITLES[r]) return;
       realm = r;
       parts.length = 0;
+      worldForce = null;
       bgEvent = { type: 0, t: 0.2, dur: 6.0, x0: 95, y0: 38, dir: 1 };
       buildStatic();
       if (titleEl) titleEl.textContent = TITLES[realm];
