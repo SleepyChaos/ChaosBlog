@@ -921,14 +921,14 @@ main.page-main {
 }
 
 .sisyphus-stage-card .bento-foot {
-  margin-top: 0.38rem;
+  margin-top: 0.45rem;
 }
 
 .ascii-slope-viewport {
   position: relative;
-  flex: 1;
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   background: var(--stage-bg);
   border: 1px solid var(--border-strong);
@@ -949,9 +949,479 @@ main.page-main {
 .ascii-slope-canvas {
   display: block;
   width: 100%;
-  height: 100%;
+  height: auto;
   aspect-ratio: 16 / 9;
   image-rendering: pixelated;
+}
+
+/* ================= 西西弗斯永恒轮回机械翻牌计 & 三源动能仪轨面板 ================= */
+.sisyphus-cycle-console {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.68rem;
+  margin-top: 0.62rem;
+  align-items: stretch;
+  font-family: var(--font-mono);
+}
+
+.cycle-odometer-plaque {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.28rem;
+  padding: 0.46rem 0.62rem;
+  min-width: 10.6rem;
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--surface-strong) 92%, var(--accent) 8%) 0%,
+      var(--bg-code) 100%
+    );
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 1px 0 var(--glass-rim),
+    0 6px 16px -8px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.25s ease;
+}
+
+.cycle-odometer-plaque::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-3));
+  opacity: 0.85;
+}
+
+.cycle-odometer-plaque:hover {
+  border-color: var(--accent);
+}
+
+.cycle-odometer-plaque.is-celebrating {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 18px var(--accent-glow),
+    inset 0 0 14px var(--accent-soft);
+  animation: plaque-summit-glow 0.9s ease-out;
+}
+
+@keyframes plaque-summit-glow {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  30% {
+    transform: translateY(-2px) scale(1.02);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+.cycle-plaque-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  font-size: 0.65rem;
+  line-height: 1.2;
+}
+
+.cycle-plaque-label {
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.cycle-phase-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.06rem 0.3rem;
+  border-radius: 2px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-inner);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.cycle-phase-pill.is-climb {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
+  background: var(--accent-soft);
+}
+
+.cycle-phase-pill.is-summit {
+  color: var(--accent-fg);
+  background: var(--accent-3);
+  border-color: var(--accent-3);
+}
+
+:root[data-realm='paper'] .cycle-phase-pill.is-summit {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fffaf3;
+}
+
+.cycle-phase-pill.is-roll {
+  color: var(--stage-fire);
+  border-color: color-mix(in srgb, var(--stage-fire) 65%, transparent);
+  background: color-mix(in srgb, var(--stage-fire) 15%, transparent);
+}
+
+.cycle-phase-pill.is-descent {
+  color: var(--accent-2);
+  border-color: color-mix(in srgb, var(--accent-2) 55%, transparent);
+  background: color-mix(in srgb, var(--accent-2) 14%, transparent);
+}
+
+.cycle-drum-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.24rem;
+  margin: 0.1rem 0;
+}
+
+.cycle-hash-mark {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--accent);
+  opacity: 0.85;
+  margin-right: 0.06rem;
+}
+
+.cycle-digits {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+}
+
+.cycle-digit-cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.48rem;
+  height: 1.82rem;
+  font-size: 1.08rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--text);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg) 78%, var(--surface-strong) 22%) 0%,
+      color-mix(in srgb, var(--bg) 92%, #000 8%) 49%,
+      color-mix(in srgb, var(--bg-code) 88%, var(--accent) 12%) 51%,
+      var(--bg-code) 100%
+    );
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 1px 0 var(--glass-rim),
+    0 2px 4px rgba(0, 0, 0, 0.28);
+  text-shadow: 0 0 10px var(--accent-soft);
+}
+
+:root[data-realm='paper'] .cycle-digit-cell {
+  background:
+    linear-gradient(
+      180deg,
+      #fffdf8 0%,
+      #f2ead9 49%,
+      #e8dec8 51%,
+      #f8f3e7 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 3px rgba(28, 25, 23, 0.14);
+  text-shadow: none;
+}
+
+/* 机械翻牌中轴折痕线 */
+.cycle-digit-cell::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: color-mix(in srgb, var(--border-strong) 65%, transparent);
+  pointer-events: none;
+}
+
+.cycle-digit-cell.is-flip {
+  animation: odometer-digit-flip 0.46s cubic-bezier(0.22, 1, 0.36, 1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+@keyframes odometer-digit-flip {
+  0% {
+    transform: perspective(180px) rotateX(-78deg) scale(0.94);
+    filter: brightness(1.45);
+  }
+  60% {
+    transform: perspective(180px) rotateX(12deg) scale(1.04);
+  }
+  100% {
+    transform: perspective(180px) rotateX(0deg) scale(1);
+    filter: brightness(1);
+  }
+}
+
+.cycle-plaque-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  font-size: 0.63rem;
+  line-height: 1.2;
+}
+
+.cycle-tier-stars {
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cycle-rank-tag {
+  color: var(--text-muted);
+  padding: 0.04rem 0.28rem;
+  border: 1px dashed var(--border);
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+/* 右侧海拔进度槽与三源动能账本 */
+.cycle-telemetry-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.38rem;
+  padding: 0.46rem 0.65rem;
+  background: var(--surface-inner);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  min-width: 0;
+}
+
+.cycle-alt-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  line-height: 1.2;
+}
+
+.cycle-alt-main {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cycle-alt-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--accent);
+  padding: 0.03rem 0.24rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent);
+  background: var(--accent-soft);
+  border-radius: 1px;
+}
+
+.cycle-alt-main strong {
+  font-size: 0.88rem;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.cycle-alt-max {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.cycle-eta-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cycle-pct-pill {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--accent-2);
+}
+
+.cycle-eta-val {
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.cycle-alt-track {
+  position: relative;
+  height: 0.86rem;
+  background: var(--bg-code);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.cycle-alt-track:hover {
+  border-color: var(--accent);
+}
+
+.cycle-alt-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--accent) 26%, transparent),
+      color-mix(in srgb, var(--accent) 26%, transparent) 5px,
+      color-mix(in srgb, var(--accent) 52%, transparent) 5px,
+      color-mix(in srgb, var(--accent) 52%, transparent) 10px
+    );
+  border-right: 2px solid var(--accent);
+  box-shadow: 0 0 10px var(--accent-soft);
+  transition: width 0.18s ease-out;
+}
+
+.cycle-alt-ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cycle-alt-ticks span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-strong);
+  opacity: 0.55;
+}
+
+.cycle-summit-pin {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.56rem;
+  line-height: 1;
+  color: var(--accent-3);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.cycle-kinetic-row {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+  flex-wrap: wrap;
+}
+
+.kinetic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.24rem;
+  padding: 0.12rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+}
+
+button.kinetic-chip {
+  cursor: pointer;
+}
+
+button.kinetic-chip:hover {
+  border-color: var(--accent-2);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent-2) 14%, var(--bg-code));
+}
+
+.kinetic-chip .k-icon {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.kinetic-chip.is-commit .k-icon {
+  color: var(--accent-2);
+}
+
+.kinetic-chip.is-blog .k-icon {
+  color: var(--accent-3);
+}
+
+:root[data-realm='paper'] .kinetic-chip.is-blog .k-icon {
+  color: var(--accent);
+}
+
+.kinetic-chip.is-pulsing {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--accent-soft);
+  box-shadow: 0 0 12px var(--accent-soft);
+  animation: kinetic-chip-pop 0.45s ease-out;
+}
+
+@keyframes kinetic-chip-pop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-1.5px) scale(1.04);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+.sisyphus-quote-foot {
+  position: relative;
+}
+
+.sisyphus-sr-tele {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .sisyphus-cycle-console {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cycle-odometer-plaque {
+    min-width: 0;
+  }
 }
 
 .ascii-slope-pre.is-sr-mirror {

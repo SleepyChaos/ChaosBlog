@@ -471,29 +471,38 @@ const computePostTerrain = (body: string) => {
   };
   bindGhCellHover();
 
-  if (ghCells.length > 0) {
-    fetch('https://github-contributions-api.jogruber.de/v4/SleepyChaos?y=last')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!data || !Array.isArray(data.contributions)) return;
-        const recent = data.contributions.slice(-ghCells.length);
-        let sum = 0;
-        recent.forEach((item: { date?: string; count?: number; level?: number }, idx: number) => {
-          const cell = ghCells[idx];
-          if (!cell) return;
-          const cnt = Number(item.count || 0);
-          const lv = Math.max(0, Math.min(4, Number(item.level ?? (cnt > 0 ? 1 : 0))));
-          sum += cnt;
-          cell.dataset.date = item.date || cell.dataset.date || '';
-          cell.dataset.count = String(cnt);
-          cell.className = `hm-cell hm-lv-${lv}`;
-        });
-        if (ghTotalEl) {
-          ghTotalEl.textContent = `${sum} commits (28w)`;
-        }
-      })
-      .catch(() => {});
-  }
+  const applyGhContributions = (contribs: { date?: string; count?: number; level?: number }[]) => {
+    if (!Array.isArray(contribs) || ghCells.length === 0) return;
+    const recent = contribs.slice(-ghCells.length);
+    let sum = 0;
+    recent.forEach((item, idx) => {
+      const cell = ghCells[idx];
+      if (!cell) return;
+      const cnt = Number(item.count || 0);
+      const lv = Math.max(0, Math.min(4, Number(item.level ?? (cnt > 0 ? 1 : 0))));
+      sum += cnt;
+      cell.dataset.date = item.date || cell.dataset.date || '';
+      cell.dataset.count = String(cnt);
+      cell.className = `hm-cell hm-lv-${lv}`;
+    });
+    if (ghTotalEl) {
+      ghTotalEl.textContent = `${sum} commits (28w)`;
+    }
+  };
+
+  window.addEventListener('sisyphus:github-contributions', (e: Event) => {
+    const d = (e as CustomEvent<{ contributions?: { date?: string; count?: number; level?: number }[] }>).detail;
+    if (d?.contributions) applyGhContributions(d.contributions);
+  });
+
+  // 若 BaseLayout 缓存已就绪则在首帧直接回填
+  try {
+    const cachedRaw = sessionStorage.getItem('sisyphus_gh_graph_v2');
+    if (cachedRaw) {
+      const parsed = JSON.parse(cachedRaw);
+      if (parsed?.data?.contributions) applyGhContributions(parsed.data.contributions);
+    }
+  } catch {}
 
   // ========= 2. 原地交互式标签/周次过滤 + 悬停联动 + j/k 终端键盘流选文 =========
   const tagChips = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-filter-tag]'));

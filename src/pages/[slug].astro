@@ -59,8 +59,13 @@ const isAbout = page.slug === 'about';
   const CYCLE_MS = 8 * 60 * 60 * 1000;
   const PEAK_ALT = 884.8;
 
-  const refreshTelemetry = () => {
+  let latestTotalCycle = 0;
+
+  const refreshTelemetry = (ev?: Event) => {
     if (!teleEl) return;
+    const d = (ev as CustomEvent<{ totalCycle?: number }> | undefined)?.detail;
+    if (typeof d?.totalCycle === 'number') latestTotalCycle = d.totalCycle;
+
     const nowEpoch = Math.floor(Date.now() / CYCLE_MS);
     let anchorEpoch = nowEpoch;
     let boostAccum = 0;
@@ -75,9 +80,11 @@ const isAbout = page.slug === 'about';
       }
     } catch {}
     const total = Math.max(0, Date.now() / CYCLE_MS - anchorEpoch + boostAccum);
-    const frac = total - Math.floor(total);
+    const cycle = Math.floor(total);
+    const frac = total - cycle;
     const alt = (frac * PEAK_ALT).toFixed(1);
-    teleEl.textContent = `当前推石进度: ALT ${alt}m / 884.8m · 累计助推 +${boostMeters}m`;
+    const shownCycle = latestTotalCycle > 0 ? latestTotalCycle : Math.max(1, cycle + 1);
+    teleEl.textContent = `永恒轮回 #${String(shownCycle).padStart(4, '0')} · ALT ${alt}m / 884.8m · 累计助推 +${boostMeters}m`;
   };
 
   refreshTelemetry();

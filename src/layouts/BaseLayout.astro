@@ -1,4 +1,5 @@
 ---
+import { execSync } from 'node:child_process';
 import '../styles/global.css';
 import 'remark-callouts/styles.css';
 import 'katex/dist/katex.min.css';
@@ -6,6 +7,7 @@ import Footer from '../components/Footer.astro';
 import FloatingAsciiNav from '../components/FloatingAsciiNav.astro';
 import RealmBackdrop from '../components/RealmBackdrop.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+import { getAllPosts } from '../lib/content';
 
 interface Props {
   title?: string;
@@ -16,6 +18,56 @@ const { title, description = SITE_DESCRIPTION } = Astro.props;
 const pageTitle = title ? `${title} · ${SITE_TITLE}` : SITE_TITLE;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const canonical = new URL(Astro.url.pathname, Astro.site);
+
+// 构建期编年史快照：汇总全站已发布博文与当前 Git 仓库提交，驱动西西弗斯推石进度与轮回纪元
+const allPosts = await getAllPosts();
+const postCount = allPosts.length;
+const totalChars = allPosts.reduce((acc, p) => acc + p.body.length, 0);
+const latestPostTitle = allPosts[0]?.title ?? '';
+const latestPostStamp = allPosts.reduce(
+  (mx, p) => Math.max(mx, p.pubDate.getTime(), p.updatedDate?.getTime() ?? 0),
+  0,
+);
+let hashAcc = 2166136261;
+for (const p of allPosts) {
+  const sig = `${p.slug}:${p.pubDate.getTime()}:${p.updatedDate?.getTime() ?? 0}:${p.body.length}|`;
+  for (let i = 0; i < sig.length; i++) {
+    hashAcc ^= sig.charCodeAt(i);
+    hashAcc = Math.imul(hashAcc, 16777619);
+  }
+}
+const blogFingerprint = `${postCount}-${totalChars}-${(hashAcc >>> 0).toString(36)}`;
+const blogBaseMeters = Math.round(postCount * 220 + totalChars * 0.015);
+
+let repoCommits = 1;
+let repoHeadSha = 'init';
+let repoHeadSubject = '';
+try {
+  repoCommits = Math.max(
+    1,
+    Number.parseInt(execSync('git rev-list --count HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(), 10) || 1,
+  );
+  const logLine = execSync('git log -1 --format="%h|%s"', { stdio: ['ignore', 'pipe', 'ignore'] })
+    .toString()
+    .trim();
+  const sep = logLine.indexOf('|');
+  if (sep > 0) {
+    repoHeadSha = logLine.slice(0, sep).trim() || 'init';
+    repoHeadSubject = logLine.slice(sep + 1).trim().slice(0, 42);
+  }
+} catch {}
+
+const chronicleSeedJson = JSON.stringify({
+  postCount,
+  totalChars,
+  latestPostTitle,
+  latestPostStamp,
+  blogFingerprint,
+  blogBaseMeters,
+  repoCommits,
+  repoHeadSha,
+  repoHeadSubject,
+}).replace(/</g, '\\u003c');
 ---
 
 <!doctype html>
@@ -32,6 +84,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
+    <script type="application/json" id="sisyphus-chronicle-seed" set:html={chronicleSeedJson} />
     <script is:inline>
       const savedRealm =
         localStorage.getItem('sisyphus_realm') ||
@@ -69,9 +122,15 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
             const raw = localStorage.getItem(KEY);
             const save = raw
               ? JSON.parse(raw)
-              : { anchorEpoch: nowEpoch, boostAccum: 0, boostMeters: 0 };
+              : { anchorEpoch: nowEpoch, boostAccum: 0, boostMeters: 0, commitMeters: 0, blogMeters: 0 };
+            const gainedMeters = rawAmt * PEAK_ALT;
             save.boostAccum = Number(save.boostAccum || 0) + rawAmt;
-            save.boostMeters = Number(save.boostMeters || 0) + rawAmt * PEAK_ALT;
+            save.boostMeters = Number(save.boostMeters || 0) + gainedMeters;
+            if (detail.category === 'commit') {
+              save.commitMeters = Number(save.commitMeters || 0) + gainedMeters;
+            } else if (detail.category === 'blog') {
+              save.blogMeters = Number(save.blogMeters || 0) + gainedMeters;
+            }
             localStorage.setItem(KEY, JSON.stringify(save));
           } catch {}
         }
@@ -123,11 +182,108 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     </div>
 
     <script>
-      // ================= 1. 全局被动推石动能引擎 + 视口底边微缩推石轨 =================
+      // ================= 1. 全局被动推石动能引擎 + GitHub/博文编年史同步 + 视口底边微缩推石轨 =================
       const CYCLE_MS = 8 * 60 * 60 * 1000;
       const PEAK_ALT = 884.8;
       const BOULDER_KEY = 'sisyphus_8h_cycle_v2';
       const FLOW_KEY = 'sisyphus_flow_v1';
+      const CHRONICLE_KEY = 'sisyphus_chronicle_v2';
+      const GH_GRAPH_CACHE_KEY = 'sisyphus_gh_graph_v2';
+      const GH_EVENTS_CACHE_KEY = 'sisyphus_gh_events_v2';
+      const METERS_PER_COMMIT = 22;
+      const METERS_PER_NEW_POST = 220;
+
+      interface BuildSeed {
+        postCount: number;
+        totalChars: number;
+        latestPostTitle: string;
+        latestPostStamp: number;
+        blogFingerprint: string;
+        blogBaseMeters: number;
+        repoCommits: number;
+        repoHeadSha: string;
+        repoHeadSubject: string;
+      }
+
+      interface ChronicleState {
+        initialized: boolean;
+        postCount: number;
+        totalChars: number;
+        blogFingerprint: string;
+        repoCommits: number;
+        repoHeadSha: string;
+        ghYearTotal: number;
+        ghTodayCommits: number;
+        ghWeekCommits: number;
+        totalCommitsTracked: number;
+        seenEventIds: string[];
+        seenShas: string[];
+        lastImpulseNote: string;
+      }
+
+      let buildSeed: BuildSeed = {
+        postCount: 1,
+        totalChars: 0,
+        latestPostTitle: '',
+        latestPostStamp: 0,
+        blogFingerprint: '1-0-0',
+        blogBaseMeters: 220,
+        repoCommits: 1,
+        repoHeadSha: 'init',
+        repoHeadSubject: '',
+      };
+      try {
+        const seedRaw = document.getElementById('sisyphus-chronicle-seed')?.textContent;
+        if (seedRaw) buildSeed = { ...buildSeed, ...JSON.parse(seedRaw) };
+      } catch {}
+
+      const loadChronicle = (): ChronicleState => {
+        const fallback: ChronicleState = {
+          initialized: false,
+          postCount: buildSeed.postCount,
+          totalChars: buildSeed.totalChars,
+          blogFingerprint: buildSeed.blogFingerprint,
+          repoCommits: buildSeed.repoCommits,
+          repoHeadSha: buildSeed.repoHeadSha,
+          ghYearTotal: 0,
+          ghTodayCommits: 0,
+          ghWeekCommits: 0,
+          totalCommitsTracked: buildSeed.repoCommits,
+          seenEventIds: [],
+          seenShas: buildSeed.repoHeadSha ? [buildSeed.repoHeadSha] : [],
+          lastImpulseNote: '',
+        };
+        try {
+          const raw = localStorage.getItem(CHRONICLE_KEY);
+          if (raw) {
+            const p = JSON.parse(raw);
+            return {
+              ...fallback,
+              ...p,
+              seenEventIds: Array.isArray(p.seenEventIds) ? p.seenEventIds.slice(-80) : fallback.seenEventIds,
+              seenShas: Array.isArray(p.seenShas) ? p.seenShas.slice(-80) : fallback.seenShas,
+            };
+          }
+        } catch {}
+        return fallback;
+      };
+
+      const saveChronicle = (st: ChronicleState) => {
+        try {
+          st.seenEventIds = st.seenEventIds.slice(-80);
+          st.seenShas = st.seenShas.slice(-80);
+          localStorage.setItem(CHRONICLE_KEY, JSON.stringify(st));
+        } catch {}
+      };
+
+      let chronicle = loadChronicle();
+
+      const getForgedCycles = () => {
+        const posts = Math.max(1, buildSeed.postCount);
+        const commits = Math.max(buildSeed.repoCommits, chronicle.totalCommitsTracked || 0);
+        // 每篇已发布文章铸就 1 座峰顶里程碑，每 40 次 GitHub 提交（880m ≈ 884.8m）额外铸就 1 次完整登山轮回
+        return posts + Math.floor(commits / 40);
+      };
 
       const horizonFill = document.getElementById('horizon-fill-line');
       const horizonNode = document.getElementById('horizon-climber-node');
@@ -138,6 +294,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
       let flowMult = 1.0;
       let lastImpulseTag = '8H_CHRONO';
       let lastImpulseMeters = 0;
+      let lastImpulseCategory: 'commit' | 'blog' | 'boost' | '' = '';
       let toastHideTimer = 0;
       let strideFrame = 0;
 
@@ -150,7 +307,13 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
 
       const loadBoulderSave = () => {
         const nowEpoch = Math.floor(Date.now() / CYCLE_MS);
-        let save = { anchorEpoch: nowEpoch, boostAccum: 0, boostMeters: 0 };
+        let save = {
+          anchorEpoch: nowEpoch,
+          boostAccum: 0,
+          boostMeters: 0,
+          commitMeters: 0,
+          blogMeters: 0,
+        };
         try {
           const raw = localStorage.getItem(BOULDER_KEY);
           if (raw) {
@@ -163,6 +326,8 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
                 anchorEpoch: parsed.anchorEpoch,
                 boostAccum: parsed.boostAccum,
                 boostMeters: Number(parsed.boostMeters || 0),
+                commitMeters: Number(parsed.commitMeters || 0),
+                blogMeters: Number(parsed.blogMeters || 0),
               };
             }
           } else {
@@ -178,7 +343,9 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         const cycle = Math.floor(total);
         const frac = total - cycle;
         const alt = frac * PEAK_ALT;
-        return { save, total, cycle, frac, alt };
+        const forgedCycles = getForgedCycles();
+        const totalCycle = forgedCycles + cycle;
+        return { save, total, cycle, forgedCycles, totalCycle, frac, alt };
       };
 
       const updateHorizonBar = (toastText?: string) => {
@@ -188,7 +355,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         if (horizonNode) horizonNode.style.left = `${pct.toFixed(1)}%`;
         if (horizonAlt) {
           const flowStr = flowMult > 1.08 ? ` · ${flowMult.toFixed(1)}x` : '';
-          horizonAlt.textContent = `${st.alt.toFixed(1)}m${flowStr}`;
+          horizonAlt.textContent = `#${String(st.totalCycle).padStart(3, '0')} · ${st.alt.toFixed(1)}m${flowStr}`;
         }
         if (horizonSprite) {
           const sprites = ['o_▪', 'o/▣', 'o_▪', 'o-▣'];
@@ -201,8 +368,14 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
           window.clearTimeout(toastHideTimer);
           toastHideTimer = window.setTimeout(() => {
             horizonToast.classList.remove('is-active');
-          }, 1450);
+          }, 1850);
         }
+
+        const totalCommits = Math.max(buildSeed.repoCommits, chronicle.totalCommitsTracked || 0);
+        const commitTotalMeters = Math.round(totalCommits * METERS_PER_COMMIT);
+        const blogTotalMeters = Math.round(
+          buildSeed.blogBaseMeters + Math.max(0, st.save.blogMeters - buildSeed.blogBaseMeters),
+        );
 
         window.dispatchEvent(
           new CustomEvent('sisyphus:boulder-telemetry', {
@@ -210,10 +383,21 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
               frac: st.frac,
               alt: st.alt,
               cycle: st.cycle,
+              forgedCycles: st.forgedCycles,
+              totalCycle: st.totalCycle,
               boostMeters: st.save.boostMeters,
+              commitDeltaMeters: st.save.commitMeters,
+              blogDeltaMeters: st.save.blogMeters,
+              totalCommits,
+              todayCommits: chronicle.ghTodayCommits || 0,
+              weekCommits: chronicle.ghWeekCommits || 0,
+              postCount: buildSeed.postCount,
+              commitTotalMeters,
+              blogTotalMeters,
               flow: flowMult,
               lastSource: lastImpulseTag,
               lastGain: lastImpulseMeters,
+              lastCategory: lastImpulseCategory,
             },
           }),
         );
@@ -229,6 +413,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
               maxM?: number;
               rolledAmount?: number;
               source?: string;
+              category?: 'commit' | 'blog' | 'boost';
               persisted?: boolean;
             }>
           ).detail || {};
@@ -254,18 +439,294 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         const gainedM = rawAmt * PEAK_ALT;
         lastImpulseTag = source;
         lastImpulseMeters = gainedM;
+        lastImpulseCategory = detail.category || 'boost';
         strideFrame++;
 
         if (!detail.persisted) {
           const save = loadBoulderSave();
           save.boostAccum += rawAmt;
           save.boostMeters += gainedM;
+          if (detail.category === 'commit') save.commitMeters += gainedM;
+          else if (detail.category === 'blog') save.blogMeters += gainedM;
           try {
             localStorage.setItem(BOULDER_KEY, JSON.stringify(save));
           } catch {}
         }
 
         updateHorizonBar(`+${gainedM.toFixed(1)}m [${source}]`);
+      });
+
+      // ================= 1B. 博客文章更新 & GitHub 提交自动转化为登山进度 =================
+      const syncBuildChronicle = () => {
+        chronicle = loadChronicle();
+        if (!chronicle.initialized) {
+          chronicle.initialized = true;
+          chronicle.postCount = buildSeed.postCount;
+          chronicle.totalChars = buildSeed.totalChars;
+          chronicle.blogFingerprint = buildSeed.blogFingerprint;
+          chronicle.repoCommits = buildSeed.repoCommits;
+          chronicle.repoHeadSha = buildSeed.repoHeadSha;
+          chronicle.totalCommitsTracked = Math.max(chronicle.totalCommitsTracked, buildSeed.repoCommits);
+          if (buildSeed.repoHeadSha && !chronicle.seenShas.includes(buildSeed.repoHeadSha)) {
+            chronicle.seenShas.push(buildSeed.repoHeadSha);
+          }
+          saveChronicle(chronicle);
+          updateHorizonBar();
+          return;
+        }
+
+        const pendingImpulses: { meters: number; source: string; category: 'blog' | 'commit' }[] = [];
+
+        // 1) 检测博客文章新增或修订更新
+        if (buildSeed.postCount > chronicle.postCount) {
+          const diffPosts = buildSeed.postCount - chronicle.postCount;
+          const charGain = Math.max(0, buildSeed.totalChars - chronicle.totalChars) * 0.015;
+          const meters = Math.min(880, Math.round(diffPosts * METERS_PER_NEW_POST + charGain));
+          const shortTitle =
+            buildSeed.latestPostTitle.length > 10
+              ? `${buildSeed.latestPostTitle.slice(0, 10)}…`
+              : buildSeed.latestPostTitle;
+          pendingImpulses.push({
+            meters,
+            source: diffPosts === 1 && shortTitle ? `博文发布《${shortTitle}》` : `博文连发 ×${diffPosts}`,
+            category: 'blog',
+          });
+        } else if (
+          buildSeed.blogFingerprint !== chronicle.blogFingerprint &&
+          buildSeed.postCount === chronicle.postCount
+        ) {
+          const charDelta = Math.abs(buildSeed.totalChars - chronicle.totalChars);
+          const meters = Math.min(220, Math.round(55 + charDelta * 0.025));
+          pendingImpulses.push({
+            meters,
+            source: '博文修订落库',
+            category: 'blog',
+          });
+        }
+
+        // 2) 检测构建期 ChaosBlog 仓库新提交（与实时 API 通过 SHA 去重）
+        if (
+          buildSeed.repoHeadSha &&
+          buildSeed.repoHeadSha !== chronicle.repoHeadSha &&
+          !chronicle.seenShas.includes(buildSeed.repoHeadSha)
+        ) {
+          const diffCommits =
+            buildSeed.repoCommits > chronicle.repoCommits
+              ? Math.min(25, buildSeed.repoCommits - chronicle.repoCommits)
+              : 1;
+          chronicle.seenShas.push(buildSeed.repoHeadSha);
+          chronicle.totalCommitsTracked = Math.max(
+            chronicle.totalCommitsTracked + diffCommits,
+            buildSeed.repoCommits,
+          );
+          pendingImpulses.push({
+            meters: diffCommits * METERS_PER_COMMIT,
+            source:
+              diffCommits > 1
+                ? `Git 提交 ×${diffCommits} (#${buildSeed.repoHeadSha})`
+                : `Git Commit #${buildSeed.repoHeadSha}`,
+            category: 'commit',
+          });
+        }
+
+        chronicle.postCount = buildSeed.postCount;
+        chronicle.totalChars = buildSeed.totalChars;
+        chronicle.blogFingerprint = buildSeed.blogFingerprint;
+        chronicle.repoCommits = buildSeed.repoCommits;
+        chronicle.repoHeadSha = buildSeed.repoHeadSha;
+        saveChronicle(chronicle);
+
+        pendingImpulses.forEach((imp, idx) => {
+          window.setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent('sisyphus:boulder-boost', {
+                detail: {
+                  rolledAmount: imp.meters / PEAK_ALT,
+                  source: imp.source,
+                  category: imp.category,
+                },
+              }),
+            );
+          }, 420 + idx * 950);
+        });
+      };
+
+      const fetchCachedJson = async (url: string, cacheKey: string, ttlMs: number, force = false) => {
+        if (!force) {
+          try {
+            const raw = sessionStorage.getItem(cacheKey);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed && Date.now() - Number(parsed.ts || 0) < ttlMs) return parsed.data;
+            }
+          } catch {}
+        }
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const data = await res.json();
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data }));
+        } catch {}
+        return data;
+      };
+
+      let ghSyncInFlight = false;
+      const syncGitHubLive = async (force = false) => {
+        if (ghSyncInFlight) return;
+        ghSyncInFlight = true;
+        try {
+          const [graphData, eventsData] = await Promise.all([
+            fetchCachedJson(
+              'https://github-contributions-api.jogruber.de/v4/SleepyChaos?y=last',
+              GH_GRAPH_CACHE_KEY,
+              180_000,
+              force,
+            ).catch(() => null),
+            fetchCachedJson(
+              'https://api.github.com/users/SleepyChaos/events/public?per_page=25',
+              GH_EVENTS_CACHE_KEY,
+              45_000,
+              force,
+            ).catch(() => null),
+          ]);
+
+          chronicle = loadChronicle();
+          const wasFirstGhSync = chronicle.ghYearTotal === 0;
+          let yearTotal = chronicle.ghYearTotal;
+          let todayCount = chronicle.ghTodayCommits;
+          let weekCount = chronicle.ghWeekCommits;
+
+          if (graphData && Array.isArray(graphData.contributions)) {
+            const contribs = graphData.contributions as { date?: string; count?: number; level?: number }[];
+            yearTotal =
+              typeof graphData.total?.lastYear === 'number'
+                ? graphData.total.lastYear
+                : contribs.reduce((s, c) => s + Number(c.count || 0), 0);
+            const tail7 = contribs.slice(-7);
+            weekCount = tail7.reduce((s, c) => s + Number(c.count || 0), 0);
+            // 取最近 2 天（兼容 UTC 与本地时区跨日）的活跃提交作为今日实时脉冲统计
+            const tail2 = contribs.slice(-2);
+            todayCount = Number(tail2[tail2.length - 1]?.count || 0) || Number(tail2[0]?.count || 0);
+
+            window.dispatchEvent(
+              new CustomEvent('sisyphus:github-contributions', {
+                detail: { contributions: contribs, yearTotal, todayCount, weekCount },
+              }),
+            );
+          }
+
+          let eventNewCommits = 0;
+          let recent24hEventCommits = 0;
+          let latestRepoShort = '';
+          let latestHeadShort = '';
+          const nowMs = Date.now();
+
+          if (Array.isArray(eventsData)) {
+            for (const ev of eventsData) {
+              if (!ev || ev.type !== 'PushEvent') continue;
+              const evId = String(ev.id || '');
+              const headFull = String(ev.payload?.head || '');
+              const headShort = headFull ? headFull.slice(0, 7) : '';
+              const commitCnt = Math.max(
+                1,
+                Number(ev.payload?.distinct_size ?? ev.payload?.size ?? ev.payload?.commits?.length ?? 1),
+              );
+              const createdMs = ev.created_at ? Date.parse(ev.created_at) : 0;
+              if (createdMs > 0 && nowMs - createdMs <= 26 * 3600 * 1000) {
+                recent24hEventCommits += commitCnt;
+              }
+              const alreadySeen =
+                (evId && chronicle.seenEventIds.includes(evId)) ||
+                (headShort && chronicle.seenShas.includes(headShort));
+
+              if (!alreadySeen) {
+                if (evId) chronicle.seenEventIds.push(evId);
+                if (headShort) chronicle.seenShas.push(headShort);
+                if (!wasFirstGhSync) {
+                  eventNewCommits += commitCnt;
+                  if (!latestRepoShort && typeof ev.repo?.name === 'string') {
+                    latestRepoShort = ev.repo.name.split('/').pop() || ev.repo.name;
+                  }
+                  if (!latestHeadShort && headShort) latestHeadShort = headShort;
+                }
+              }
+            }
+          }
+
+          todayCount = Math.max(todayCount, recent24hEventCommits);
+          chronicle.ghTodayCommits = todayCount;
+          chronicle.ghWeekCommits = Math.max(weekCount, todayCount);
+
+          if (wasFirstGhSync) {
+            if (yearTotal > 0) {
+              chronicle.ghYearTotal = yearTotal;
+              chronicle.totalCommitsTracked = Math.max(
+                chronicle.totalCommitsTracked,
+                buildSeed.repoCommits,
+                yearTotal,
+              );
+            }
+            saveChronicle(chronicle);
+            // 首次建立 GitHub 遥测连接时：若最近 24h 有真实提交，立即给予今日鲜活代码助推脉冲！
+            if (todayCount > 0) {
+              const welcomeCommits = Math.min(4, todayCount);
+              const meters = welcomeCommits * METERS_PER_COMMIT;
+              window.setTimeout(() => {
+                window.dispatchEvent(
+                  new CustomEvent('sisyphus:boulder-boost', {
+                    detail: {
+                      rolledAmount: meters / PEAK_ALT,
+                      source: `今日 GitHub 提交 ×${todayCount}`,
+                      category: 'commit',
+                    },
+                  }),
+                );
+              }, 680);
+            } else {
+              updateHorizonBar();
+            }
+          } else {
+            const graphDelta = yearTotal > chronicle.ghYearTotal ? yearTotal - chronicle.ghYearTotal : 0;
+            const newCommits = Math.max(eventNewCommits, graphDelta);
+            if (yearTotal > 0 || eventNewCommits > 0) {
+              chronicle.ghYearTotal = Math.max(
+                chronicle.ghYearTotal + eventNewCommits,
+                yearTotal,
+              );
+              chronicle.totalCommitsTracked = Math.max(
+                chronicle.totalCommitsTracked + newCommits,
+                chronicle.ghYearTotal,
+                buildSeed.repoCommits,
+              );
+            }
+            saveChronicle(chronicle);
+
+            if (newCommits > 0) {
+              const meters = Math.min(660, newCommits * METERS_PER_COMMIT);
+              const repoTag = latestRepoShort ? ` · ${latestRepoShort}` : '';
+              const shaTag = latestHeadShort && newCommits === 1 ? ` #${latestHeadShort}` : '';
+              window.dispatchEvent(
+                new CustomEvent('sisyphus:boulder-boost', {
+                  detail: {
+                    rolledAmount: meters / PEAK_ALT,
+                    source: `GitHub Commit${repoTag}${shaTag}${newCommits > 1 ? ` ×${newCommits}` : ''}`,
+                    category: 'commit',
+                  },
+                }),
+              );
+            } else if (force) {
+              updateHorizonBar('GitHub 遥测已同步 · 暂无新提交');
+            } else {
+              updateHorizonBar();
+            }
+          }
+        } finally {
+          ghSyncInFlight = false;
+        }
+      };
+
+      window.addEventListener('sisyphus:sync-github', () => {
+        syncGitHubLive(true);
       });
 
       // 被动推石手段 A：沉浸式匀速阅读步频（每次在 +1.8m ~ +6.2m 乘以心流倍率区间内随机推进）
@@ -365,12 +826,21 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
       });
 
       updateHorizonBar();
+      syncBuildChronicle();
+      syncGitHubLive(false);
+
       setInterval(() => {
         if (flowMult > 1.0) {
           flowMult = Math.max(1.0, +(flowMult - 0.02).toFixed(2));
         }
         updateHorizonBar();
       }, 4000);
+
+      setInterval(() => {
+        if (!document.hidden) {
+          syncGitHubLive(false);
+        }
+      }, 180_000);
 
       // ================= 3. 终端代码块顶栏增强 + 代码研读/复制被动推石奖励 =================
       document.querySelectorAll('.prose pre').forEach((pre, blockIdx) => {

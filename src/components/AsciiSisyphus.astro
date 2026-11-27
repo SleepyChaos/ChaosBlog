@@ -46,11 +46,96 @@ const { initialSummits = 1 } = Astro.props;
     <pre class="ascii-slope-pre is-sr-mirror" id="sisyphus-sr-status" aria-hidden="true"></pre>
   </div>
 
-  <div class="bento-foot">
-    <span id="sisyphus-telemetry" data-summits={initialSummits}>
-      ALT 210.0m / 884.8m · ETA 06h 05m · #1
-    </span>
+  <!-- 永恒轮回机械翻牌计 + 三源登山遥测仪轨面板 -->
+  <div class="sisyphus-cycle-console" id="sisyphus-cycle-console" data-summits={initialSummits}>
+    <!-- 左舱：永恒轮回机械翻牌计数器 -->
+    <div
+      class="cycle-odometer-plaque"
+      id="cycle-odometer-plaque"
+      title="西西弗斯永恒轮回计数：融合 8h 昼夜周期、已发布博文里程碑与 GitHub 代码提交铸就的总登顶轮回"
+    >
+      <div class="cycle-plaque-head">
+        <span class="cycle-plaque-label" id="cycle-realm-sigil">♾ 星渊纪元</span>
+        <span class="cycle-phase-pill is-climb" id="sisyphus-phase-pill">▲ 攀登中</span>
+      </div>
+      <div class="cycle-drum-row" aria-label="当前登山轮回次数">
+        <span class="cycle-hash-mark">#</span>
+        <div class="cycle-digits" id="sisyphus-cycle-digits">
+          <span class="cycle-digit-cell">0</span>
+          <span class="cycle-digit-cell">0</span>
+          <span class="cycle-digit-cell">0</span>
+          <span class="cycle-digit-cell">{String(initialSummits % 10)}</span>
+        </div>
+      </div>
+      <div class="cycle-plaque-foot">
+        <span class="cycle-tier-stars" id="sisyphus-epoch-stars" aria-hidden="true">◈◈◇◇◇</span>
+        <span class="cycle-rank-tag" id="sisyphus-rank-tag">执石行者</span>
+      </div>
+    </div>
+
+    <!-- 右舱：海拔推进进度槽 + GitHub Commit / 博文更新 / 助推 三源动能账本 -->
+    <div class="cycle-telemetry-panel">
+      <div class="cycle-alt-head">
+        <span class="cycle-alt-main">
+          <span class="cycle-alt-label">ALT</span>
+          <strong id="sisyphus-alt-val">210.0m</strong>
+          <span class="cycle-alt-max">/ 884.8m</span>
+        </span>
+        <span class="cycle-eta-wrap">
+          <span class="cycle-pct-pill" id="sisyphus-pct-val">23.7%</span>
+          <span class="cycle-eta-val" id="sisyphus-eta-val">ETA 06h 05m 00s</span>
+        </span>
+      </div>
+
+      <div
+        class="cycle-alt-track"
+        id="sisyphus-alt-track"
+        title="点击舞台或 [+PUSH 助推]、提交 GitHub Commit (+22m/次)、发布新博文 (+220m+/篇) 均可推进登山进度"
+      >
+        <div class="cycle-alt-fill" id="sisyphus-alt-fill" style="width: 23.7%"></div>
+        <div class="cycle-alt-ticks" aria-hidden="true">
+          <span style="left: 25%"></span>
+          <span style="left: 50%"></span>
+          <span style="left: 75%"></span>
+        </div>
+        <span class="cycle-summit-pin" aria-hidden="true">▲</span>
+      </div>
+
+      <div class="cycle-kinetic-row">
+        <button
+          type="button"
+          class="kinetic-chip is-commit"
+          id="kinetic-chip-commit"
+          title="点击立即同步 @SleepyChaos 最新 GitHub 提交（每次新 Commit 自动助推 +22m，每 40 次铸就 +1 轮回）"
+        >
+          <span class="k-icon">⎇</span>
+          <span id="kinetic-commit-text">Commits 同步中</span>
+        </button>
+        <span
+          class="kinetic-chip is-blog"
+          id="kinetic-chip-blog"
+          title="每篇新发布博文自动注入 +220m+ 登山动能，每次修订博文注入 +55m+ 动能"
+        >
+          <span class="k-icon">✎</span>
+          <span id="kinetic-blog-text">博文 {initialSummits}篇</span>
+        </span>
+        <span
+          class="kinetic-chip is-boost"
+          id="kinetic-chip-boost"
+          title="累计通过点击助推、阅读心流、GitHub 提交与博文更新注入的额外攀登海拔"
+        >
+          <span class="k-icon">⚡</span>
+          <span id="kinetic-boost-text">助推 +0m</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bento-foot sisyphus-quote-foot">
     <span id="sisyphus-phase-quote">"{CAMUS_QUOTE}"</span>
+    <span class="sisyphus-sr-tele" id="sisyphus-telemetry" data-summits={initialSummits}>
+      ALT 210.0m / 884.8m · #{initialSummits}
+    </span>
   </div>
 </div>
 
@@ -86,6 +171,29 @@ const { initialSummits = 1 } = Astro.props;
     const srEl = document.getElementById('sisyphus-sr-status');
     const pushBtn = document.getElementById('sisyphus-push-btn');
     const summitBtn = document.getElementById('sisyphus-summit-btn');
+
+    // 永恒轮回机械翻牌计 + 三源遥测面板 DOM
+    const odometerPlaque = document.getElementById('cycle-odometer-plaque');
+    const realmSigilEl = document.getElementById('cycle-realm-sigil');
+    const phasePillEl = document.getElementById('sisyphus-phase-pill');
+    const cycleDigitsEl = document.getElementById('sisyphus-cycle-digits');
+    const digitCells = cycleDigitsEl
+      ? Array.from(cycleDigitsEl.querySelectorAll<HTMLElement>('.cycle-digit-cell'))
+      : [];
+    const epochStarsEl = document.getElementById('sisyphus-epoch-stars');
+    const rankTagEl = document.getElementById('sisyphus-rank-tag');
+    const altValEl = document.getElementById('sisyphus-alt-val');
+    const pctValEl = document.getElementById('sisyphus-pct-val');
+    const etaValEl = document.getElementById('sisyphus-eta-val');
+    const altFillEl = document.getElementById('sisyphus-alt-fill');
+    const altTrackEl = document.getElementById('sisyphus-alt-track');
+    const commitChipBtn = document.getElementById('kinetic-chip-commit');
+    const commitTextEl = document.getElementById('kinetic-commit-text');
+    const blogChipEl = document.getElementById('kinetic-chip-blog');
+    const blogTextEl = document.getElementById('kinetic-blog-text');
+    const boostChipEl = document.getElementById('kinetic-chip-boost');
+    const boostTextEl = document.getElementById('kinetic-boost-text');
+
     if (!canvas || !telemetryEl) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -103,6 +211,25 @@ const { initialSummits = 1 } = Astro.props;
     const PEAK_ALT = 884.8;
     const STORAGE_KEY = 'sisyphus_8h_cycle_v2';
     const baseSummits = Number(telemetryEl.dataset.summits || '1');
+    let liveForgedCycles = baseSummits + 1;
+    let liveTotalCommits = 0;
+    let liveTodayCommits = 0;
+    let livePostCount = baseSummits;
+    let liveBlogMeters = baseSummits * 220;
+    let liveCommitMeters = 0;
+
+    // 首屏从构建种子同步仓库提交数与博文基础里程
+    try {
+      const seedRaw = document.getElementById('sisyphus-chronicle-seed')?.textContent;
+      if (seedRaw) {
+        const seed = JSON.parse(seedRaw);
+        livePostCount = Number(seed.postCount || baseSummits);
+        liveTotalCommits = Number(seed.repoCommits || 1);
+        liveBlogMeters = Number(seed.blogBaseMeters || livePostCount * 220);
+        liveCommitMeters = liveTotalCommits * 22;
+        liveForgedCycles = livePostCount + Math.floor(liveTotalCommits / 40);
+      }
+    } catch {}
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
@@ -1061,7 +1188,21 @@ const { initialSummits = 1 } = Astro.props;
       amber: '"[暴击助推] 阿崔迪扑翼机俯冲投弹，香料矿脉大喷发将巨石掀上沙脊！"',
     };
 
-    const applyBoost = (amount: number, at?: { x: number; y: number }, forcedTier?: number) => {
+    const pulseKineticChip = (el: HTMLElement | null) => {
+      if (!el) return;
+      el.classList.remove('is-pulsing');
+      void el.offsetWidth;
+      el.classList.add('is-pulsing');
+      window.setTimeout(() => el.classList.remove('is-pulsing'), 1100);
+    };
+
+    const applyBoost = (
+      amount: number,
+      at?: { x: number; y: number },
+      forcedTier?: number,
+      category?: 'commit' | 'blog' | 'boost',
+      source?: string,
+    ) => {
       if (phase !== 'CLIMB') return;
       reloadSave();
       const gained = amount * PEAK_ALT;
@@ -1077,24 +1218,36 @@ const { initialSummits = 1 } = Astro.props;
       climbBreatherClock = 0.2;
       windupTimer = 0.22;
 
+      const reachesSummit = frac + amount >= 0.995 && gained >= 60;
       const tier =
         forcedTier ??
-        (gained >= 180 ? 4 : counteredHazard || gained >= 35 ? 3 : gained >= 18.5 ? 2 : 1);
+        (reachesSummit ? 4 : counteredHazard || gained >= 35 ? 3 : gained >= 18.5 ? 2 : 1);
 
       activeTier = tier;
-      tierDuration = tier === 4 ? 3.5 : tier === 3 ? 1.75 : tier === 2 ? 1.15 : 0.7;
+      tierDuration = tier === 4 ? 3.5 : tier === 3 ? 1.85 : tier === 2 ? 1.2 : 0.7;
       tierTimer = tierDuration;
       kick = tier >= 2 ? 0.78 : 0.48;
+
+      if (category === 'commit') pulseKineticChip(commitChipBtn);
+      else if (category === 'blog') pulseKineticChip(blogChipEl);
+      pulseKineticChip(boostChipEl);
 
       const bc = boulderCenter(contactX(frac));
       const hx = bc.x - R;
       const pal = ROCK[realm];
+      const floatPrefix = category === 'commit' ? 'GIT' : category === 'blog' ? 'BLOG' : '';
 
       if (tier === 4) {
         sprint = true;
         epicCharge = true;
         if (quoteEl) quoteEl.textContent = EPIC_QUOTES[realm];
-        floats.push({ x: clamp(bc.x - 24, 8, W - 72), y: bc.y - R - 14, s: `*1%MAX+${Math.round(PEAK_ALT)}m!`, t: 0, tier: 4 });
+        floats.push({
+          x: clamp(bc.x - 24, 8, W - 72),
+          y: bc.y - R - 14,
+          s: forcedTier === 4 ? `*1%MAX+${Math.round(PEAK_ALT)}m!` : `SUMMIT+${gained.toFixed(0)}m!`,
+          t: 0,
+          tier: 4,
+        });
         for (let i = 0; i < 42; i++) {
           const a = Math.random() * Math.PI * 2;
           const v = 18 + Math.random() * 55;
@@ -1104,9 +1257,19 @@ const { initialSummits = 1 } = Astro.props;
         if (quoteEl) {
           quoteEl.textContent = counteredHazard
             ? '"[★逆境反击!] 西西弗斯怒吼顶碎逆流，将灾变阻力反转为暴击冲量！"'
-            : TIER3_QUOTES[realm];
+            : category === 'blog'
+              ? `"[✎ ${source || '博客更新'}] 思考凝结成碑，新增文字化作磅礴动能推石猛进 +${Math.round(gained)}m！"`
+              : category === 'commit'
+                ? `"[⎇ ${source || 'GitHub Commit'}] 代码合入主干，推进器全功率爆发向上猛冲 +${Math.round(gained)}m！"`
+                : TIER3_QUOTES[realm];
         }
-        floats.push({ x: bc.x - 14, y: bc.y - R - 10, s: `CRIT+${gained.toFixed(0)}m!!`, t: 0, tier: 3 });
+        floats.push({
+          x: bc.x - 16,
+          y: bc.y - R - 10,
+          s: `${floatPrefix || 'CRIT'}+${gained.toFixed(0)}m!!`,
+          t: 0,
+          tier: 3,
+        });
         for (let i = 0; i < 30; i++) {
           const a = Math.random() * Math.PI * 2;
           const v = 16 + Math.random() * 44;
@@ -1126,7 +1289,19 @@ const { initialSummits = 1 } = Astro.props;
         }
         if (realm === 'crt') glitch = Math.max(glitch, 0.25);
       } else if (tier === 2) {
-        floats.push({ x: bc.x - 8, y: bc.y - R - 8, s: `+${gained.toFixed(0)}m!`, t: 0, tier: 2 });
+        if (quoteEl && (category === 'commit' || category === 'blog')) {
+          quoteEl.textContent =
+            category === 'commit'
+              ? `"[⎇ ${source || 'GitHub Commit'}] 新提交注入 +${Math.round(gained)}m 登山冲量，西西弗斯沉肩加速上行！"`
+              : `"[✎ ${source || '博文修订'}] 文字打磨生辉，为巨石注入 +${Math.round(gained)}m 攀登动能！"`;
+        }
+        floats.push({
+          x: bc.x - 10,
+          y: bc.y - R - 8,
+          s: `${floatPrefix}+${gained.toFixed(0)}m!`,
+          t: 0,
+          tier: 2,
+        });
         for (let i = 0; i < 22; i++) {
           const a = Math.random() * Math.PI * 2;
           const v = 12 + Math.random() * 34;
@@ -1136,7 +1311,13 @@ const { initialSummits = 1 } = Astro.props;
           else emit(hx, bc.y, Math.cos(a) * v, Math.sin(a) * v, 0.9, i % 2 ? pal[0] : hex('#8fd3ff'), 0, 4);
         }
       } else {
-        floats.push({ x: bc.x - 6, y: bc.y - R - 6, s: `+${gained.toFixed(0)}m`, t: 0, tier: 1 });
+        floats.push({
+          x: bc.x - 6,
+          y: bc.y - R - 6,
+          s: `${floatPrefix}+${gained.toFixed(0)}m`,
+          t: 0,
+          tier: 1,
+        });
         for (let i = 0; i < 12; i++) {
           const a = Math.random() * Math.PI * 2;
           const v = 8 + Math.random() * 20;
@@ -1168,6 +1349,7 @@ const { initialSummits = 1 } = Astro.props;
             detail: {
               rolledAmount: remainFrac * 0.25,
               source: '★1%神迹登顶',
+              category: 'boost',
             },
           }),
         );
@@ -1202,23 +1384,61 @@ const { initialSummits = 1 } = Astro.props;
             maxM,
             rolledAmount: randM / PEAK_ALT,
             source,
+            category: 'boost',
           },
         }),
       );
     };
 
     window.addEventListener('sisyphus:boulder-boost', (ev: Event) => {
-      const d = (ev as CustomEvent<{ amount?: number; minM?: number; maxM?: number; rolledAmount?: number }>).detail;
+      const d = (
+        ev as CustomEvent<{
+          amount?: number;
+          minM?: number;
+          maxM?: number;
+          rolledAmount?: number;
+          category?: 'commit' | 'blog' | 'boost';
+          source?: string;
+        }>
+      ).detail;
       let amt = d?.rolledAmount;
       if (typeof amt !== 'number') {
         if (typeof d?.minM === 'number' && typeof d?.maxM === 'number') amt = (d.minM + Math.random() * (d.maxM - d.minM)) / PEAK_ALT;
         else amt = clamp(d?.amount ?? 0.018, 0.001, 0.12) * (0.58 + Math.random() * 0.87);
         if (d) d.rolledAmount = amt;
       }
-      applyBoost(amt, pendingAt, pendingTier);
+      applyBoost(amt, pendingAt, pendingTier, d?.category, d?.source);
       pendingAt = undefined;
       pendingTier = undefined;
     });
+
+    window.addEventListener('sisyphus:boulder-telemetry', (ev: Event) => {
+      const d = (
+        ev as CustomEvent<{
+          forgedCycles?: number;
+          totalCommits?: number;
+          todayCommits?: number;
+          postCount?: number;
+          blogTotalMeters?: number;
+          commitTotalMeters?: number;
+        }>
+      ).detail;
+      if (!d) return;
+      if (typeof d.forgedCycles === 'number') liveForgedCycles = d.forgedCycles;
+      if (typeof d.totalCommits === 'number') liveTotalCommits = d.totalCommits;
+      if (typeof d.todayCommits === 'number') liveTodayCommits = d.todayCommits;
+      if (typeof d.postCount === 'number') livePostCount = d.postCount;
+      if (typeof d.blogTotalMeters === 'number') liveBlogMeters = d.blogTotalMeters;
+      if (typeof d.commitTotalMeters === 'number') liveCommitMeters = d.commitTotalMeters;
+    });
+
+    commitChipBtn?.addEventListener('click', () => {
+      pulseKineticChip(commitChipBtn);
+      if (commitTextEl) commitTextEl.textContent = '同步 GitHub…';
+      window.dispatchEvent(new CustomEvent('sisyphus:sync-github'));
+    });
+
+    altTrackEl?.addEventListener('click', () => requestPush('轨迹助推'));
 
     const triggerEpicSummitCharge = () => {
       if (phase === 'CLIMB') {
@@ -2951,15 +3171,42 @@ const { initialSummits = 1 } = Astro.props;
     // ======================================================================
     // 13. DOM 文本
     // ======================================================================
+    const REALM_SIGILS: Record<Realm, string> = {
+      void: '♾ 星渊纪元',
+      paper: '§ 帝国纪元',
+      crt: '>_ 矩阵迭代',
+      amber: '◈ 沙丘历元',
+    };
+
+    const getCycleRank = (c: number) => {
+      if (c >= 100) return '永恒归来';
+      if (c >= 50) return '群峰立碑';
+      if (c >= 25) return '碎岩破壁';
+      if (c >= 12) return '逆风推山';
+      if (c >= 5) return '执石行者';
+      return '初抵山麓';
+    };
+
     const fmtEta = (ms: number) => {
       const s = Math.max(0, Math.floor(ms / 1000));
       const h = Math.floor(s / 3600);
       const m = Math.floor((s % 3600) / 60);
       return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s % 60).padStart(2, '0')}s`;
     };
+    const fmtCompactMeters = (m: number) => {
+      const r = Math.round(m);
+      return r >= 10000 ? `${(r / 1000).toFixed(1)}km` : `${r.toLocaleString()}m`;
+    };
+
     let lastTele = '';
     let lastQuote = '';
     let lastSr = 0;
+    let lastCycleShown = -1;
+    let lastPhaseShown = '';
+    let lastCommitChipStr = '';
+    let lastBlogChipStr = '';
+    let lastBoostChipStr = '';
+
     const updateDom = (now: number) => {
       const latest = getTotal(Date.now());
       const idx = Math.floor(latest);
@@ -2968,15 +3215,119 @@ const { initialSummits = 1 } = Astro.props;
       else if (phase === 'SUMMIT') p = 1;
       else if (phase === 'ROLL') p = clamp((rollX - PATH_X0) / (PATH_X1 - PATH_X0), 0, 1);
       else p = 0;
-      const alt = (p * PEAK_ALT).toFixed(1);
-      const filled = Math.round(p * 10);
-      const bar = '▪'.repeat(filled) + '▫'.repeat(10 - filled);
-      const boost = save.boostMeters >= 0.5 ? ` · BOOST +${Math.round(save.boostMeters)}m` : '';
-      const tele = `ALT ${alt}m [${bar}] ETA ${fmtEta((1 - p) * CYCLE_MS)} · #${baseSummits + idx}${boost}`;
+
+      const altNum = p * PEAK_ALT;
+      const alt = altNum.toFixed(1);
+      const pctStr = `${(p * 100).toFixed(1)}%`;
+      const etaStr =
+        phase === 'SUMMIT'
+          ? '★ PEAK REACHED'
+          : phase === 'ROLL'
+            ? '▼ GRAVITY FALL'
+            : phase === 'DESCENT'
+              ? '↺ RETURNING'
+              : `ETA ${fmtEta((1 - p) * CYCLE_MS)}`;
+
+      const totalCycle = Math.max(1, liveForgedCycles + idx);
+
+      // 1. 机械翻牌轮回计数器更新（位数变化时触发单格翻牌动效与峰顶辉光）
+      if (totalCycle !== lastCycleShown) {
+        const hadPrev = lastCycleShown > 0;
+        const grew = hadPrev && totalCycle > lastCycleShown;
+        lastCycleShown = totalCycle;
+
+        const digitsStr = String(Math.min(9999, totalCycle)).padStart(4, '0');
+        digitCells.forEach((cell, i) => {
+          const ch = digitsStr[i] || '0';
+          if (cell.textContent !== ch) {
+            cell.textContent = ch;
+            if (hadPrev) {
+              cell.classList.remove('is-flip');
+              void cell.offsetWidth;
+              cell.classList.add('is-flip');
+            }
+          }
+        });
+
+        if (grew && odometerPlaque) {
+          odometerPlaque.classList.remove('is-celebrating');
+          void odometerPlaque.offsetWidth;
+          odometerPlaque.classList.add('is-celebrating');
+          window.setTimeout(() => odometerPlaque.classList.remove('is-celebrating'), 1800);
+        }
+
+        if (epochStarsEl) {
+          const lit = ((totalCycle - 1) % 5) + 1;
+          const tierRoman = Math.floor((totalCycle - 1) / 5) + 1;
+          epochStarsEl.textContent = `T${tierRoman} ${'◈'.repeat(lit)}${'◇'.repeat(5 - lit)}`;
+        }
+        if (rankTagEl) {
+          rankTagEl.textContent = getCycleRank(totalCycle);
+        }
+      }
+
+      // 2. 阶段状态徽章
+      const phaseKey = `${phase}:${worldForce ? worldForce.dir : 0}:${epicCharge ? 1 : 0}`;
+      if (phaseKey !== lastPhaseShown && phasePillEl) {
+        lastPhaseShown = phaseKey;
+        phasePillEl.className = 'cycle-phase-pill';
+        if (phase === 'SUMMIT') {
+          phasePillEl.classList.add('is-summit');
+          phasePillEl.textContent = '★ 已登顶';
+        } else if (phase === 'ROLL') {
+          phasePillEl.classList.add('is-roll');
+          phasePillEl.textContent = '▼ 巨石滚落';
+        } else if (phase === 'DESCENT') {
+          phasePillEl.classList.add('is-descent');
+          phasePillEl.textContent = '↺ 从容下山';
+        } else if (epicCharge) {
+          phasePillEl.classList.add('is-summit');
+          phasePillEl.textContent = '⚡ 神迹冲顶';
+        } else if (worldForce && worldForce.dir === -1) {
+          phasePillEl.classList.add('is-roll');
+          phasePillEl.textContent = '⚠ 逆境死顶';
+        } else {
+          phasePillEl.classList.add('is-climb');
+          phasePillEl.textContent = '▲ 攀登中';
+        }
+      }
+
+      // 3. 海拔与进度槽
+      if (altValEl && altValEl.textContent !== `${alt}m`) altValEl.textContent = `${alt}m`;
+      if (pctValEl && pctValEl.textContent !== pctStr) pctValEl.textContent = pctStr;
+      if (etaValEl && etaValEl.textContent !== etaStr) etaValEl.textContent = etaStr;
+      if (altFillEl) altFillEl.style.width = `${(p * 100).toFixed(2)}%`;
+
+      // 4. 三源动能账本徽章 (GitHub Commits / 博文更新 / 实时助推)
+      const commitChipStr =
+        liveTotalCommits > 0
+          ? liveTodayCommits > 0
+            ? `${liveTotalCommits}提交 (今日+${liveTodayCommits})`
+            : `${liveTotalCommits}提交 · +${fmtCompactMeters(liveCommitMeters)}`
+          : 'Commits 同步中';
+      if (commitTextEl && commitChipStr !== lastCommitChipStr) {
+        commitTextEl.textContent = commitChipStr;
+        lastCommitChipStr = commitChipStr;
+      }
+
+      const blogChipStr = `博文 ${livePostCount}篇 · +${fmtCompactMeters(liveBlogMeters)}`;
+      if (blogTextEl && blogChipStr !== lastBlogChipStr) {
+        blogTextEl.textContent = blogChipStr;
+        lastBlogChipStr = blogChipStr;
+      }
+
+      const boostChipStr = `助推 +${fmtCompactMeters(save.boostMeters)}`;
+      if (boostTextEl && boostChipStr !== lastBoostChipStr) {
+        boostTextEl.textContent = boostChipStr;
+        lastBoostChipStr = boostChipStr;
+      }
+
+      const tele = `ALT ${alt}m · ${etaStr} · #${totalCycle}`;
       if (tele !== lastTele) {
         telemetryEl.textContent = tele;
         lastTele = tele;
       }
+
       if (tierTimer <= 0 && !epicCharge && !worldForce) {
         const q =
           phase === 'SUMMIT'
@@ -2998,7 +3349,13 @@ const { initialSummits = 1 } = Astro.props;
       if (srEl && now - lastSr > 2000) {
         lastSr = now;
         srEl.textContent =
-          phase === 'CLIMB' ? `西西弗斯正推石上山，海拔 ${alt} 米` : phase === 'SUMMIT' ? '西西弗斯登顶' : phase === 'ROLL' ? '巨石滚落' : '西西弗斯走下山去';
+          phase === 'CLIMB'
+            ? `第 ${totalCycle} 次轮回，西西弗斯正推石上山，海拔 ${alt} 米`
+            : phase === 'SUMMIT'
+              ? `第 ${totalCycle} 次轮回登顶`
+              : phase === 'ROLL'
+                ? '巨石滚落'
+                : '西西弗斯走下山去';
       }
     };
 
@@ -3011,6 +3368,7 @@ const { initialSummits = 1 } = Astro.props;
       bgEvent = { type: 0, t: 0.2, dur: 6.0, x0: 95, y0: 38, dir: 1 };
       buildStatic();
       if (titleEl) titleEl.textContent = TITLES[realm];
+      if (realmSigilEl) realmSigilEl.textContent = REALM_SIGILS[realm];
       lastQuote = '';
     };
     window.addEventListener('sisyphus:realmchange', syncRealm);
@@ -3020,6 +3378,7 @@ const { initialSummits = 1 } = Astro.props;
     // ======================================================================
     buildStatic();
     if (titleEl) titleEl.textContent = TITLES[realm];
+    if (realmSigilEl) realmSigilEl.textContent = REALM_SIGILS[realm];
     let last = performance.now();
     let lastDraw = 0;
     const frameGap = reduceMotion ? 80 : 33;
