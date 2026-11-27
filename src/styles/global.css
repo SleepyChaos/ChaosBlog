@@ -3,13 +3,15 @@
 :root[data-realm='void'] {
   /* 世界 01：星渊神殿 · ASTRAL MYTH（古典双线星盘 ASCII ╔═══╗） */
   --bg: #080913;
-  --bg-veil: rgba(8, 9, 19, 0.14);
-  --surface: rgba(16, 19, 36, 0.54);
-  --surface-strong: rgba(18, 22, 42, 0.72);
-  --surface-inner: rgba(12, 15, 30, 0.52);
+  --bg-veil: rgba(8, 9, 19, 0.04);
+  --surface: rgba(14, 18, 36, 0.36);
+  --surface-glass: rgba(12, 16, 32, 0.32);
+  --surface-strong: rgba(18, 22, 42, 0.74);
+  --surface-inner: rgba(10, 14, 28, 0.28);
   --surface-hud: rgba(15, 19, 38, 0.62);
-  --glass-rim: rgba(199, 210, 254, 0.22);
-  --bg-code: rgba(10, 13, 26, 0.76);
+  --glass-rim: rgba(199, 210, 254, 0.28);
+  --glass-sheen: rgba(199, 210, 254, 0.06);
+  --bg-code: rgba(8, 11, 24, 0.44);
 
   /* 高对比文字层（主文字 >16:1，次级文字 >8.5:1） */
   --text: #f3f5ff;
@@ -60,13 +62,15 @@
 /* 世界 02：浮世纸墨 · UKIYO SCROLL（宣纸版画印章 ASCII ┏━━━┓ · 朱砂与松烟墨） */
 :root[data-realm='paper'] {
   --bg: #f5f0e4;
-  --bg-veil: rgba(245, 240, 228, 0.12);
-  --surface: rgba(255, 252, 245, 0.66);
-  --surface-strong: rgba(255, 253, 248, 0.84);
-  --surface-inner: rgba(249, 244, 233, 0.62);
-  --surface-hud: rgba(255, 252, 245, 0.78);
-  --glass-rim: rgba(255, 255, 255, 0.90);
-  --bg-code: rgba(236, 229, 214, 0.78);
+  --bg-veil: rgba(245, 240, 228, 0.03);
+  --surface: rgba(255, 252, 245, 0.44);
+  --surface-glass: rgba(255, 252, 245, 0.40);
+  --surface-strong: rgba(255, 253, 248, 0.82);
+  --surface-inner: rgba(249, 244, 233, 0.32);
+  --surface-hud: rgba(255, 252, 245, 0.76);
+  --glass-rim: rgba(255, 255, 255, 0.82);
+  --glass-sheen: rgba(255, 255, 255, 0.22);
+  --bg-code: rgba(236, 229, 214, 0.46);
 
   /* 宣纸高对比浓墨与熟褐次级字（彻底杜绝浅灰看不清） */
   --text: #191613;
@@ -108,13 +112,15 @@
 /* 世界 03：霓虹矩阵 · CYBER ANSI（赛博半块像素 ASCII ▛▀▓▀▜ · 荧光绿与电光青洋红） */
 :root[data-realm='crt'] {
   --bg: #040b07;
-  --bg-veil: rgba(4, 11, 7, 0.16);
-  --surface: rgba(7, 22, 13, 0.58);
+  --bg-veil: rgba(4, 11, 7, 0.04);
+  --surface: rgba(6, 20, 12, 0.36);
+  --surface-glass: rgba(5, 18, 10, 0.32);
   --surface-strong: rgba(8, 27, 16, 0.76);
-  --surface-inner: rgba(5, 17, 10, 0.56);
+  --surface-inner: rgba(4, 14, 8, 0.28);
   --surface-hud: rgba(6, 22, 13, 0.68);
-  --glass-rim: rgba(52, 211, 153, 0.28);
-  --bg-code: rgba(4, 15, 8, 0.82);
+  --glass-rim: rgba(52, 211, 153, 0.34);
+  --glass-sheen: rgba(52, 211, 153, 0.07);
+  --bg-code: rgba(3, 12, 7, 0.46);
 
   --text: #ecfdf5;
   --text-muted: #8ce9b5;
@@ -152,13 +158,15 @@
 /* 世界 04：大漠星轨 · DUNE ASTROLABE（游牧黄铜星轨点阵 ASCII ╭─◈─╮ · 曜金与绿洲松石） */
 :root[data-realm='amber'] {
   --bg: #0f0a06;
-  --bg-veil: rgba(15, 10, 6, 0.15);
-  --surface: rgba(28, 19, 11, 0.56);
+  --bg-veil: rgba(15, 10, 6, 0.04);
+  --surface: rgba(26, 17, 10, 0.36);
+  --surface-glass: rgba(22, 14, 8, 0.32);
   --surface-strong: rgba(34, 23, 13, 0.75);
-  --surface-inner: rgba(22, 15, 9, 0.54);
+  --surface-inner: rgba(18, 12, 7, 0.28);
   --surface-hud: rgba(28, 19, 11, 0.66);
-  --glass-rim: rgba(251, 191, 36, 0.26);
-  --bg-code: rgba(18, 12, 7, 0.80);
+  --glass-rim: rgba(251, 191, 36, 0.32);
+  --glass-sheen: rgba(251, 191, 36, 0.06);
+  --bg-code: rgba(14, 9, 5, 0.45);
 
   /* 大幅提亮次级砂金文字对比度，彻底解决底色相近问题 */
   --text: #fff8eb;
@@ -247,13 +255,15 @@ h3,
   border-width: 3px;
 }
 
-/* 浮世纸墨专属：古典线装书虚实边框 */
+/* 浮世纸墨专属：古典线装书虚实玻璃边框 */
 :root[data-realm='paper'] .bento-card,
+:root[data-realm='paper'] .article-card,
 :root[data-realm='paper'] .ascent-box {
   border-style: solid;
   box-shadow:
     0 10px 26px -12px rgba(28, 25, 23, 0.14),
-    inset 0 0 0 3px color-mix(in srgb, var(--border) 36%, transparent);
+    inset 0 1px 0 var(--glass-rim),
+    inset 0 0 0 3px color-mix(in srgb, var(--border) 32%, transparent);
 }
 
 /* 大漠星轨专属：模块顶栏游牧织纹斜线 */
@@ -359,9 +369,7 @@ a:hover {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  /* 阅读区中央略微压暗背景细节，边缘保留完整景观 */
-  -webkit-mask-image: radial-gradient(ellipse 62% 58% at 50% 46%, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.82) 55%, #000 100%);
-  mask-image: radial-gradient(ellipse 62% 58% at 50% 46%, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.82) 55%, #000 100%);
+  /* 不对阅读区中央做遮罩压暗，让动态景观完整穿透上层半透明玻璃底板 */
   animation: backdrop-in 1.2s ease-out both;
 }
 
@@ -526,9 +534,16 @@ main.page-main {
 
 .bento-card {
   position: relative;
-  background: var(--surface);
-  -webkit-backdrop-filter: blur(18px) saturate(175%);
-  backdrop-filter: blur(18px) saturate(175%);
+  background:
+    linear-gradient(
+      155deg,
+      var(--glass-sheen) 0%,
+      transparent 40%,
+      color-mix(in srgb, var(--accent) 3%, transparent) 100%
+    ),
+    var(--surface);
+  -webkit-backdrop-filter: blur(7px) saturate(165%);
+  backdrop-filter: blur(7px) saturate(165%);
   border: 1px solid var(--border);
   border-radius: 2px;
   box-shadow: var(--shadow-card);
@@ -2255,13 +2270,45 @@ button.kinetic-chip:hover {
 
 .article-card {
   position: relative;
-  background: var(--surface-strong);
-  -webkit-backdrop-filter: blur(20px) saturate(175%);
-  backdrop-filter: blur(20px) saturate(175%);
+  background:
+    linear-gradient(
+      155deg,
+      var(--glass-sheen) 0%,
+      transparent 36%,
+      color-mix(in srgb, var(--accent) 3.5%, transparent) 100%
+    ),
+    var(--surface-glass);
+  -webkit-backdrop-filter: blur(5.5px) saturate(165%);
+  backdrop-filter: blur(5.5px) saturate(165%);
   border: 1px solid var(--border);
   border-radius: 2px;
-  box-shadow: var(--shadow-card);
+  box-shadow:
+    var(--shadow-card),
+    inset 1px 0 0 color-mix(in srgb, var(--glass-rim) 42%, transparent);
   padding: 1.75rem 2.1rem 2.2rem;
+}
+
+.article-card::before,
+.article-card::after {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1;
+  color: var(--accent);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.article-card::before {
+  content: var(--card-corner-tl);
+  top: 5px;
+  left: 6px;
+}
+
+.article-card::after {
+  content: var(--card-corner-br);
+  bottom: 5px;
+  right: 6px;
 }
 
 .back-link {
@@ -2316,11 +2363,14 @@ button.kinetic-chip:hover {
 }
 
 .ascent-box {
-  background: var(--surface);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  backdrop-filter: blur(22px) saturate(140%);
+  background:
+    linear-gradient(155deg, var(--glass-sheen) 0%, transparent 45%),
+    var(--surface);
+  -webkit-backdrop-filter: blur(6.5px) saturate(160%);
+  backdrop-filter: blur(6.5px) saturate(160%);
   border: 1px solid var(--border);
   border-radius: 2px;
+  box-shadow: var(--shadow-card);
   padding: 0.85rem 0.95rem;
   font-family: var(--font-mono);
   font-size: 0.76rem;
@@ -2603,14 +2653,30 @@ button.kinetic-chip:hover {
   color: var(--text-muted);
 }
 
-/* Shiki 暗色语法高亮适配（仅亮色宣纸模式保持浅色高亮） */
+/* Shiki 语法高亮与半透明毛玻璃代码底板适配（去除不透明实心色块，让背景光影柔和穿透） */
+.prose pre.astro-code {
+  background-color: var(--bg-code) !important;
+}
+
+.prose pre.astro-code span {
+  background-color: transparent !important;
+}
+
 :root:not([data-realm='paper']) .astro-code,
 :root:not([data-realm='paper']) .astro-code span {
   color: var(--shiki-dark, inherit) !important;
-  background-color: var(--shiki-dark-bg) !important;
   font-style: var(--shiki-dark-font-style) !important;
   font-weight: var(--shiki-dark-font-weight) !important;
   text-decoration: var(--shiki-dark-text-decoration) !important;
+}
+
+/* 轻微光学衬底描边：保证高通透玻璃底板在明亮星体/代码雨/天际线划过时文字依然清晰锐利 */
+:root:not([data-realm='paper']) .article-card .prose {
+  text-shadow: 0 1px 2px rgba(4, 6, 14, 0.42);
+}
+
+:root[data-realm='paper'] .article-card .prose {
+  text-shadow: 0 1px 1px rgba(255, 252, 245, 0.52);
 }
 
 .prose p {
@@ -2774,14 +2840,20 @@ button.kinetic-chip:hover {
   padding: 0.8rem 1rem;
   border: 1px solid var(--border);
   border-radius: 2px;
-  background: var(--surface-inner);
+  background:
+    linear-gradient(155deg, var(--glass-sheen) 0%, transparent 50%),
+    var(--surface-inner);
+  -webkit-backdrop-filter: blur(5px) saturate(160%);
+  backdrop-filter: blur(5px) saturate(160%);
+  box-shadow: inset 0 1px 0 var(--glass-rim);
   color: var(--text);
   font-size: 0.92rem;
-  transition: border-color 0.12s steps(2);
+  transition: border-color 0.12s steps(2), background-color 0.18s ease;
 }
 
 .post-nav a:hover {
   border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface-inner));
   text-decoration: none;
 }
 
@@ -2963,11 +3035,16 @@ button.kinetic-chip:hover {
   color: var(--accent);
 }
 
-/* 文章底部登顶界石堆（ASCII Cairn） */
+/* 文章底部登顶界石堆（ASCII Cairn · 高透玻璃底板） */
 .article-cairn-card {
   margin-top: 2.2rem;
   padding: 0.9rem 1.1rem;
-  background: var(--surface-inner);
+  background:
+    linear-gradient(155deg, var(--glass-sheen) 0%, transparent 48%),
+    var(--surface-inner);
+  -webkit-backdrop-filter: blur(5px) saturate(160%);
+  backdrop-filter: blur(5px) saturate(160%);
+  box-shadow: inset 0 1px 0 var(--glass-rim);
   border: 1px dashed var(--border-strong);
   border-radius: 2px;
   display: flex;
@@ -2982,7 +3059,7 @@ button.kinetic-chip:hover {
 .cairn-ascii-pile {
   margin: 0;
   padding: 0.3rem 0.65rem;
-  background: var(--stage-bg);
+  background: var(--bg-code);
   border: 1px solid var(--border);
   border-radius: 1px;
   font-family: Menlo, Monaco, Consolas, monospace;
@@ -3016,11 +3093,14 @@ button.kinetic-chip:hover {
   justify-content: space-between;
   gap: 0.6rem 1.2rem;
   padding: 0.75rem 1.05rem;
-  background: var(--surface);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  backdrop-filter: blur(20px) saturate(140%);
+  background:
+    linear-gradient(155deg, var(--glass-sheen) 0%, transparent 45%),
+    var(--surface);
+  -webkit-backdrop-filter: blur(6.5px) saturate(160%);
+  backdrop-filter: blur(6.5px) saturate(160%);
   border: 1px solid var(--border);
   border-radius: 2px;
+  box-shadow: var(--shadow-card);
   font-family: var(--font-mono);
   font-size: 0.76rem;
   color: var(--text-muted);
