@@ -1,0 +1,1161 @@
+---
+/**
+ * 全站四主题动态背景（固定在视口最底层，位于毛玻璃卡片之后）
+ * - void  · 2001 太空漫游：三层视差星空 + 银河带 + 木星与伽利略卫星 + 流星 + 发现号飞船 + 鼠标星座连线
+ * - paper · 基地 / 川陀：宣纸纤维 + 银河帝国星图（川陀↔端点星超空间跃迁航线）+ 心理史学方程 + 川陀摩天城市天际线与空中交通
+ * - crt   · 黑客帝国：代码雨 + 霓虹地平线线框城市 + 向镜头流动的透视网格地面 + 信号故障条纹
+ * - amber · 沙丘 / 厄拉科斯：双月 + 四层视差沙丘 + 风沙流 + 香料微光 + 沙虫潜行 + 扑翼机
+ * 背景风速与全站 8h 推石海拔 / 阅读心流耦合；支持 prefers-reduced-motion（只绘制静态一帧）。
+ */
+---
+
+<canvas id="bg-pixel-canvas" class="realm-backdrop" aria-hidden="true"></canvas>
+
+<script>
+  type RGB = [number, number, number];
+  type Layer = { c: HTMLCanvasElement; g: CanvasRenderingContext2D; w: number; h: number };
+
+  const TAU = Math.PI * 2;
+  const PAD = 70;
+  const root = document.documentElement;
+  const canvas = document.getElementById('bg-pixel-canvas') as HTMLCanvasElement | null;
+  const ctx = canvas?.getContext('2d') ?? null;
+
+  const toRgb = (raw: string, fb: RGB): RGB => {
+    const c = (raw || '').trim();
+    if (c.startsWith('#')) {
+      let h = c.slice(1);
+      if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+      const n = parseInt(h.slice(0, 6), 16);
+      if (Number.isFinite(n)) return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    const m = c.match(/[\d.]+/g);
+    if (m && m.length >= 3) return [+m[0], +m[1], +m[2]];
+    return fb;
+  };
+  const rgba = (c: RGB, a: number) =>
+    `rgba(${c[0]},${c[1]},${c[2]},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
+  const mulberry = (seed: number) => () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+  if (canvas && ctx) {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let W = 0;
+    let H = 0;
+    let DPR = 1;
+    let realm = root.dataset.realm || 'void';
+    let wind = 1;
+    let scrollS = window.scrollY;
+    let raf = 0;
+    let last = performance.now();
+    const mouse = { x: 0.5, y: 0.5, sx: 0.5, sy: 0.5, px: -9999, py: -9999, active: false };
+
+    let C: Record<string, RGB> = {};
+    const readPalette = () => {
+      const cs = getComputedStyle(root);
+      const g = (n: string, fb: RGB) => toRgb(cs.getPropertyValue(n), fb);
+      C = {
+        text: g('--text', [243, 245, 255]),
+        muted: g('--text-muted', [184, 194, 230]),
+        accent: g('--accent', [165, 180, 252]),
+        accent2: g('--accent-2', [56, 189, 248]),
+        accent3: g('--accent-3', [251, 191, 36]),
+        sky: g('--stage-sky', [253, 230, 138]),
+        far: g('--stage-far', [129, 140, 248]),
+        earth: g('--stage-earth', [136, 150, 199]),
+        ridge: g('--stage-ridge', [226, 232, 240]),
+        fire: g('--stage-fire', [255, 59, 92]),
+        bg: g('--bg', [8, 9, 19]),
+      };
+    };
+
+    const makeLayer = (w: number, h: number): Layer => {
+      const d = Math.min(DPR, 1.5);
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.ceil(w * d));
+      c.height = Math.max(1, Math.ceil(h * d));
+      const g = c.getContext('2d') as CanvasRenderingContext2D;
+      g.setTransform(d, 0, 0, d, 0, 0);
+      return { c, g, w, h };
+    };
+
+    // 视差偏移：鼠标 + 页面滚动（场景层限制滚动影响，星空层可无限卷动取模）
+    const par = (d: number, cap = 900) => ({
+      x: (0.5 - mouse.sx) * d * 40,
+      y: (0.5 - mouse.sy) * d * 24 - Math.min(scrollS, cap) * d * 0.035,
+    });
+    const layerPos = (L: Layer, d: number, bottom = false) => {
+      const o = par(d);
+      return {
+        x: -PAD + o.x,
+        y: bottom ? H - L.h + PAD * 0.5 + o.y * 0.6 : -PAD + o.y,
+      };
+    };
+    const blit = (L: Layer | undefined, d: number, bottom = false, alpha = 1) => {
+      if (!L) return;
+      const p = layerPos(L, d, bottom);
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(L.c, p.x, p.y, L.w, L.h);
+      ctx.globalAlpha = 1;
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let S: any = {};
+
+    /* ================================================================
+     * 01 · VOID — 2001: A Space Odyssey
+     * ================================================================ */
+    const buildVoid = () => {
+      const r = mulberry(2001);
+      const n = Math.min(560, Math.floor((W * H) / 3000));
+      const pick = () => {
+        const v = r();
+        return v < 0.1 ? C.accent3 : v < 0.28 ? C.accent2 : v < 0.4 ? C.accent : C.text;
+      };
+      S.stars = Array.from({ length: n }, (_, i) => {
+        const d = [0.12, 0.35, 0.8][i % 3];
+        return {
+          x: r() * W,
+          y: r() * H,
+          d,
+          s: (d < 0.2 ? 0.7 : d < 0.5 ? 1.1 : 1.5) + r() * 0.8,
+          ph: r() * TAU,
+          sp: 0.5 + r() * 2.4,
+          c: pick(),
+        };
+      });
+
+      const L = makeLayer(W + PAD * 2, H + PAD * 2);
+      const g = L.g;
+      const neb: [number, number, RGB, number][] = [
+        [0.18, 0.22, C.accent, 0.1],
+        [0.64, 0.1, C.accent2, 0.07],
+        [0.42, 0.72, C.far, 0.08],
+      ];
+      for (const [fx, fy, col, a] of neb) {
+        const cx = PAD + W * fx;
+        const cy = PAD + H * fy;
+        const rr = Math.max(W, H) * 0.45;
+        const gr = g.createRadialGradient(cx, cy, 0, cx, cy, rr);
+        gr.addColorStop(0, rgba(col, a));
+        gr.addColorStop(1, rgba(col, 0));
+        g.fillStyle = gr;
+        g.fillRect(0, 0, L.w, L.h);
+      }
+      // 银河带：沿对角线高斯散布的微尘
+      for (let i = 0; i < 1500; i++) {
+        const u = r();
+        const x = u * L.w;
+        const spread = (r() + r() + r() - 1.5) * Math.min(W, H) * 0.12;
+        const y = L.h * 0.92 - u * L.h * 0.85 + spread;
+        g.fillStyle = rgba(C.text, 0.04 + r() * 0.14);
+        const s = r() < 0.92 ? 0.8 : 1.5;
+        g.fillRect(x, y, s, s);
+      }
+
+      // 木星
+      const R = Math.max(140, Math.min(400, Math.min(W, H) * 0.34));
+      const J = makeLayer(R * 2 + 48, R * 2 + 48);
+      const jg = J.g;
+      const jc = R + 24;
+      jg.save();
+      jg.beginPath();
+      jg.arc(jc, jc, R, 0, TAU);
+      jg.clip();
+      const bands = ['#f3dcb0', '#c99363', '#ecc895', '#a86d45', '#f4e2bf', '#bb7f52', '#e4bb88', '#9c623d', '#efd7ad'];
+      let y = jc - R;
+      let bi = 0;
+      while (y < jc + R) {
+        const bh = R * (0.05 + r() * 0.1);
+        jg.fillStyle = bands[bi % bands.length];
+        jg.beginPath();
+        jg.moveTo(jc - R - 6, y);
+        for (let x = jc - R - 6; x <= jc + R + 6; x += 6) {
+          jg.lineTo(x, y + Math.sin(x * 0.045 + bi * 1.3) * R * 0.01);
+        }
+        jg.lineTo(jc + R + 6, y + bh + 3);
+        jg.lineTo(jc - R - 6, y + bh + 3);
+        jg.closePath();
+        jg.fill();
+        y += bh;
+        bi++;
+      }
+      jg.fillStyle = '#b5523b';
+      jg.beginPath();
+      jg.ellipse(jc - R * 0.32, jc + R * 0.24, R * 0.15, R * 0.08, 0, 0, TAU);
+      jg.fill();
+      const sh = jg.createRadialGradient(jc - R * 0.5, jc - R * 0.55, R * 0.1, jc, jc, R * 1.05);
+      sh.addColorStop(0, 'rgba(255,255,255,0.14)');
+      sh.addColorStop(0.5, 'rgba(0,0,0,0.08)');
+      sh.addColorStop(1, rgba(C.bg, 0.94));
+      jg.fillStyle = sh;
+      jg.fillRect(0, 0, J.w, J.h);
+      jg.restore();
+      jg.strokeStyle = rgba(C.accent2, 0.4);
+      jg.lineWidth = 1.5;
+      jg.shadowColor = rgba(C.accent2, 0.7);
+      jg.shadowBlur = 18;
+      jg.beginPath();
+      jg.arc(jc, jc, R, Math.PI * 0.95, Math.PI * 1.62);
+      jg.stroke();
+
+      const jx = PAD + W * 0.92;
+      const jy = PAD + H * 0.9;
+      g.globalAlpha = 0.5;
+      g.drawImage(J.c, jx - jc, jy - jc, J.w, J.h);
+      g.globalAlpha = 1;
+      g.fillStyle = rgba(C.ridge, 0.6);
+      for (const [dx, dy, rr] of [
+        [-1.32, -0.78, 2.6],
+        [-1.6, -0.42, 1.8],
+        [-1.15, -1.05, 1.5],
+      ]) {
+        g.beginPath();
+        g.arc(jx + R * dx, jy + R * dy, rr, 0, TAU);
+        g.fill();
+      }
+      S.far = L;
+      S.meteors = [];
+      S.nextMeteor = performance.now() + 2500;
+      S.ship = null;
+      S.nextShip = performance.now() + 7000 + Math.random() * 8000;
+    };
+
+    const drawVoid = (t: number, dt: number) => {
+      blit(S.far, 0.18);
+      const near: [number, number][] = [];
+      for (const s of S.stars) {
+        const o = par(s.d, 1e9);
+        const x = (((s.x + o.x) % W) + W) % W;
+        const y = (((s.y + o.y) % H) + H) % H;
+        const tw = 0.55 + 0.45 * Math.sin(t * 0.001 * s.sp + s.ph);
+        const a = (0.22 + s.d * 0.6) * tw;
+        ctx.fillStyle = rgba(s.c, a);
+        ctx.fillRect(x, y, s.s, s.s);
+        if (s.s > 2 && tw > 0.92) {
+          ctx.fillStyle = rgba(s.c, a * 0.45);
+          ctx.fillRect(x - 3, y + s.s / 2 - 0.4, 6 + s.s, 0.8);
+          ctx.fillRect(x + s.s / 2 - 0.4, y - 3, 0.8, 6 + s.s);
+        }
+        if (mouse.active && s.d > 0.5 && near.length < 26) {
+          const dx = x - mouse.px;
+          const dy = y - mouse.py;
+          if (dx * dx + dy * dy < 175 * 175) near.push([x, y]);
+        }
+      }
+      // 鼠标附近的星座连线
+      if (near.length > 1) {
+        ctx.lineWidth = 0.7;
+        for (let i = 0; i < near.length; i++) {
+          for (let j = i + 1; j < near.length; j++) {
+            const dx = near[i][0] - near[j][0];
+            const dy = near[i][1] - near[j][1];
+            const d = Math.sqrt(dx * dx + dy * dy);
+            if (d < 100) {
+              ctx.strokeStyle = rgba(C.accent, (1 - d / 100) * 0.38);
+              ctx.beginPath();
+              ctx.moveTo(near[i][0], near[i][1]);
+              ctx.lineTo(near[j][0], near[j][1]);
+              ctx.stroke();
+            }
+          }
+        }
+      }
+      // 流星
+      if (t > S.nextMeteor) {
+        S.nextMeteor = t + (3500 + Math.random() * 7000) / Math.max(0.6, wind);
+        const ang = 0.3 + Math.random() * 0.4;
+        const sp = 620 + Math.random() * 520;
+        S.meteors.push({
+          x: Math.random() * W * 0.85,
+          y: Math.random() * H * 0.45,
+          vx: Math.cos(ang) * sp,
+          vy: Math.sin(ang) * sp,
+          sp,
+          life: 0,
+          max: 0.6 + Math.random() * 0.6,
+        });
+      }
+      S.meteors = S.meteors.filter((m: any) => {
+        m.life += dt;
+        m.x += m.vx * dt;
+        m.y += m.vy * dt;
+        const a = Math.sin(Math.PI * clamp01(m.life / m.max));
+        const tx = m.x - (m.vx / m.sp) * 110;
+        const ty = m.y - (m.vy / m.sp) * 110;
+        const gr = ctx.createLinearGradient(m.x, m.y, tx, ty);
+        gr.addColorStop(0, rgba(C.text, 0.8 * a));
+        gr.addColorStop(1, rgba(C.accent2, 0));
+        ctx.strokeStyle = gr;
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.moveTo(m.x, m.y);
+        ctx.lineTo(tx, ty);
+        ctx.stroke();
+        return m.life < m.max;
+      });
+      // 发现号飞船缓慢掠过
+      if (!S.ship && t > S.nextShip) {
+        S.ship = { x: -90, y: H * (0.14 + Math.random() * 0.22), v: 14 + Math.random() * 10 };
+      }
+      if (S.ship) {
+        const sp = S.ship;
+        sp.x += sp.v * dt * Math.min(1.6, wind);
+        const fade = clamp01(Math.min((sp.x + 90) / 160, (W + 90 - sp.x) / 160));
+        ctx.save();
+        ctx.translate(sp.x, sp.y);
+        ctx.globalAlpha = 0.42 * fade;
+        ctx.fillStyle = rgba(C.text, 1);
+        ctx.beginPath();
+        ctx.arc(0, 0, 3.4, 0, TAU);
+        ctx.fill();
+        ctx.fillRect(-48, -0.6, 48, 1.2);
+        ctx.fillRect(-26, -1.8, 3, 3.6);
+        ctx.fillRect(-36, -1.4, 2, 2.8);
+        ctx.fillRect(-56, -3.2, 9, 6.4);
+        const eg = ctx.createRadialGradient(-58, 0, 0, -58, 0, 8);
+        eg.addColorStop(0, rgba(C.accent2, 0.9));
+        eg.addColorStop(1, rgba(C.accent2, 0));
+        ctx.fillStyle = eg;
+        ctx.fillRect(-66, -8, 16, 16);
+        ctx.restore();
+        if (sp.x > W + 100) {
+          S.ship = null;
+          S.nextShip = t + 25000 + Math.random() * 25000;
+        }
+      }
+    };
+
+    /* ================================================================
+     * 02 · PAPER — Foundation / Trantor
+     * ================================================================ */
+    const EQUATIONS = [
+      'Σ ψᵢ·Pᵢ(t)',
+      '∂S/∂t ≥ 0',
+      'P(Δ) = 0.997',
+      'ψ(t+1) = M·ψ(t)',
+      '∫ ρ dV',
+      'lim N→∞',
+      'σ² ∝ 1/N',
+      '∴ 1000 yrs',
+      '§ SELDON PLAN',
+      'Ψ',
+      '∞',
+      'Δ',
+      'E[H] → 30 000 → 1 000',
+    ];
+
+    const buildCity = (seed: number, alpha: number, hMul: number, wMin: number, wMax: number, windows: boolean, skyH: number) => {
+      const rr = mulberry(seed);
+      const L = makeLayer(W + PAD * 2, skyH + PAD * 0.5);
+      const g = L.g;
+      const base = L.h;
+      const beacons: [number, number][] = [];
+      let x = -12;
+      while (x < L.w + 12) {
+        const bw = wMin + rr() * (wMax - wMin);
+        const bh = skyH * (0.22 + rr() * 0.72) * hMul + PAD * 0.5;
+        let tx = x;
+        let tw = bw;
+        let ty = base;
+        const tiers = [0.62, 0.24, 0.14];
+        const nt = 1 + Math.floor(rr() * 3);
+        g.fillStyle = rgba(C.text, alpha);
+        for (let k = 0; k < nt; k++) {
+          const h = bh * (nt === 1 ? 1 : tiers[k] / tiers.slice(0, nt).reduce((a, b) => a + b, 0));
+          g.fillRect(tx, ty - h, tw, h);
+          if (windows && tw > 8) {
+            g.fillStyle = rgba(C.bg, 0.6);
+            for (let wy = ty - h + 4; wy < ty - 4; wy += 5) {
+              for (let wx = tx + 2.5; wx < tx + tw - 2.5; wx += 4) {
+                if (rr() < 0.35) g.fillRect(wx, wy, 1.4, 1.6);
+              }
+            }
+            g.fillStyle = rgba(C.text, alpha);
+          }
+          ty -= h;
+          tx += tw * 0.13;
+          tw *= 0.74;
+        }
+        if (rr() < 0.38) {
+          const sh = bh * (0.12 + rr() * 0.14);
+          g.fillRect(tx + tw / 2 - 0.75, ty - sh, 1.5, sh);
+          beacons.push([tx + tw / 2, ty - sh]);
+        }
+        if (rr() < 0.18 && x > 0) {
+          const by = base - bh * (0.3 + rr() * 0.3);
+          g.fillRect(x - 10, by, 14, 1.2);
+        }
+        x += bw + rr() * 5;
+      }
+      return { L, beacons };
+    };
+
+    const buildPaper = () => {
+      const r = mulberry(1951);
+      const L = makeLayer(W + PAD * 2, H + PAD * 2);
+      const g = L.g;
+      // 宣纸纤维
+      g.lineWidth = 0.6;
+      const nf = Math.min(2400, Math.floor((L.w * L.h) / 650));
+      for (let i = 0; i < nf; i++) {
+        const x = r() * L.w;
+        const y = r() * L.h;
+        const len = 3 + r() * 13;
+        const ang = r() * TAU;
+        g.strokeStyle = rgba(C.muted, 0.03 + r() * 0.05);
+        g.beginPath();
+        g.moveTo(x, y);
+        g.quadraticCurveTo(x + Math.cos(ang + 0.6) * len * 0.5, y + Math.sin(ang + 0.6) * len * 0.5, x + Math.cos(ang) * len, y + Math.sin(ang) * len);
+        g.stroke();
+      }
+      // 银河帝国星图
+      const gx = PAD + W * 0.8;
+      const gy = PAD + H * 0.3;
+      const GR = Math.max(170, Math.min(W, H) * 0.42);
+      const core = g.createRadialGradient(gx, gy, 0, gx, gy, GR * 0.38);
+      core.addColorStop(0, rgba(C.accent, 0.12));
+      core.addColorStop(1, rgba(C.accent, 0));
+      g.fillStyle = core;
+      g.fillRect(gx - GR, gy - GR, GR * 2, GR * 2);
+      const tilt = -0.35;
+      g.save();
+      g.translate(gx, gy);
+      g.rotate(tilt);
+      g.setLineDash([2, 5]);
+      g.lineWidth = 0.8;
+      for (let k = 1; k <= 5; k++) {
+        g.strokeStyle = rgba(C.text, 0.08);
+        g.beginPath();
+        g.ellipse(0, 0, (GR * k) / 5, ((GR * k) / 5) * 0.55, 0, 0, TAU);
+        g.stroke();
+      }
+      g.setLineDash([]);
+      S.mapStars = [];
+      let terminus: [number, number] = [gx + GR, gy];
+      const toWorld = (px: number, py: number): [number, number] => [
+        gx + px * Math.cos(tilt) - py * Math.sin(tilt) - PAD,
+        gy + px * Math.sin(tilt) + py * Math.cos(tilt) - PAD,
+      ];
+      for (let arm = 0; arm < 2; arm++) {
+        for (let i = 0; i < 280; i++) {
+          const tt = i / 280;
+          const th = arm * Math.PI + tt * 4.2;
+          const rad = GR * 0.08 + tt * GR * 0.9;
+          const px = Math.cos(th) * rad + (r() - 0.5) * GR * 0.1 * (0.4 + tt);
+          const py = (Math.sin(th) * rad + (r() - 0.5) * GR * 0.07) * 0.55;
+          g.fillStyle = rgba(C.text, 0.08 + r() * 0.18 * (1 - tt * 0.5));
+          const s = r() < 0.08 ? 1.9 : 1;
+          g.fillRect(px, py, s, s);
+          if (i % 23 === 9) S.mapStars.push(toWorld(px, py));
+          if (arm === 0 && i === 276) terminus = toWorld(px, py);
+        }
+      }
+      g.restore();
+      S.trantor = [gx - PAD, gy - PAD];
+      S.terminus = terminus;
+      g.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+      g.strokeStyle = rgba(C.text, 0.4);
+      g.lineWidth = 0.8;
+      g.beginPath();
+      g.moveTo(gx - 12, gy);
+      g.lineTo(gx + 12, gy);
+      g.moveTo(gx, gy - 12);
+      g.lineTo(gx, gy + 12);
+      g.stroke();
+      g.beginPath();
+      g.arc(gx, gy, 5, 0, TAU);
+      g.stroke();
+      g.fillStyle = rgba(C.text, 0.42);
+      g.fillText('TRANTOR · 0.0.0', gx + 10, gy - 9);
+      const tx = terminus[0] + PAD;
+      const ty = terminus[1] + PAD;
+      g.strokeStyle = rgba(C.accent, 0.6);
+      g.beginPath();
+      g.arc(tx, ty, 6, 0, TAU);
+      g.stroke();
+      g.fillStyle = rgba(C.accent, 0.6);
+      g.beginPath();
+      g.arc(tx, ty, 2, 0, TAU);
+      g.fill();
+      g.fillText('TERMINUS · PERIPHERY', tx + 10, ty + 3);
+      g.fillStyle = rgba(C.text, 0.26);
+      g.fillText('GALACTIC EMPIRE · 12,067 G.E. · PRIME RADIANT', gx - GR * 0.7, gy + GR * 0.7);
+      // 左侧坐标刻度
+      g.strokeStyle = rgba(C.text, 0.16);
+      g.fillStyle = rgba(C.text, 0.2);
+      g.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+      for (let y2 = PAD + 120; y2 < PAD + H * 0.66; y2 += 40) {
+        const major = Math.round(y2 - PAD) % 200 === 0;
+        g.beginPath();
+        g.moveTo(PAD + 6, y2);
+        g.lineTo(PAD + 6 + (major ? 9 : 4), y2);
+        g.stroke();
+        if (major) g.fillText(String(Math.round(y2 - PAD)).padStart(4, '0'), PAD + 18, y2 + 3);
+      }
+      S.far = L;
+
+      const skyH = Math.min(300, Math.max(150, H * 0.3));
+      const back = buildCity(4127, 0.055, 1.25, 18, 52, false, skyH);
+      const front = buildCity(9311, 0.1, 0.78, 12, 40, true, skyH);
+      // 谢顿穹顶
+      const fg = front.L.g;
+      const dx = PAD + W * 0.3;
+      fg.fillStyle = rgba(C.text, 0.1);
+      fg.beginPath();
+      fg.arc(dx, front.L.h, Math.min(64, skyH * 0.32), Math.PI, 0);
+      fg.fill();
+      fg.strokeStyle = rgba(C.accent, 0.22);
+      fg.lineWidth = 1;
+      for (let k = 1; k < 4; k++) {
+        fg.beginPath();
+        fg.arc(dx, front.L.h, Math.min(64, skyH * 0.32) * (k / 4), Math.PI, 0);
+        fg.stroke();
+      }
+      S.cityBack = back.L;
+      S.cityFront = front.L;
+      S.beacons = front.beacons;
+      S.skyH = skyH;
+      S.routes = [];
+      S.nextRoute = performance.now() + 1200;
+      S.eqs = [];
+      S.cars = Array.from({ length: 16 }, () => ({
+        x: Math.random() * W,
+        y: H - skyH * (0.25 + Math.random() * 0.6),
+        v: (18 + Math.random() * 36) * (Math.random() < 0.5 ? -1 : 1),
+      }));
+    };
+
+    const drawPaper = (t: number, dt: number) => {
+      blit(S.far, 0.12);
+      const o = layerPos(S.far, 0.12);
+      const ox = o.x + PAD;
+      const oy = o.y + PAD;
+      // 超空间跃迁航线
+      if (t > S.nextRoute && S.routes.length < 3 && S.mapStars.length > 4) {
+        const ms = S.mapStars;
+        const a = Math.random() < 0.3 ? S.terminus : ms[Math.floor(Math.random() * ms.length)];
+        const b = Math.random() < 0.35 ? S.trantor : ms[Math.floor(Math.random() * ms.length)];
+        if (a !== b) S.routes.push({ a, b, life: 0, max: 5 });
+        S.nextRoute = t + 2200 + Math.random() * 3500;
+      }
+      S.routes = S.routes.filter((rt: any) => {
+        rt.life += dt;
+        const p = clamp01(rt.life / 2);
+        const fade = rt.life > rt.max - 1.3 ? clamp01((rt.max - rt.life) / 1.3) : 1;
+        const ax = rt.a[0] + ox;
+        const ay = rt.a[1] + oy;
+        const bx = rt.b[0] + ox;
+        const by = rt.b[1] + oy;
+        const mx = (ax + bx) / 2 - (by - ay) * 0.3;
+        const my = (ay + by) / 2 + (bx - ax) * 0.3;
+        const pt = (k: number) => [
+          (1 - k) * (1 - k) * ax + 2 * (1 - k) * k * mx + k * k * bx,
+          (1 - k) * (1 - k) * ay + 2 * (1 - k) * k * my + k * k * by,
+        ];
+        ctx.setLineDash([3, 4]);
+        ctx.strokeStyle = rgba(C.accent2, 0.5 * fade);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        for (let k = 1; k <= 24; k++) {
+          const q = pt((k / 24) * p);
+          ctx.lineTo(q[0], q[1]);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const h = pt(p);
+        ctx.fillStyle = rgba(C.accent, 0.75 * fade);
+        ctx.beginPath();
+        ctx.arc(h[0], h[1], p < 1 ? 2.2 : 1.6, 0, TAU);
+        ctx.fill();
+        if (p >= 1) {
+          const ring = (rt.life - 2) * 14;
+          ctx.strokeStyle = rgba(C.accent, 0.4 * fade * clamp01(1 - ring / 30));
+          ctx.beginPath();
+          ctx.arc(bx, by, ring, 0, TAU);
+          ctx.stroke();
+        }
+        return rt.life < rt.max;
+      });
+      // 心理史学方程（渐入渐出漂浮）
+      while (S.eqs.length < Math.min(13, Math.floor(W / 110))) {
+        S.eqs.push({
+          txt: EQUATIONS[Math.floor(Math.random() * EQUATIONS.length)],
+          x: Math.random() * W * 0.92,
+          y: H * 0.14 + Math.random() * H * 0.56,
+          life: -Math.random() * 6,
+          max: 9 + Math.random() * 8,
+          vy: 3 + Math.random() * 5,
+          size: 11 + Math.random() * 8,
+          red: Math.random() < 0.25,
+        });
+      }
+      S.eqs = S.eqs.filter((e: any) => {
+        e.life += dt;
+        if (e.life < 0) return true;
+        e.y -= e.vy * dt * wind;
+        const a = Math.sin(Math.PI * clamp01(e.life / e.max)) * 0.22;
+        ctx.font = `italic ${e.size.toFixed(0)}px 'Songti SC', Georgia, serif`;
+        ctx.fillStyle = rgba(e.red ? C.accent : C.text, a);
+        ctx.fillText(e.txt, e.x, e.y);
+        return e.life < e.max;
+      });
+      // 川陀城市天际线 + 空中交通 + 航标灯
+      blit(S.cityBack, 0.3, true);
+      for (const c of S.cars) {
+        c.x += c.v * dt * Math.min(1.8, wind);
+        if (c.x > W + 10) c.x = -10;
+        if (c.x < -10) c.x = W + 10;
+        ctx.fillStyle = rgba(C.text, 0.28);
+        ctx.fillRect(c.x, c.y, 3.5, 1.1);
+        ctx.fillStyle = rgba(C.accent, 0.35);
+        ctx.fillRect(c.v > 0 ? c.x + 3.5 : c.x - 1, c.y, 1, 1.1);
+      }
+      blit(S.cityFront, 0.55, true);
+      const fp = layerPos(S.cityFront, 0.55, true);
+      S.beacons.forEach((b: [number, number], i: number) => {
+        const blink = Math.sin(t * 0.0028 + i * 1.7);
+        if (blink > 0.55) {
+          ctx.fillStyle = rgba(C.accent, 0.75 * (blink - 0.55) * 2.2);
+          ctx.beginPath();
+          ctx.arc(fp.x + b[0], fp.y + b[1], 1.8, 0, TAU);
+          ctx.fill();
+        }
+      });
+      // 鼠标朱砂罗盘印
+      if (mouse.active) {
+        ctx.strokeStyle = rgba(C.accent, 0.24);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(mouse.px, mouse.py, 15, 0, TAU);
+        ctx.stroke();
+        ctx.beginPath();
+        for (let k = 0; k < 4; k++) {
+          const a = (k * Math.PI) / 2 + t * 0.0004;
+          ctx.moveTo(mouse.px + Math.cos(a) * 19, mouse.py + Math.sin(a) * 19);
+          ctx.lineTo(mouse.px + Math.cos(a) * 27, mouse.py + Math.sin(a) * 27);
+        }
+        ctx.stroke();
+      }
+    };
+
+    /* ================================================================
+     * 03 · CRT — The Matrix
+     * ================================================================ */
+    const RAIN = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ012345789Z:.=*+-<>¦|';
+    const rc = () => RAIN[Math.floor(Math.random() * RAIN.length)];
+    const CW = 18;
+
+    const resetCol = (col: any, initial = false) => {
+      col.y = initial ? Math.random() * H * 0.9 - H * 0.3 : -Math.random() * H * 0.5;
+      col.sp = 55 + Math.random() * 150;
+      col.len = 6 + Math.floor(Math.random() * 20);
+      col.on = Math.random() < 0.55;
+    };
+
+    const buildCrt = () => {
+      const r = mulberry(1999);
+      S.hz = Math.round(H * 0.72);
+      const top = 150;
+      const L = makeLayer(W + PAD * 2, H - S.hz + PAD * 0.5 + top);
+      const g = L.g;
+      const glow = g.createLinearGradient(0, top - 70, 0, top + 50);
+      glow.addColorStop(0, rgba(C.accent, 0));
+      glow.addColorStop(0.58, rgba(C.accent, 0.13));
+      glow.addColorStop(1, rgba(C.accent, 0));
+      g.fillStyle = glow;
+      g.fillRect(0, top - 70, L.w, 120);
+      const floor = g.createLinearGradient(0, top, 0, L.h);
+      floor.addColorStop(0, rgba(C.accent, 0.05));
+      floor.addColorStop(1, rgba(C.accent2, 0.02));
+      g.fillStyle = floor;
+      g.fillRect(0, top, L.w, L.h - top);
+      let x = -10;
+      while (x < L.w) {
+        const bw = 16 + r() * 46;
+        const bh = 18 + r() * 125 * (0.5 + 0.5 * Math.sin(x * 0.004 + 1.2) ** 2);
+        g.fillStyle = rgba(C.bg, 0.65);
+        g.fillRect(x, top - bh, bw, bh);
+        g.strokeStyle = rgba(C.accent, 0.18);
+        g.lineWidth = 1;
+        g.strokeRect(x + 0.5, top - bh + 0.5, bw - 1, bh);
+        g.strokeStyle = rgba(C.accent, 0.06);
+        for (let wy = top - bh + 5; wy < top - 2; wy += 6) {
+          g.beginPath();
+          g.moveTo(x + 3, wy);
+          g.lineTo(x + bw - 3, wy);
+          g.stroke();
+        }
+        if (r() < 0.25) {
+          g.strokeStyle = rgba(C.accent2, 0.22);
+          g.beginPath();
+          g.moveTo(x + bw / 2, top - bh);
+          g.lineTo(x + bw / 2, top - bh - 14 - r() * 18);
+          g.stroke();
+        }
+        x += bw + r() * 10;
+      }
+      g.strokeStyle = rgba(C.accent, 0.45);
+      g.beginPath();
+      g.moveTo(0, top + 0.5);
+      g.lineTo(L.w, top + 0.5);
+      g.stroke();
+      S.city = L;
+      S.cityTop = top;
+      S.cols = Array.from({ length: Math.ceil(W / CW) }, (_, i) => {
+        const col: any = { x: i * CW + 2, chars: Array.from({ length: 64 }, rc) };
+        resetCol(col, true);
+        return col;
+      });
+      S.glitch = null;
+      S.nextGlitch = performance.now() + 4000;
+    };
+
+    const drawCrt = (t: number, dt: number) => {
+      const hz = S.hz;
+      // 代码雨
+      ctx.font = `${CW - 4}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+      ctx.textBaseline = 'top';
+      for (const col of S.cols) {
+        const near = mouse.active && Math.abs(col.x - mouse.px) < 70;
+        col.y += col.sp * dt * wind * (near ? 1.9 : 1);
+        if (Math.random() < 0.04) col.chars[Math.floor(Math.random() * 64)] = rc();
+        const head = Math.floor(col.y / CW);
+        if ((head - col.len) * CW > hz + 40) resetCol(col);
+        if (!col.on && !near) continue;
+        for (let j = 0; j <= col.len; j++) {
+          const row = head - j;
+          const y = row * CW;
+          if (y < -CW || y > hz + 30) continue;
+          const fade = clamp01((hz + 30 - y) / 150);
+          const a = (j === 0 ? (near ? 0.95 : 0.7) : (1 - j / col.len) * (near ? 0.5 : 0.3)) * fade;
+          ctx.fillStyle = j === 0 ? rgba(C.text, a) : rgba(C.accent, a);
+          ctx.fillText(col.chars[((row % 64) + 64) % 64], col.x, y);
+        }
+      }
+      ctx.textBaseline = 'alphabetic';
+      // 地平线城市
+      blit(S.city, 0.45, true);
+      const cp = layerPos(S.city, 0.45, true);
+      const hy = cp.y + S.cityTop;
+      const vx = W / 2 + par(0.7).x;
+      // 透视网格地面
+      ctx.lineWidth = 1;
+      for (let i = -26; i <= 26; i++) {
+        ctx.strokeStyle = rgba(C.accent, 0.1 - Math.abs(i) * 0.0025);
+        ctx.beginPath();
+        ctx.moveTo(vx + i * W * 0.012, hy);
+        ctx.lineTo(vx + i * W * 0.09, H);
+        ctx.stroke();
+      }
+      const phase = (t * 0.00022 * wind) % 1;
+      for (let k = 0; k < 15; k++) {
+        const z = (k + phase) / 15;
+        const y = hy + (H - hy) * Math.pow(z, 2.3);
+        ctx.strokeStyle = rgba(C.accent, 0.03 + z * 0.17);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(W, y);
+        ctx.stroke();
+      }
+      // 信号故障条纹
+      if (t > S.nextGlitch) {
+        S.glitch = { y: Math.random() * H, h: 2 + Math.random() * 8, until: t + 90 + Math.random() * 140 };
+        S.nextGlitch = t + 4500 + Math.random() * 8000;
+      }
+      if (S.glitch && t < S.glitch.until) {
+        const gl = S.glitch;
+        ctx.fillStyle = rgba(C.accent2, 0.1);
+        ctx.fillRect(0, gl.y, W, gl.h);
+        ctx.fillStyle = rgba(C.accent3, 0.12);
+        ctx.fillRect(Math.random() * W * 0.6, gl.y + gl.h, W * 0.25, 1);
+      }
+      // 鼠标瞄准角框
+      if (mouse.active) {
+        const s = 11;
+        ctx.strokeStyle = rgba(C.accent, 0.45);
+        ctx.beginPath();
+        for (const [sx, sy] of [
+          [-1, -1],
+          [1, -1],
+          [-1, 1],
+          [1, 1],
+        ]) {
+          const cx = mouse.px + sx * s;
+          const cy = mouse.py + sy * s;
+          ctx.moveTo(cx, cy - sy * 5);
+          ctx.lineTo(cx, cy);
+          ctx.lineTo(cx - sx * 5, cy);
+        }
+        ctx.stroke();
+      }
+    };
+
+    /* ================================================================
+     * 04 · AMBER — Dune / Arrakis
+     * ================================================================ */
+    const drawMoon = (g: CanvasRenderingContext2D, cx: number, cy: number, R: number, r: () => number) => {
+      const halo = g.createRadialGradient(cx, cy, R * 0.8, cx, cy, R * 3.4);
+      halo.addColorStop(0, rgba(C.accent, 0.1));
+      halo.addColorStop(1, rgba(C.accent, 0));
+      g.fillStyle = halo;
+      g.fillRect(cx - R * 3.5, cy - R * 3.5, R * 7, R * 7);
+      g.save();
+      g.beginPath();
+      g.arc(cx, cy, R, 0, TAU);
+      g.clip();
+      const body = g.createRadialGradient(cx - R * 0.35, cy - R * 0.35, R * 0.1, cx, cy, R);
+      body.addColorStop(0, rgba(C.ridge, 0.62));
+      body.addColorStop(1, rgba(C.earth, 0.5));
+      g.fillStyle = body;
+      g.fillRect(cx - R, cy - R, R * 2, R * 2);
+      for (let i = 0; i < 7; i++) {
+        g.fillStyle = rgba(C.earth, 0.22 + r() * 0.2);
+        g.beginPath();
+        g.arc(cx + (r() - 0.5) * R * 1.4, cy + (r() - 0.5) * R * 1.4, R * (0.06 + r() * 0.16), 0, TAU);
+        g.fill();
+      }
+      const term = g.createLinearGradient(cx - R, cy - R, cx + R, cy + R);
+      term.addColorStop(0.45, rgba(C.bg, 0));
+      term.addColorStop(1, rgba(C.bg, 0.85));
+      g.fillStyle = term;
+      g.fillRect(cx - R, cy - R, R * 2, R * 2);
+      g.restore();
+    };
+
+    const DUNES = [
+      { d: 0.14, base: 0.6, amp: 44, a: 0.1, seed: 11 },
+      { d: 0.3, base: 0.68, amp: 36, a: 0.15, seed: 23 },
+      { d: 0.5, base: 0.78, amp: 30, a: 0.21, seed: 37 },
+      { d: 0.78, base: 0.88, amp: 24, a: 0.3, seed: 59 },
+    ];
+
+    const buildAmber = () => {
+      const r = mulberry(10191);
+      const L = makeLayer(W + PAD * 2, H + PAD * 2);
+      const g = L.g;
+      for (let i = 0; i < 170; i++) {
+        g.fillStyle = rgba(C.ridge, 0.08 + r() * 0.32);
+        const s = r() < 0.9 ? 1 : 1.6;
+        g.fillRect(r() * L.w, r() * L.h * 0.6, s, s);
+      }
+      const haze = g.createLinearGradient(0, PAD + H * 0.4, 0, PAD + H * 0.85);
+      haze.addColorStop(0, rgba(C.accent, 0));
+      haze.addColorStop(1, rgba(C.accent2, 0.09));
+      g.fillStyle = haze;
+      g.fillRect(0, PAD + H * 0.4, L.w, H * 0.6 + PAD);
+      const MR = Math.max(30, Math.min(70, Math.min(W, H) * 0.07));
+      drawMoon(g, PAD + W * 0.16, PAD + H * 0.2, MR, r);
+      drawMoon(g, PAD + W * 0.25, PAD + H * 0.1, MR * 0.42, r);
+      S.far = L;
+
+      const sc = Math.max(0.6, H / 900);
+      S.dunes = DUNES.map((cfg, idx) => {
+        const rr = mulberry(cfg.seed);
+        const amp = cfg.amp * sc;
+        const f = [0.004 + rr() * 0.003, 0.009 + rr() * 0.006, 0.021 + rr() * 0.01];
+        const p = [rr() * TAU, rr() * TAU, rr() * TAU];
+        const ridgeScreen = (x: number) => {
+          const s0 = Math.sin(x * f[0] + p[0]);
+          const crest = Math.pow(Math.abs(s0), 0.75) * (s0 > 0 ? 1 : 0.55);
+          return H * cfg.base - amp * (0.6 * crest + 0.28 * Math.sin(x * f[1] + p[1]) + 0.12 * Math.sin(x * f[2] + p[2]));
+        };
+        const topScreen = H * cfg.base - amp * 1.6 - (idx === 1 ? 70 : 0);
+        const Ld = makeLayer(W + PAD * 2, H + PAD * 0.5 - topScreen);
+        const dg = Ld.g;
+        const layerTop = H + PAD * 0.5 - Ld.h;
+        const ry = (x: number) => ridgeScreen(x - PAD) - layerTop;
+        // 远景台地岩柱
+        if (idx === 1) {
+          dg.fillStyle = rgba(C.earth, cfg.a * 0.9);
+          for (let k = 0; k < 4; k++) {
+            const mx = rr() * Ld.w;
+            const mw = 40 + rr() * 90;
+            const mh = 30 + rr() * 50;
+            const by = ry(mx + mw / 2) + 6;
+            dg.beginPath();
+            dg.moveTo(mx, by);
+            dg.lineTo(mx + mw * 0.15, by - mh);
+            dg.lineTo(mx + mw * 0.82, by - mh);
+            dg.lineTo(mx + mw, by);
+            dg.closePath();
+            dg.fill();
+          }
+        }
+        const grd = dg.createLinearGradient(0, 0, 0, Ld.h);
+        grd.addColorStop(0, rgba(C.earth, cfg.a));
+        grd.addColorStop(1, rgba(C.far, cfg.a * 0.45));
+        dg.fillStyle = grd;
+        dg.beginPath();
+        dg.moveTo(0, Ld.h);
+        for (let x = 0; x <= Ld.w; x += 4) dg.lineTo(x, ry(x));
+        dg.lineTo(Ld.w, Ld.h);
+        dg.closePath();
+        dg.fill();
+        dg.strokeStyle = rgba(C.accent, 0.1 + idx * 0.05);
+        dg.lineWidth = 1.2;
+        dg.beginPath();
+        for (let x = 0; x <= Ld.w; x += 4) {
+          if (x === 0) dg.moveTo(x, ry(x));
+          else dg.lineTo(x, ry(x));
+        }
+        dg.stroke();
+        // 沙纹
+        dg.strokeStyle = rgba(C.accent, 0.035 + idx * 0.012);
+        dg.lineWidth = 0.8;
+        for (let k = 0; k < 18 + idx * 8; k++) {
+          const sx = rr() * Ld.w;
+          const sy = ry(sx) + 8 + rr() * (Ld.h - ry(sx)) * 0.6;
+          const len = 20 + rr() * 50;
+          dg.beginPath();
+          dg.moveTo(sx, sy);
+          dg.quadraticCurveTo(sx + len / 2, sy - 3, sx + len, sy + 1);
+          dg.stroke();
+        }
+        return { L: Ld, d: cfg.d, ry };
+      });
+
+      S.sand = Array.from({ length: 120 }, () => ({
+        x: Math.random() * W,
+        y: H * 0.3 + Math.random() * H * 0.7,
+        len: 6 + Math.random() * 22,
+        sp: 60 + Math.random() * 140,
+        a: 0.08 + Math.random() * 0.22,
+        hot: Math.random() < 0.3,
+      }));
+      S.spice = Array.from({ length: 28 }, () => ({
+        x: Math.random() * W,
+        y: H * 0.5 + Math.random() * H * 0.5,
+        ph: Math.random() * TAU,
+        v: 6 + Math.random() * 12,
+      }));
+      S.worm = null;
+      S.nextWorm = performance.now() + 9000 + Math.random() * 9000;
+      S.thopter = null;
+      S.nextThopter = performance.now() + 5000 + Math.random() * 12000;
+    };
+
+    const drawAmber = (t: number, dt: number) => {
+      blit(S.far, 0.1);
+      // 扑翼机
+      if (!S.thopter && t > S.nextThopter) {
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        S.thopter = { x: dir > 0 ? -60 : W + 60, y: H * (0.16 + Math.random() * 0.2), dir, v: 45 + Math.random() * 30 };
+      }
+      if (S.thopter) {
+        const th = S.thopter;
+        th.x += th.dir * th.v * dt;
+        th.y += Math.sin(t * 0.0015) * 0.15;
+        const flap = Math.sin(t * 0.06) * 4;
+        ctx.save();
+        ctx.translate(th.x, th.y);
+        ctx.scale(th.dir, 1);
+        ctx.strokeStyle = rgba(C.muted, 0.55);
+        ctx.fillStyle = rgba(C.muted, 0.55);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 9, 2.6, 0, 0, TAU);
+        ctx.fill();
+        ctx.fillRect(-16, -0.6, 8, 1.2);
+        ctx.beginPath();
+        ctx.moveTo(-2, -1);
+        ctx.lineTo(-10, -4 - flap);
+        ctx.moveTo(2, -1);
+        ctx.lineTo(10, -4 + flap);
+        ctx.stroke();
+        ctx.restore();
+        if (th.x < -80 || th.x > W + 80) {
+          S.thopter = null;
+          S.nextThopter = t + 18000 + Math.random() * 22000;
+        }
+      }
+      // 香料微光
+      for (const s of S.spice) {
+        s.y -= s.v * dt;
+        s.x += Math.sin(t * 0.0008 + s.ph) * 0.25 + 0.15 * wind;
+        if (s.y < H * 0.35) {
+          s.y = H + 10;
+          s.x = Math.random() * W;
+        }
+        const a = (0.25 + 0.25 * Math.sin(t * 0.003 + s.ph)) * clamp01((s.y - H * 0.35) / (H * 0.2));
+        ctx.fillStyle = rgba(C.accent2, a);
+        ctx.fillRect(s.x, s.y, 1.6, 1.6);
+      }
+      // 四层沙丘
+      S.dunes.forEach((dn: any, idx: number) => {
+        blit(dn.L, dn.d, true);
+        if (idx === S.dunes.length - 1) drawWorm(t, dt, dn);
+      });
+      // 风沙流（鼠标附近被吹散）
+      ctx.lineWidth = 1;
+      for (const p of S.sand) {
+        p.x += p.sp * dt * wind;
+        p.y += Math.sin(t * 0.0012 + p.x * 0.01) * 0.25;
+        if (mouse.active) {
+          const dx = p.x - mouse.px;
+          const dy = p.y - mouse.py;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < 110 * 110) {
+            const d = Math.sqrt(d2) || 1;
+            const f = (1 - d / 110) * 3.2;
+            p.x += (dx / d) * f;
+            p.y += (dy / d) * f;
+          }
+        }
+        if (p.x > W + 30) {
+          p.x = -30;
+          p.y = H * 0.3 + Math.random() * H * 0.7;
+        }
+        ctx.strokeStyle = rgba(p.hot ? C.accent : C.muted, p.a);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.len, p.y + 0.6);
+        ctx.stroke();
+      }
+    };
+
+    const drawWorm = (t: number, dt: number, dn: any) => {
+      if (!S.worm && t > S.nextWorm) {
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        S.worm = { x: dir > 0 ? -120 : W + 120, dir, v: 55 + Math.random() * 35, dust: [] };
+      }
+      if (!S.worm) return;
+      const w = S.worm;
+      w.x += w.dir * w.v * dt;
+      const p = layerPos(dn.L, dn.d, true);
+      for (let k = 0; k < 9; k++) {
+        const hx = w.x - w.dir * k * 20;
+        const by = p.y + dn.ry(hx - p.x);
+        const amp = (9 - k) * 0.9 + 2;
+        ctx.fillStyle = rgba(C.earth, 0.38);
+        ctx.strokeStyle = rgba(C.accent, 0.28 - k * 0.025);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(hx, by + 2, 11, amp, 0, Math.PI, 0);
+        ctx.fill();
+        ctx.stroke();
+      }
+      const hy = p.y + dn.ry(w.x - p.x);
+      if (Math.random() < 0.7) {
+        w.dust.push({
+          x: w.x + (Math.random() - 0.5) * 12,
+          y: hy,
+          vx: (Math.random() - 0.5) * 30 - w.dir * 20,
+          vy: -30 - Math.random() * 40,
+          life: 0,
+        });
+      }
+      w.dust = w.dust.filter((d: any) => {
+        d.life += dt;
+        d.x += d.vx * dt;
+        d.y += d.vy * dt;
+        d.vy += 60 * dt;
+        ctx.fillStyle = rgba(C.accent, 0.4 * (1 - d.life / 1.2));
+        ctx.fillRect(d.x, d.y, 1.5, 1.5);
+        return d.life < 1.2;
+      });
+      if (w.x < -160 || w.x > W + 160) {
+        S.worm = null;
+        S.nextWorm = t + 22000 + Math.random() * 26000;
+      }
+    };
+
+    /* ================================================================ */
+    const BUILD: Record<string, () => void> = { void: buildVoid, paper: buildPaper, crt: buildCrt, amber: buildAmber };
+    const DRAW: Record<string, (t: number, dt: number) => void> = {
+      void: drawVoid,
+      paper: drawPaper,
+      crt: drawCrt,
+      amber: drawAmber,
+    };
+
+    const rebuild = () => {
+      DPR = Math.min(window.devicePixelRatio || 1, 1.75);
+      W = window.innerWidth;
+      H = window.innerHeight;
+      canvas.width = Math.round(W * DPR);
+      canvas.height = Math.round(H * DPR);
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      realm = root.dataset.realm || 'void';
+      readPalette();
+      S = {};
+      (BUILD[realm] || buildVoid)();
+      if (reduce) renderOnce();
+    };
+
+    const renderFrame = (t: number, dt: number) => {
+      ctx.clearRect(0, 0, W, H);
+      (DRAW[realm] || drawVoid)(t, dt);
+    };
+    const renderOnce = () => renderFrame(performance.now(), 0);
+
+    const loop = (t: number) => {
+      const dt = Math.min(0.05, Math.max(0.001, (t - last) / 1000));
+      last = t;
+      const k = Math.min(1, dt * 3);
+      mouse.sx += (mouse.x - mouse.sx) * k;
+      mouse.sy += (mouse.y - mouse.sy) * k;
+      scrollS += (window.scrollY - scrollS) * Math.min(1, dt * 6);
+      renderFrame(t, dt);
+      raf = requestAnimationFrame(loop);
+    };
+
+    const start = () => {
+      if (reduce || raf) return;
+      last = performance.now();
+      raf = requestAnimationFrame(loop);
+    };
+    const stop = () => {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    };
+
+    rebuild();
+    start();
+
+    let resizeTimer = 0;
+    window.addEventListener('resize', () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(rebuild, 160);
+    });
+    document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
+    new MutationObserver(() => {
+      if ((root.dataset.realm || 'void') !== realm) rebuild();
+    }).observe(root, { attributes: true, attributeFilter: ['data-realm'] });
+    window.addEventListener('sisyphus:realmchange', () => {
+      if ((root.dataset.realm || 'void') !== realm) rebuild();
+    });
+
+    window.addEventListener(
+      'pointermove',
+      (e) => {
+        mouse.x = e.clientX / Math.max(1, W);
+        mouse.y = e.clientY / Math.max(1, H);
+        mouse.px = e.clientX;
+        mouse.py = e.clientY;
+        mouse.active = e.pointerType === 'mouse';
+        if (reduce) renderOnce();
+      },
+      { passive: true },
+    );
+    document.addEventListener('mouseout', (e) => {
+      if (!e.relatedTarget) mouse.active = false;
+    });
+    window.addEventListener('scroll', () => reduce && ((scrollS = window.scrollY), renderOnce()), { passive: true });
+
+    // 背景风速与全站 8h 推石海拔 + 阅读心流耦合
+    window.addEventListener('sisyphus:boulder-telemetry', (e: Event) => {
+      const d = (e as CustomEvent<{ frac?: number; flow?: number }>).detail;
+      const f = d?.frac ?? 0.25;
+      const fl = d?.flow ?? 1;
+      wind = Math.min(2.2, (0.8 + f * 0.7) * (0.9 + fl * 0.15));
+    });
+  }
+</script>

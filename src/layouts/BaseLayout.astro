@@ -4,6 +4,7 @@ import 'remark-callouts/styles.css';
 import 'katex/dist/katex.min.css';
 import Footer from '../components/Footer.astro';
 import FloatingAsciiNav from '../components/FloatingAsciiNav.astro';
+import RealmBackdrop from '../components/RealmBackdrop.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
 
 interface Props {
@@ -86,7 +87,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
       <div class="ambient-grid-marks"></div>
     </div>
     <div class="heavy-frost-veil" aria-hidden="true"></div>
-    <canvas id="bg-pixel-canvas" aria-hidden="true"></canvas>
+    <RealmBackdrop />
 
     <!-- 全站悬浮导航与双层链式挂件终端 -->
     <FloatingAsciiNav />
@@ -370,115 +371,6 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         }
         updateHorizonBar();
       }, 4000);
-
-      // ================= 2. 四主题背景 ASCII 漂浮字符画布（流速与风向耦合当前巨石海拔！） =================
-      const bgCanvas = document.getElementById('bg-pixel-canvas') as HTMLCanvasElement | null;
-      if (bgCanvas && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        const ctx = bgCanvas.getContext('2d');
-        let mutedColor = '#b8c2e6';
-        let accentColor = '#a5b4fc';
-        let accent2Color = '#38bdf8';
-        let curRealm = document.documentElement.dataset.realm || 'void';
-        let altitudeWindMult = 1.0;
-
-        window.addEventListener('sisyphus:boulder-telemetry', (e: Event) => {
-          const d = (e as CustomEvent<{ frac?: number; flow?: number }>).detail;
-          const f = d?.frac ?? 0.25;
-          const fl = d?.flow ?? 1.0;
-          // 海拔越高（越接近 884.8m 峰顶）且阅读心流越强，背景星风/代码雨/香料流越强劲
-          altitudeWindMult = (0.75 + f * 1.15) * (0.85 + fl * 0.22);
-        });
-
-        const GLYPH_SETS: Record<string, string[]> = {
-          void: ['▮', '*', '⋆', '·', '◉', '⟡', '1:4:9'],
-          paper: ['∑', 'Ψ', '∂', '∆', '∞', '∴', '§'],
-          crt: ['ﾊ', 'ﾐ', 'ﾋ', 'ｰ', 'ｳ', 'ｼ', '0', '1'],
-          amber: ['◈', '∷', '·', '◐', '~', '⟡', '◦'],
-        };
-
-        const syncPalette = () => {
-          const cs = getComputedStyle(document.documentElement);
-          mutedColor = cs.getPropertyValue('--text-muted').trim() || '#b8c2e6';
-          accentColor = cs.getPropertyValue('--accent').trim() || '#a5b4fc';
-          accent2Color = cs.getPropertyValue('--accent-2').trim() || '#38bdf8';
-          curRealm = document.documentElement.dataset.realm || 'void';
-        };
-        syncPalette();
-        window.addEventListener('sisyphus:realmchange', syncPalette);
-
-        const resize = () => {
-          const dpr = window.devicePixelRatio || 1;
-          bgCanvas.width = window.innerWidth * dpr;
-          bgCanvas.height = window.innerHeight * dpr;
-          if (ctx) {
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          }
-        };
-        resize();
-        window.addEventListener('resize', resize);
-
-        const motes = Array.from({ length: 28 }, (_, idx) => ({
-          x: Math.random() * window.innerWidth,
-          y: Math.random() * window.innerHeight,
-          seed: idx,
-          alpha: 0.14 + Math.random() * 0.22,
-          size: idx % 5 === 0 ? 12 : 10,
-        }));
-
-        const tickDust = (t: number) => {
-          if (ctx) {
-            const w = window.innerWidth;
-            const h = window.innerHeight;
-            ctx.clearRect(0, 0, w, h);
-            const glyphs = GLYPH_SETS[curRealm] || GLYPH_SETS.void;
-
-            for (const p of motes) {
-              const glyph = glyphs[p.seed % glyphs.length];
-              ctx.font = `${p.size}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-
-              if (curRealm === 'crt') {
-                p.y += (0.72 + (p.seed % 4) * 0.3) * altitudeWindMult;
-                if (p.y > h + 14) {
-                  p.y = -12;
-                  p.x = Math.round((Math.random() * w) / 24) * 24;
-                }
-                ctx.fillStyle = p.seed % 4 === 0 ? accent2Color : accentColor;
-                ctx.globalAlpha = p.alpha * 1.1;
-                ctx.fillText(glyph, p.x, p.y);
-              } else if (curRealm === 'paper') {
-                p.x += (0.24 + Math.sin(t * 0.0011 + p.seed) * 0.22) * altitudeWindMult;
-                p.y += (0.22 + (p.seed % 3) * 0.1) * altitudeWindMult;
-                if (p.x > w + 12) p.x = -10;
-                if (p.y > h + 12) p.y = -10;
-                ctx.fillStyle = p.seed % 3 === 0 ? accentColor : mutedColor;
-                ctx.globalAlpha = p.alpha * 1.05;
-                ctx.fillText(glyph, p.x, p.y);
-              } else if (curRealm === 'amber') {
-                p.x += (0.34 + Math.sin(t * 0.001 + p.seed) * 0.18) * altitudeWindMult;
-                p.y -= (0.2 + (p.seed % 3) * 0.1) * altitudeWindMult;
-                if (p.x > w + 12) p.x = -10;
-                if (p.y < -12) p.y = h + 10;
-                ctx.fillStyle = p.seed % 3 === 0 ? accentColor : mutedColor;
-                ctx.globalAlpha = p.alpha;
-                ctx.fillText(glyph, p.x, p.y);
-              } else {
-                p.x += Math.sin(t * 0.0007 + p.seed) * 0.18 * altitudeWindMult;
-                p.y -= (0.12 + (p.seed % 3) * 0.07) * altitudeWindMult;
-                if (p.x < -12) p.x = w + 10;
-                if (p.x > w + 12) p.x = -10;
-                if (p.y < -12) p.y = h + 10;
-                const twinkle = 0.65 + 0.35 * Math.sin(t * 0.002 + p.seed * 1.7);
-                ctx.fillStyle = p.seed % 3 === 0 ? accent2Color : accentColor;
-                ctx.globalAlpha = p.alpha * twinkle;
-                ctx.fillText(glyph, p.x, p.y);
-              }
-            }
-            ctx.globalAlpha = 1;
-          }
-          requestAnimationFrame(tickDust);
-        };
-        requestAnimationFrame(tickDust);
-      }
 
       // ================= 3. 终端代码块顶栏增强 + 代码研读/复制被动推石奖励 =================
       document.querySelectorAll('.prose pre').forEach((pre, blockIdx) => {
