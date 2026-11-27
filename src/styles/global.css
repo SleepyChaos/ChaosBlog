@@ -1828,13 +1828,215 @@ main.page-main {
   font-size: 0.76rem;
 }
 
+.ascent-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  margin-bottom: 0.5rem;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.ascent-head-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  letter-spacing: 0.04em;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.ascent-pct-badge {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  padding: 0.06rem 0.34rem;
+  border: 1px solid var(--border-strong);
+  background: var(--accent-soft);
+  border-radius: 2px;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.ascent-mini-viewport {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  background: var(--stage-bg, var(--bg-code));
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ascent-mini-viewport:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-soft);
+}
+
+.ascent-mini-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 160 / 68;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.ascii-slope-pre.is-sr-mirror {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: pre;
+  border: 0;
+}
+
 .ascent-bar-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.4rem;
-  margin: 0.45rem 0;
+  gap: 0.45rem;
+  margin: 0.55rem 0;
   color: var(--accent);
+}
+
+.ascent-progress-track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 1.38rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  background: var(--bg-code);
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s ease;
+}
+
+.ascent-progress-track:hover {
+  border-color: var(--accent);
+}
+
+.ascent-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      var(--accent-soft),
+      var(--accent-soft) 5px,
+      color-mix(in srgb, var(--accent) 34%, transparent) 5px,
+      color-mix(in srgb, var(--accent) 34%, transparent) 10px
+    );
+  border-right: 2px solid var(--accent);
+  transition: width 0.08s linear;
+}
+
+.ascent-progress-ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ascent-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-strong);
+  opacity: 0.7;
+}
+
+.ascent-progress-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px var(--bg-code);
+  white-space: nowrap;
+}
+
+.ascent-top-btn {
+  flex-shrink: 0;
+  height: 1.38rem;
+  padding: 0 0.42rem !important;
+  font-size: 0.68rem !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ascent-status-stack {
+  display: grid;
+  gap: 0.32rem;
+  padding-top: 0.38rem;
+  border-top: 1px dashed var(--border);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.ascent-camp-row {
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.ascent-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.ascent-alt-readout {
+  color: var(--text-muted);
+  font-size: 0.67rem;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ascent-reward-pill {
+  flex-shrink: 0;
+  padding: 0.05rem 0.34rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  background: var(--bg-code);
+}
+
+.ascent-reward-pill.is-unlocked {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.ascent-toc-head {
+  color: var(--text);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .toc-list {

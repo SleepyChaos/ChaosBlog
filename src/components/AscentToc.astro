@@ -14,42 +14,71 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
 ---
 
 <aside class="ascent-sidebar" aria-label="阅读海拔与文章目录">
-  <div class="ascent-box">
-    <div style="display: flex; align-items: center; justify-content: space-between;">
-      <span style="display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 700;">
+  <div class="ascent-box ascent-telemetry-card">
+    <div class="ascent-head-row">
+      <span class="ascent-head-title">
         <span class="term-ascii-icon">/▲</span>
         <span>ASCENT_TELEMETRY</span>
       </span>
-      <span id="ascent-pct" style="color: var(--accent); font-weight: 700;">000%</span>
+      <span id="ascent-pct" class="ascent-pct-badge">000%</span>
     </div>
 
-    <!-- 随文章滚动 1:1 实时攀登的 28x6 迷你 ASCII 西西弗斯画布 -->
-    <pre
-      id="reader-mini-slope"
-      class="ascii-slope-pre"
-      style="margin: 0.55rem 0 0.45rem; padding: 0.35rem 0.45rem; font-size: 0.6rem; line-height: 1.15; cursor: default;"
-      aria-hidden="true"></pre>
+    <!-- 随文章滚动 1:1 实时攀登的 160x68 四主题原生像素画剧场（支持点击画布任意山坡位置跳转阅读进度） -->
+    <div
+      class="ascent-mini-viewport"
+      id="ascent-mini-viewport"
+      title="随阅读进度实时攀登 · 点击山坡任意高度可快速跳转至对应段落"
+    >
+      <canvas
+        id="reader-mini-canvas"
+        class="ascent-mini-canvas"
+        width="160"
+        height="68"
+        aria-label="随文章阅读进度同步攀登的西西弗斯迷你像素舞台"></canvas>
+      <pre
+        id="reader-mini-slope"
+        class="ascii-slope-pre is-sr-mirror"
+        aria-hidden="true"></pre>
+    </div>
 
+    <!-- 可点击跳转的分段式像素进度条 + 回到顶部按钮 -->
     <div class="ascent-bar-row">
-      <span id="ascent-bar">[▫▫▫▫▫▫▫▫▫▫]</span>
-      <button type="button" class="term-btn" id="scroll-top-btn" title="回到文章顶部">
+      <div
+        class="ascent-progress-track"
+        id="ascent-progress-track"
+        role="slider"
+        tabindex="0"
+        aria-label="文章阅读攀登进度条（点击跳转）"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+        title="点击进度条任意位置跳转至对应章节高度"
+      >
+        <div class="ascent-progress-fill" id="ascent-progress-fill"></div>
+        <div class="ascent-progress-ticks" id="ascent-progress-ticks"></div>
+        <span class="ascent-progress-text" id="ascent-bar">0m / 500m</span>
+      </div>
+      <button type="button" class="term-btn ascent-top-btn" id="scroll-top-btn" title="回到文章顶部">
         [↑TOP]
       </button>
     </div>
 
-    <div
-      id="ascent-status"
-      style="color: var(--text-muted); font-size: 0.72rem; display: flex; justify-content: space-between; gap: 0.3rem;"
-    >
-      <span id="ascent-status-text">CAMP: 山麓起点</span>
-      <span id="ascent-reward-badge" style="color: var(--accent); font-weight: 700;"></span>
+    <!-- 双行防折断状态区：第一行独占全宽显示当前章节营地，第二行显示海拔与完读助推徽章 -->
+    <div class="ascent-status-stack" id="ascent-status">
+      <div class="ascent-camp-row" id="ascent-status-text" title="当前阅读章节">
+        |&gt; CAMP: 山麓起点
+      </div>
+      <div class="ascent-meta-row">
+        <span class="ascent-alt-readout" id="ascent-alt-readout">ALT 0m / 500m</span>
+        <span class="ascent-reward-pill" id="ascent-reward-badge">[▲ 登顶 +35m]</span>
+      </div>
     </div>
   </div>
 
   {
     tocItems.length > 0 && (
       <div class="ascent-box">
-        <div style="display: flex; align-items: center; gap: 0.4rem; font-weight: 700; padding-bottom: 0.45rem; border-bottom: 1px solid var(--border);">
+        <div class="ascent-toc-head">
           <span class="term-ascii-icon">≡</span>
           <span>CHECKPOINTS ({tocItems.length})</span>
         </div>
@@ -77,16 +106,46 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
 </aside>
 
 <script>
+  type Realm = 'void' | 'paper' | 'crt' | 'amber';
+
   const pctEl = document.getElementById('ascent-pct');
   const barEl = document.getElementById('ascent-bar');
+  const fillEl = document.getElementById('ascent-progress-fill');
+  const trackEl = document.getElementById('ascent-progress-track');
+  const ticksEl = document.getElementById('ascent-progress-ticks');
   const statusTextEl = document.getElementById('ascent-status-text');
+  const altReadoutEl = document.getElementById('ascent-alt-readout');
   const rewardBadgeEl = document.getElementById('ascent-reward-badge');
   const miniSlopeEl = document.getElementById('reader-mini-slope');
+  const miniCanvas = document.getElementById('reader-mini-canvas') as HTMLCanvasElement | null;
+  const miniViewport = document.getElementById('ascent-mini-viewport');
   const topBtn = document.getElementById('scroll-top-btn');
   const tocLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('#toc-list .toc-link'));
+  const articleEl = document.querySelector<HTMLElement>('article[data-peak-alt]');
+  const peakAlt = Number(articleEl?.dataset.peakAlt || '520');
 
   topBtn?.addEventListener('click', () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  const scrollToFraction = (frac: number) => {
+    const docHeight = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    window.scrollTo({ top: Math.max(0, Math.min(1, frac)) * docHeight, behavior: 'smooth' });
+  };
+
+  trackEl?.addEventListener('click', (e: MouseEvent) => {
+    const rect = trackEl.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    scrollToFraction((e.clientX - rect.left) / rect.width);
+  });
+
+  miniViewport?.addEventListener('click', (e: MouseEvent) => {
+    const rect = miniViewport.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    // 将画布 X 坐标 (20..136) 映射为 0..1 阅读进度
+    const rx = (e.clientX - rect.left) / rect.width;
+    const mapped = (rx * 160 - 20) / 116;
+    scrollToFraction(mapped);
   });
 
   const headingEls = tocLinks
@@ -95,6 +154,23 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
       return id ? document.getElementById(id) : null;
     })
     .filter((el): el is HTMLElement => Boolean(el));
+
+  let headingFracs: number[] = [];
+  const computeHeadingFracs = () => {
+    const docHeight = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    headingFracs = headingEls
+      .filter((el) => el.tagName === 'H2')
+      .slice(0, 6)
+      .map((el) => {
+        const top = el.getBoundingClientRect().top + window.scrollY - 120;
+        return Math.max(0.05, Math.min(0.94, top / docHeight));
+      });
+    if (ticksEl) {
+      ticksEl.innerHTML = headingFracs
+        .map((f) => `<span class="ascent-tick" style="left:${(f * 100).toFixed(1)}%"></span>`)
+        .join('');
+    }
+  };
 
   let summitRewarded = false;
   const rewardKey = `sisyphus_read_reward_${window.location.pathname}`;
@@ -107,7 +183,6 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
     summitRewarded = true;
     try {
       sessionStorage.setItem(rewardKey, '1');
-      // 同步在文章垒石记录中点亮初登顶印记
       const slug = document.querySelector<HTMLElement>('article[data-post-slug]')?.dataset.postSlug;
       if (slug) {
         const rawC = localStorage.getItem('sisyphus_cairns_v1');
@@ -125,79 +200,455 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
     );
   };
 
-  const renderMiniClimber = (progress: number, atSummit: boolean) => {
-    if (!miniSlopeEl) return;
-    const W = 28;
-    const H = 6;
-    const grid = Array.from({ length: H }, () => Array(W).fill(' '));
-    const cls = Array.from({ length: H }, () => Array(W).fill(''));
+  // ================= 160x68 四主题迷你像素西西弗斯渲染引擎 =================
+  const CW = 160;
+  const CH = 68;
+  const CN = CW * CH;
+  const ctx = miniCanvas?.getContext('2d') || null;
+  const imgData = ctx ? ctx.createImageData(CW, CH) : null;
+  const buf = imgData ? new Uint32Array(imgData.data.buffer) : new Uint32Array(CN);
+  const bgBuf = new Uint32Array(CN);
 
-    const sY = (c: number) => {
-      if (c <= 2) return 5;
-      if (c >= 23) return 1;
-      return Math.round(5 - ((c - 2) / 21) * 4);
-    };
+  const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
+  const pack = (r: number, g: number, b: number) =>
+    ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
+  const hex = (h: string) => {
+    const n = parseInt(h.slice(1), 16);
+    return pack((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  };
+  const hash = (x: number, y: number) => {
+    const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return h - Math.floor(h);
+  };
+  const B4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+  const bayer = (x: number, y: number) => B4[((y & 3) << 2) | (x & 3)];
 
-    for (let c = 0; c < W; c++) {
-      const r = sY(c);
-      if (r >= 0 && r < H) {
-        grid[r][c] = c >= 23 ? '═' : '/';
-        cls[r][c] = 'as-ridge';
-      }
-      for (let br = r + 1; br < H; br++) {
-        grid[br][c] = (br + c) % 2 === 0 ? '▒' : '░';
-        cls[br][c] = 'as-earth';
-      }
+  const plot = (x: number, y: number, c: number) => {
+    const xi = Math.round(x);
+    const yi = Math.round(y);
+    if (xi >= 0 && yi >= 0 && xi < CW && yi < CH) buf[yi * CW + xi] = c;
+  };
+  const pdither = (x: number, y: number, c: number, a: number) => {
+    const xi = Math.round(x);
+    const yi = Math.round(y);
+    if (a >= 1 || (a > 0 && a > bayer(xi, yi))) plot(xi, yi, c);
+  };
+  const rect = (x: number, y: number, w: number, h: number, c: number) => {
+    const x0 = Math.round(x);
+    const y0 = Math.round(y);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) plot(x0 + i, y0 + j, c);
+  };
+  const disc = (cx: number, cy: number, r: number, c: number) => {
+    const R = Math.ceil(r);
+    const r2 = r * r;
+    const x0 = Math.round(cx);
+    const y0 = Math.round(cy);
+    for (let dy = -R; dy <= R; dy++)
+      for (let dx = -R; dx <= R; dx++) if (dx * dx + dy * dy <= r2) plot(x0 + dx, y0 + dy, c);
+  };
+  const stroke = (x0: number, y0: number, x1: number, y1: number, c: number) => {
+    const steps = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))));
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      plot(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, c);
     }
-
-    // 峰顶路标
-    grid[0][25] = '^';
-    cls[0][25] = 'as-fire';
-
-    const bCol = Math.max(4, Math.min(23, Math.round(4 + progress * 19)));
-    const bRow = Math.max(0, sY(bCol) - 1);
-    const rockFrames = ['@', 'O', '0', '*'];
-    grid[bRow][bCol] = rockFrames[bCol % rockFrames.length];
-    cls[bRow][bCol] = 'as-rock';
-
-    const sCol = Math.max(2, bCol - 2);
-    const sRow = Math.max(0, sY(sCol) - 1);
-    if (atSummit) {
-      grid[sRow][sCol] = '\\';
-      grid[sRow][sCol + 1] = 'o';
-      cls[sRow][sCol] = 'as-hero';
-      cls[sRow][sCol + 1] = 'as-hero';
-    } else {
-      grid[sRow][sCol] = 'o';
-      grid[sRow][sCol + 1] = '_';
-      cls[sRow][sCol] = 'as-hero';
-      cls[sRow][sCol + 1] = 'as-hero';
+  };
+  const ring = (cx: number, cy: number, rx: number, ry: number, c: number, a = 1) => {
+    const steps = Math.ceil((rx + ry) * 3.2);
+    for (let s = 0; s < steps; s++) {
+      const t = (s / steps) * Math.PI * 2;
+      pdither(cx + Math.cos(t) * rx, cy + Math.sin(t) * ry, c, a);
     }
-
-    const lines = grid.map((row, r) =>
-      row
-        .map((ch, c) => (cls[r][c] ? `<span class="${cls[r][c]}">${ch}</span>` : ch))
-        .join(''),
-    );
-    miniSlopeEl.innerHTML = lines.join('\n');
   };
 
+  // 迷你山脊曲线 (x: 0..160 -> y: 60 -> 22)
+  const X0 = 14;
+  const X1 = 134;
+  const BASE_Y = 59;
+  const SUMMIT_Y = 23;
+  const gy = (x: number) => {
+    if (x <= X0) return BASE_Y;
+    if (x >= X1) return SUMMIT_Y;
+    const t = (x - X0) / (X1 - X0);
+    const e = t * 0.72 + t * t * (3 - 2 * t) * 0.28;
+    const und = Math.sin(t * Math.PI * 3) * Math.sin(t * Math.PI) * 1.4;
+    return BASE_Y - (BASE_Y - SUMMIT_Y) * e + und;
+  };
+  const gyi = new Int16Array(CW);
+  for (let x = 0; x < CW; x++) gyi[x] = Math.round(gy(x));
+
+  const getRealm = (): Realm => {
+    const r = document.documentElement.dataset.realm;
+    return r === 'paper' || r === 'crt' || r === 'amber' ? r : 'void';
+  };
+  let curRealm: Realm = getRealm();
+
+  // 烘焙四主题静态迷你背景
+  const buildMiniStatic = (realm: Realm) => {
+    if (realm === 'void') {
+      // 太空漫游：深空星空 + 木星条带 + 月面环形山 + 峰顶 TMA-1 黑石碑
+      for (let y = 0; y < CH; y++) {
+        const c = y < 24 ? hex('#030510') : y < 46 ? hex('#080f24') : hex('#121c3b');
+        for (let x = 0; x < CW; x++) plot(x, y, c);
+      }
+      // 木星
+      const jx = 28;
+      const jy = 18;
+      const jr = 10;
+      const bands = [hex('#efdcb4'), hex('#c89a63'), hex('#f4e7cb'), hex('#a86f45')];
+      for (let dy = -jr; dy <= jr; dy++) {
+        for (let dx = -jr; dx <= jr; dx++) {
+          if (dx * dx + dy * dy > jr * jr) continue;
+          const lum = (-dx * 0.7 - dy * 0.3 + Math.sqrt(jr * jr - dx * dx - dy * dy) * 0.6) / jr;
+          let c = bands[Math.abs(Math.floor((dy + jr) * 0.65)) % bands.length];
+          if (dx >= -4 && dx <= -1 && dy >= 2 && dy <= 4) c = hex('#c4563c');
+          if (lum < 0.2) c = hex('#14111d');
+          plot(jx + dx, jy + dy, c);
+        }
+      }
+      // 远山与月面主坡
+      for (let x = 0; x < CW; x++) {
+        const fy = Math.round(45 + Math.sin(x * 0.05 + 1) * 4);
+        for (let y = fy; y < CH; y++) plot(x, y, y === fy ? hex('#3e4766') : hex('#1b2136'));
+        const top = gyi[x];
+        for (let y = top; y < CH; y++) {
+          const d = y - top;
+          plot(x, y, d === 0 ? hex('#e2e7f0') : d < 5 ? hex('#8f96a8') : d < 14 ? hex('#5a6074') : hex('#353a4c'));
+        }
+      }
+      // 峰顶黑石碑
+      const mb = gyi[146];
+      rect(144, mb - 9, 4, 9, hex('#030306'));
+      rect(144, mb - 9, 1, 9, hex('#4f5b82'));
+    } else if (realm === 'paper') {
+      // 银河帝国：川陀摩天大楼群 + 天空端点星 + 太空电梯 + 谢顿时间穹顶
+      for (let y = 0; y < CH; y++) {
+        const c = y < 18 ? hex('#2d405c') : y < 36 ? hex('#627b96') : y < 50 ? hex('#b8b0a0') : hex('#e3d8c2');
+        for (let x = 0; x < CW; x++) plot(x, y, c);
+      }
+      // 端点星 (Terminus) 与金色星环
+      disc(28, 15, 7.5, hex('#2e557d'));
+      disc(26, 14, 3.5, hex('#dfc58b'));
+      ring(28, 15, 13, 3.5, hex('#f0c875'), 0.9);
+      // 太空电梯
+      for (let y = 0; y < 52; y++) plot(74, y, y % 3 === 0 ? hex('#f0c875') : hex('#526173'));
+      // 川陀摩天大楼天际线
+      const towers = [
+        [6, 7, 34],
+        [16, 8, 28],
+        [27, 7, 36],
+        [37, 9, 25],
+        [49, 8, 31],
+        [60, 9, 23],
+        [71, 8, 20],
+        [82, 8, 27],
+        [93, 7, 30],
+        [103, 8, 26],
+      ];
+      for (const [bx, bw, btop] of towers) {
+        for (let y = btop; y < 56; y++) {
+          for (let x = bx; x < bx + bw; x++) {
+            const edge = x === bx || x === bx + bw - 1 || y === btop;
+            let c = edge ? hex('#7f90a3') : x < bx + (bw >> 1) ? hex('#2e3846') : hex('#1f2630');
+            if (!edge && (x - bx) % 2 === 1 && (y - btop) % 3 === 1 && hash(x, y) > 0.35) {
+              c = hex('#f7e09e');
+            }
+            plot(x, y, c);
+          }
+        }
+      }
+      // 川陀钛金大道与谢顿穹顶
+      for (let x = 0; x < CW; x++) {
+        const top = gyi[x];
+        for (let y = top; y < CH; y++) {
+          const d = y - top;
+          plot(x, y, d === 0 ? hex('#fff6e0') : d === 2 ? hex('#d4a756') : d < 8 ? hex('#b8aa90') : hex('#756a57'));
+        }
+      }
+      const tb = gyi[147];
+      rect(142, tb - 5, 11, 5, hex('#dcd0b8'));
+      disc(147, tb - 5, 4.5, hex('#e5ba63'));
+    } else if (realm === 'crt') {
+      // 黑客帝国：矩阵暗夜 + 机械城线框天际线 + 网格斜坡 + 源头之门
+      buf.fill(hex('#010603'));
+      let bx = 2;
+      while (bx < 130) {
+        const bw = 5 + Math.floor(hash(bx, 2) * 7);
+        const bh = 10 + Math.floor(hash(bx, 3) * 24);
+        const btop = 54 - bh;
+        for (let y = btop; y < 54; y++) {
+          for (let x = bx; x < Math.min(CW, bx + bw); x++) {
+            if (x === bx || x === bx + bw - 1 || y === btop) plot(x, y, hex('#0b3a1a'));
+          }
+        }
+        bx += bw + 2;
+      }
+      for (let x = 0; x < CW; x++) {
+        const top = gyi[x];
+        for (let y = top; y < CH; y++) {
+          const d = y - top;
+          let c = hex('#010804');
+          if (d === 0) c = hex('#3dff7a');
+          else if (d % 4 === 0 || x % 8 === 0) c = hex('#0c4f22');
+          plot(x, y, c);
+        }
+      }
+      const db = gyi[147];
+      rect(144, db - 9, 6, 9, hex('#3dff7a'));
+      rect(145, db - 8, 4, 8, hex('#0a2e14'));
+      rect(146, db - 7, 2, 7, hex('#c8ffd9'));
+    } else {
+      // 沙丘：大漠暮色 + 双月 + 远景沙丘 + 主沙脊与障壁岩柱
+      for (let y = 0; y < CH; y++) {
+        const c = y < 14 ? hex('#1e0d24') : y < 28 ? hex('#5c202e') : y < 42 ? hex('#a84632') : hex('#e08a46');
+        for (let x = 0; x < CW; x++) plot(x, y, c);
+      }
+      disc(26, 13, 5, hex('#f0dcc0'));
+      disc(44, 8, 2.5, hex('#dcc6a4'));
+      for (let x = 0; x < CW; x++) {
+        const my = Math.round(48 + Math.sin(x * 0.05 + 1.5) * 3.5);
+        for (let y = my; y < CH; y++) plot(x, y, y === my ? hex('#e3894c') : hex('#9c4727'));
+        const top = gyi[x];
+        for (let y = top; y < CH; y++) {
+          const d = y - top;
+          const rip = Math.sin(x * 0.4 + d * 1.1) > 0.75;
+          plot(x, y, d === 0 ? hex('#f7c27c') : rip ? hex('#eaa25c') : d < 10 ? hex('#c97538') : hex('#8f4c26'));
+        }
+      }
+      const rb = gyi[147];
+      rect(143, rb - 8, 3, 8, hex('#4a2418'));
+      rect(147, rb - 11, 4, 11, hex('#4a2418'));
+      stroke(147, rb - 11, 147, rb - 1, hex('#8a4a2c'));
+    }
+    bgBuf.set(buf);
+  };
+
+  buildMiniStatic(curRealm);
+
+  let targetProg = 0;
+  let smoothProg = 0;
+  let scrollDir = 0; // +1: 向下滚动攀登, -1: 向上回滚, 0: 驻足阅读
+  let scrollActiveTimer = 0;
+  let gait = 0;
+
+  interface Spark { x: number; y: number; vx: number; vy: number; life: number; c: number }
+  const sparks: Spark[] = [];
+
+  const renderMiniCanvas = (sec: number, dt: number) => {
+    if (!ctx || !imgData) return;
+    const r = getRealm();
+    if (r !== curRealm) {
+      curRealm = r;
+      buildMiniStatic(curRealm);
+    }
+    buf.set(bgBuf);
+
+    // 平滑插值进度
+    const diff = targetProg - smoothProg;
+    smoothProg += diff * (1 - Math.exp(-dt * 12));
+    if (Math.abs(diff) > 0.0015 || scrollActiveTimer > 0) {
+      gait += dt * 11;
+    }
+
+    // 1. 动态背景点缀（闪烁星辰 / 飞车 / 代码雨 / 扑翼机）
+    if (curRealm === 'void') {
+      for (let i = 0; i < 24; i++) {
+        const sx = Math.floor(hash(i, 11) * (CW - 10)) + 5;
+        const sy = Math.floor(hash(i, 12) * 38) + 2;
+        if (sy < gyi[sx] - 4 && Math.hypot(sx - 28, sy - 18) > 12) {
+          if (Math.sin(sec * 2 + i) > -0.2) plot(sx, sy, i % 3 === 0 ? hex('#ffffff') : hex('#8fa6d9'));
+        }
+      }
+    } else if (curRealm === 'paper') {
+      for (let i = 0; i < 4; i++) {
+        const dir = i % 2 === 0 ? 1 : -1;
+        const ax = ((i * 37 + sec * 14 * dir) % CW + CW) % CW;
+        const ay = 26 + i * 5;
+        if (ay < gyi[Math.floor(ax)] - 3) {
+          plot(ax, ay, hex('#fff4c2'));
+          plot(ax - dir, ay, hex('#c8402a'));
+        }
+      }
+    } else if (curRealm === 'crt') {
+      for (let i = 0; i < 18; i++) {
+        const rx = 4 + i * 8;
+        const ry = Math.floor((sec * (16 + (i % 4) * 5) + i * 13) % CH);
+        if (ry < gyi[rx] - 2) {
+          plot(rx, ry, hex('#c8ffd9'));
+          plot(rx, ry - 2, hex('#3dff7a'));
+          plot(rx, ry - 4, hex('#138a3a'));
+        }
+      }
+    } else {
+      const tx = ((sec * 12) % (CW + 30)) - 15;
+      const ty = 18 + Math.sin(sec * 1.5) * 2;
+      stroke(tx - 2, ty, tx + 2, ty, hex('#2a140c'));
+      const wy = Math.sin(sec * 32) > 0 ? -1.5 : 1.5;
+      stroke(tx, ty, tx - 2, ty + wy, hex('#fbdc98'));
+      stroke(tx, ty, tx + 2, ty + wy, hex('#fbdc98'));
+    }
+
+    // 2. 绘制文章 H2 章节营地旗帜 (Checkpoint Flags along the Slope)
+    for (const hf of headingFracs) {
+      const fx = Math.round(24 + hf * 108);
+      const fy = gyi[clamp(fx, 0, CW - 1)];
+      const passed = smoothProg >= hf - 0.015;
+      const flagC = passed
+        ? curRealm === 'crt'
+          ? hex('#3dff7a')
+          : curRealm === 'paper'
+            ? hex('#c8402a')
+            : hex('#f2b44f')
+        : hex('#52607a');
+      stroke(fx, fy - 5, fx, fy - 1, flagC);
+      plot(fx + 1, fy - 5, flagC);
+      plot(fx + 2, fy - 5, flagC);
+      plot(fx + 1, fy - 4, flagC);
+    }
+
+    // 3. 绘制 3D 光照迷你巨石与西西弗斯小人
+    const atSummit = smoothProg >= 0.95;
+    const bx = 24 + clamp(smoothProg, 0, 1) * 110;
+    const by = gy(bx) - 4.2;
+    const rPal =
+      curRealm === 'crt'
+        ? [hex('#c8ffd9'), hex('#3dff7a'), hex('#0c5a27')]
+        : curRealm === 'paper'
+          ? [hex('#fff2b2'), hex('#d4a756'), hex('#6e5832')]
+          : curRealm === 'amber'
+            ? [hex('#ffd59a'), hex('#d9944f'), hex('#7a3d22')]
+            : [hex('#f1f3f8'), hex('#9aa3b8'), hex('#454c63')];
+
+    const br = 3.8;
+    const angle = bx * 0.35;
+    for (let dy = -4; dy <= 4; dy++) {
+      for (let dx = -4; dx <= 4; dx++) {
+        if (dx * dx + dy * dy > br * br) continue;
+        const lum = (-dx * 0.5 - dy * 0.5 + Math.sqrt(Math.max(0, br * br - dx * dx - dy * dy)) * 0.7) / br;
+        const groove = Math.sin(dx * Math.cos(angle) + dy * Math.sin(angle)) > 0.75;
+        const c = groove ? rPal[0] : lum > 0.55 ? rPal[0] : lum > 0.15 ? rPal[1] : rPal[2];
+        plot(bx + dx, by + dy, c);
+      }
+    }
+
+    // 西西弗斯迷你像素角色（随滚动方向自动切换：推石上行 / 制动回看 / 驻足喘息 / 登顶振臂欢呼！）
+    const hx = atSummit ? bx - 6.5 : bx - 6.2;
+    const hy = gy(hx);
+    const hColor =
+      curRealm === 'crt'
+        ? hex('#3dff7a')
+        : curRealm === 'paper'
+          ? hex('#2a2833')
+          : curRealm === 'amber'
+            ? hex('#f2bb78')
+            : hex('#e9edf5');
+    const accColor =
+      curRealm === 'crt'
+        ? hex('#c8ffd9')
+        : curRealm === 'paper'
+          ? hex('#c8402a')
+          : curRealm === 'amber'
+            ? hex('#5ec8ff')
+            : hex('#f2b44f');
+
+    if (atSummit) {
+      // 登顶振臂高呼 + 峰顶奇观共鸣环
+      disc(hx, hy - 8, 1.6, hColor);
+      plot(hx, hy - 8, accColor);
+      stroke(hx, hy - 6, hx, hy - 3, hColor);
+      stroke(hx, hy - 3, hx - 1.5, hy - 1, hColor);
+      stroke(hx, hy - 3, hx + 1.5, hy - 1, hColor);
+      const wave = Math.sin(sec * 10) * 0.8;
+      stroke(hx, hy - 6, hx - 2.5, hy - 9 + wave, accColor);
+      stroke(hx, hy - 6, hx + 2.5, hy - 9 - wave, accColor);
+
+      // 峰顶圣殿扩散光环
+      for (let k = 0; k < 2; k++) {
+        const rr = ((sec * 14 + k * 8) % 18) + 3;
+        ring(146, gyi[146] - 7, rr, rr * 0.6, accColor, 1 - rr / 21);
+      }
+    } else {
+      const isPushing = scrollActiveTimer > 0 && scrollDir >= 0;
+      const isBracing = scrollActiveTimer > 0 && scrollDir < 0;
+      const lean = isPushing ? 2.2 : isBracing ? 0.8 : 1.3;
+      const hipX = hx;
+      const hipY = hy - 3.6;
+      const shX = hipX + lean;
+      const shY = hipY - 3.2;
+
+      // 双腿交替步态
+      const stride = isPushing || isBracing ? Math.sin(gait) * 1.8 : 0.9;
+      stroke(hipX, hipY, hipX + stride, hy - 1, hColor);
+      stroke(hipX, hipY, hipX - stride, hy - 1, hColor);
+      // 躯干与披风
+      stroke(hipX, hipY, shX, shY, hColor);
+      if (curRealm !== 'void') {
+        stroke(shX - 1, shY, hipX - 2.5 - (isPushing ? 1.5 : 0), hipY + 1 + Math.sin(sec * 9) * 0.6, accColor);
+      }
+      // 头部与抵石双臂
+      disc(shX + 0.8, shY - 1.6, 1.5, hColor);
+      plot(shX + 1.4, shY - 1.6, accColor);
+      stroke(shX, shY, bx - 3.2, by + 0.5, hColor);
+      stroke(shX, shY + 1, bx - 3.2, by + 1.5, accColor);
+    }
+
+    // 4. 更新与绘制脚底火花微粒
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const sp = sparks[i];
+      sp.life -= dt;
+      if (sp.life <= 0) {
+        sparks.splice(i, 1);
+        continue;
+      }
+      sp.x += sp.vx * dt;
+      sp.y += sp.vy * dt;
+      sp.vy += 28 * dt;
+      pdither(sp.x, sp.y, sp.c, sp.life * 2);
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+  };
+
+  let lastScrollY = window.scrollY;
   const updateAscent = () => {
     const docHeight = document.documentElement.scrollHeight - window.innerHeight;
     const raw = docHeight > 20 ? window.scrollY / docHeight : 1;
     const clamped = Math.max(0, Math.min(1, raw));
     const pct = Math.round(clamped * 100);
-    const filled = Math.round(clamped * 10);
     const atSummit = pct >= 95;
+    const curAlt = Math.round(clamped * peakAlt);
+
+    const dy = window.scrollY - lastScrollY;
+    lastScrollY = window.scrollY;
+    if (Math.abs(dy) > 2) {
+      scrollDir = dy > 0 ? 1 : -1;
+      scrollActiveTimer = 0.35;
+      if (sparks.length < 18) {
+        const bx = 24 + clamped * 110;
+        sparks.push({
+          x: bx - 6,
+          y: gy(bx - 6) - 1,
+          vx: (scrollDir > 0 ? -1 : 1) * (8 + Math.random() * 14),
+          vy: -6 - Math.random() * 10,
+          life: 0.45,
+          c: curRealm === 'crt' ? hex('#3dff7a') : hex('#f2b44f'),
+        });
+      }
+    }
+    targetProg = clamped;
 
     if (pctEl) pctEl.textContent = `${String(pct).padStart(3, '0')}%`;
-    if (barEl) barEl.textContent = `[${'▪'.repeat(filled)}${'▫'.repeat(10 - filled)}]`;
+    if (fillEl) fillEl.style.width = `${(clamped * 100).toFixed(1)}%`;
+    if (trackEl) trackEl.setAttribute('aria-valuenow', String(pct));
+    if (barEl) barEl.textContent = `${curAlt}m / ${peakAlt}m`;
+    if (altReadoutEl) altReadoutEl.textContent = `ALT ${curAlt}m / ${peakAlt}m`;
 
     if (atSummit) {
       grantReadingBoost();
     }
     if (rewardBadgeEl) {
-      rewardBadgeEl.textContent = summitRewarded ? '[+35m 助推 OK]' : '';
+      rewardBadgeEl.textContent = summitRewarded ? '[★ +35m 已助推]' : '[▲ 登顶 +35m]';
+      rewardBadgeEl.classList.toggle('is-unlocked', summitRewarded);
     }
 
     let currentTitle = '山麓起点';
@@ -219,14 +670,34 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
 
     if (statusTextEl) {
       statusTextEl.textContent = atSummit
-        ? '[OK] 已登顶完读'
-        : `|> ${currentTitle.slice(0, 12)}${currentTitle.length > 12 ? '…' : ''}`;
+        ? '|> [SUMMIT] 已登顶完读全文'
+        : `|> ${currentTitle}`;
+      statusTextEl.title = currentTitle;
     }
-
-    renderMiniClimber(clamped, atSummit);
+    if (miniSlopeEl) {
+      miniSlopeEl.textContent = `ALT ${curAlt}m / ${peakAlt}m (${pct}%) - ${currentTitle}`;
+    }
   };
 
+  computeHeadingFracs();
   updateAscent();
+  smoothProg = targetProg;
+
   window.addEventListener('scroll', updateAscent, { passive: true });
-  window.addEventListener('resize', updateAscent);
+  window.addEventListener('resize', () => {
+    computeHeadingFracs();
+    updateAscent();
+  });
+
+  let lastT = performance.now();
+  const tickMini = (now: number) => {
+    requestAnimationFrame(tickMini);
+    const dt = Math.min(0.1, Math.max(0.001, (now - lastT) / 1000));
+    lastT = now;
+    if (scrollActiveTimer > 0) scrollActiveTimer = Math.max(0, scrollActiveTimer - dt);
+    if (!document.hidden) {
+      renderMiniCanvas(now * 0.001, dt);
+    }
+  };
+  requestAnimationFrame(tickMini);
 </script>
